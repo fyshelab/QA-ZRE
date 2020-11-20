@@ -17,6 +17,10 @@ passages_df = pd.read_csv(
     escapechar='\\', 
     quoting=0
 )
-passages_df = passages_df[["id", "genreId", "gradeId", "text"]].to_csv(repo_root/'data/clean/passages.csv',encoding='utf8')
+
+# Seems like grae != 1 might already be filtered out
+passages_out_df = passages_df[passages_df["gradeId"]==1]
+
+passages_out_df = passages_df[["id", "genreId", "gradeId", "text"]].to_csv(repo_root/'data/clean/passages.csv',encoding='utf8')
 
 # %%
