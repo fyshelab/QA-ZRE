@@ -10,6 +10,7 @@ from io import StringIO
 from pathlib import Path
 
 repo_root = Path(__file__).parent.parent.parent
+output_dir = repo_root/'data/dreamscape-clean'
 #%% Generate clean passages.csv
 passages_df = pd.read_csv(
     repo_root/'data/dreamscape/passages.csv',
@@ -21,7 +22,7 @@ passages_df = pd.read_csv(
 
 passages_out_df = passages_df[passages_df["gradeId"]==1]
 
-passages_out_df[["id", "genreId", "gradeId", "text"]].to_csv(repo_root/'data/clean/passages.csv',encoding='utf8', index = False)
+passages_out_df[["id", "genreId", "gradeId", "text"]].to_csv(output_dir/'passages.csv',encoding='utf8', index = False)
 
 #%% Generate clean questions.csv
 questions_df = pd.read_csv(
@@ -35,7 +36,7 @@ questions_df = pd.read_csv(
 questions_out_df = questions_df[questions_df["questionTypeId"]==1]
 questions_out_df = questions_out_df[questions_df['passageId'].isin(passages_out_df["id"])]
 
-questions_out_df[["id", "passageId", "questionTypeId", "question", "potentialAnswers", "correctAnswers"]].to_csv(repo_root/'data/clean/questions.csv',encoding='utf8', index = False)
+questions_out_df[["id", "passageId", "questionTypeId", "question", "potentialAnswers", "correctAnswers"]].to_csv(output_dir/'questions.csv',encoding='utf8', index = False)
 #%% Join dfs and parse json data
 join_df = passages_out_df.merge(questions_out_df,left_on="id",right_on="passageId")
 
@@ -60,7 +61,7 @@ for group_name, group_df in groups:
         "questions_answers": list(group_df[["question", "correctAnswers", "wrongAnswers"]].to_dict('records')),
     })
 
-with open(repo_root/'data/clean/passages_questions_answers.json','w') as out_file:
+with open(output_dir/'passages_questions_answers.json','w') as out_file:
     out_file.write(json.dumps(final_json_out))
 
 
