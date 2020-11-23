@@ -9,6 +9,7 @@
 # This will not work for all types of quesitons. For example if you want fill in the blank 
 # questions you need to phrase differently
 # It seems to do best with information extraction questions
+# Any GPT-2 model smaller than medium does not work very well (large works best)
 
 import json
 import requests
