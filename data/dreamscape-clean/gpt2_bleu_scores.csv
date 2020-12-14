@@ -1,0 +1,2103 @@
+passage_id,passage_text,question_text,correct_answer,gpt2_answer,bleu_score
+1,"""Oh no, my wife is coming!” Zeus whispered to Io. ""Quick, I’ll turn you into a cow!”
+",Zeus turned lo into ______.,A cow.,"Yes, he did.",0.0
+1,"""Oh no, my wife is coming!” Zeus whispered to Io. ""Quick, I’ll turn you into a cow!”
+",Zeus turned lo into ______.,A cow.,‪Io‪ was a cow.,0.31947155212313627
+1,"""Oh no, my wife is coming!” Zeus whispered to Io. ""Quick, I’ll turn you into a cow!”
+","What does the word ""whispered"" mean?",To speak softly and quietly.,"It means ""to whisper"" or ""to whisper something to someone.""",0.041961149062965476
+1,"""Oh no, my wife is coming!” Zeus whispered to Io. ""Quick, I’ll turn you into a cow!”
+",Which question could NOT be answered by reading this passage?,What is Zeus' wife's name?,"""Which question could NOT be answered by reading this passage?""",0.0
+1,"""Oh no, my wife is coming!” Zeus whispered to Io. ""Quick, I’ll turn you into a cow!”
+",What happens to lo?,Io is turned into a cow.,Lo is turned into a cow.,0.7598356856515925
+2,"The book’s pages fluttered, and then it spoke in a deep voice. ""Read me!” it boomed.
+",What is the most likely genre of this story?,Fantasy,Fantasy.,0.3535533905932738
+2,"The book’s pages fluttered, and then it spoke in a deep voice. ""Read me!” it boomed.
+","What does the word ""boomed"" mean here?",Spoke in a loud voice,It means,0.0
+2,"The book’s pages fluttered, and then it spoke in a deep voice. ""Read me!” it boomed.
+",Why did the book's pages flutter?,Because the book was trying to get someone's attention.,Because it was a book.,0.0631690612820213
+2,"The book’s pages fluttered, and then it spoke in a deep voice. ""Read me!” it boomed.
+",What does the book want?,To be read,To be read.,0.8408964152537145
+3,"Philip looked at the others with wide eyes. ""We have to get out of here!” he screamed.
+","What does it mean that Philip looked at the others with ""wide eyes""?",His eyelids were open very far.,It means that he is not sure what to do.,0.0
+3,"Philip looked at the others with wide eyes. ""We have to get out of here!” he screamed.
+","Which word is an antonym for ""screamed""?",Whispered,"""Screamed"" is an antonym for ""screamed.""",0.0
+3,"Philip looked at the others with wide eyes. ""We have to get out of here!” he screamed.
+",The mood of this passage is ________.,Scary,The mood of this passage is ________.,0.0
+3,"Philip looked at the others with wide eyes. ""We have to get out of here!” he screamed.
+",What question might the reader of this story ask themselves?,What did Philip see that scared him so much?,What is the meaning of life?,0.049230261240159306
+3,"Philip looked at the others with wide eyes. ""We have to get out of here!” he screamed.
+",Which question would the reader NOT be likely to ask after reading this passage?,Does Philip have a loud voice?,"""Why did you leave?""",0.0
+4,"Zeus was angry. In his rage he threw a lightning bolt down to Earth. The dark sky flashed white. The humans looked up in fear.
+",Who is Zeus most likely angry with?,The humans.,The humans.,0.5946035575013605
+4,"Zeus was angry. In his rage he threw a lightning bolt down to Earth. The dark sky flashed white. The humans looked up in fear.
+","Which of Zeus' actions creates the mood of ""danger""?",Zeus threw a lighning bolt down to Earth.,The lightning bolt is the first action of the story.,0.041961149062965476
+4,"Zeus was angry. In his rage he threw a lightning bolt down to Earth. The dark sky flashed white. The humans looked up in fear.
+",What is the mood of this passage?,Endangerment,The mood is very dark.,0.0
+4,"Zeus was angry. In his rage he threw a lightning bolt down to Earth. The dark sky flashed white. The humans looked up in fear.
+",Which question would be most helpful for a reader to ask themselves when reading this passage?,What does it feel like to be angry?,"""What",0.0003223989607426581
+4,"Zeus was angry. In his rage he threw a lightning bolt down to Earth. The dark sky flashed white. The humans looked up in fear.
+",What question would a good reader be wondering after reading this passage?,Why was Zeus angry?,"What is the meaning of the word ""God""?",0.0
+262,"The elf fell out of the tree. ""I make toys. Climbing is not my strong suit.” he squeaked.
+","Based on this passage, what do you think the elf likes to do?",Make toys.,He likes to climb.,0.0
+262,"The elf fell out of the tree. ""I make toys. Climbing is not my strong suit.” he squeaked.
+",Which description does NOT apply to the elf?,Likes climbing trees.,"""I make toys.",0.0
+262,"The elf fell out of the tree. ""I make toys. Climbing is not my strong suit.” he squeaked.
+",Where does this story most likely take place?,In a forest,It's a fantasy world.,0.15973577606156814
+262,"The elf fell out of the tree. ""I make toys. Climbing is not my strong suit.” he squeaked.
+",What is the meaning of the word “squeak” as it is used in this passage?,A high pitched voice.,It is a word that is used to describe a person who is squeaky.,0.028398387225677897
+262,"The elf fell out of the tree. ""I make toys. Climbing is not my strong suit.” he squeaked.
+",Where was the elf BEFORE he spoke?,In the tree.,He was in the tree.,0.3976353643835253
+265,"""What do we do now?” Marcia asked Cody.
+
+""Now we wait for the thief to fall into our trap!” Cody replied.
+",What were Marcia and Cody doing?,Setting a trap to catch the thief.,They were waiting for the thief to fall into their trap.,0.08913765521398126
+265,"""What do we do now?” Marcia asked Cody.
+
+""Now we wait for the thief to fall into our trap!” Cody replied.
+",True or False: Cody was trying to catch the thief alone.,False,True.,0.0
+265,"""What do we do now?” Marcia asked Cody.
+
+""Now we wait for the thief to fall into our trap!” Cody replied.
+",How would Marcia and Cody know if their plan worked?,The thief would be caught in their trap.,They would have to be able to see the thief's face.,0.04932351569489709
+265,"""What do we do now?” Marcia asked Cody.
+
+""Now we wait for the thief to fall into our trap!” Cody replied.
+","Based on the passage, who most likely created the idea of trapping the thief?",Cody,It was probably the thief himself.,0.0
+265,"""What do we do now?” Marcia asked Cody.
+
+""Now we wait for the thief to fall into our trap!” Cody replied.
+",Why do you think Marcia and Cody wanted to trap the thief?,Because the thief had stolen something.,Because they wanted to get rid of the thief.,0.10552670315936319
+265,"""What do we do now?” Marcia asked Cody.
+
+""Now we wait for the thief to fall into our trap!” Cody replied.
+","Based on the title, what do you think this story is most focused on?",A trap,I think it's about a thief who is trying to steal a treasure from a castle.,0.024455939372403618
+265,"""What do we do now?” Marcia asked Cody.
+
+""Now we wait for the thief to fall into our trap!” Cody replied.
+",How do you think Marcia feels in this passage?,Anxious,She is very happy.,0.0
+271,"The great oak tree looked down at the small wizard in his pointy hat. ""You have got to be kidding me!” it said. ""No tree in their right root would agree to that!”
+",What most likely happened between the oak tree and wizard right before this moment?,The wizard asked the oak tree for a crazy favor.,The wizard was trying to get the tree to agree to the plan.,0.07347053125977877
+271,"The great oak tree looked down at the small wizard in his pointy hat. ""You have got to be kidding me!” it said. ""No tree in their right root would agree to that!”
+","Reread this sentence: ""No tree in their right root would agree to that!"" The term ""right root"" is a joke based on which common saying?",Right mind,"""No tree in their right root would agree to that!""",0.041961149062965476
+271,"The great oak tree looked down at the small wizard in his pointy hat. ""You have got to be kidding me!” it said. ""No tree in their right root would agree to that!”
+",What does the tree mean when it says “you have got to be kidding me!”?,I think you are joking.,It means that the tree is a wizard.,0.0
+271,"The great oak tree looked down at the small wizard in his pointy hat. ""You have got to be kidding me!” it said. ""No tree in their right root would agree to that!”
+","Reread this phrase: ""No tree in their right root!"" Which of the following phrases is that line most likely based on?","""No one in their right mind!""","""No tree in their right root""",0.32466791547509893
+271,"The great oak tree looked down at the small wizard in his pointy hat. ""You have got to be kidding me!” it said. ""No tree in their right root would agree to that!”
+","The title of this passage contains the word ""disdainful"". Based on the passage, what do you think the word ""disdainful"" means?",Showing a lack of respect,"I think it means ""disgusting"".",0.0
+271,"The great oak tree looked down at the small wizard in his pointy hat. ""You have got to be kidding me!” it said. ""No tree in their right root would agree to that!”
+","Choose the correct word to finish this sentence from the passage: ""The great oak tree looked down at the small wizard in his pointy _____.""",Hat,"""The great oak tree looked down at the small wizard in his pointy",0.0
+271,"The great oak tree looked down at the small wizard in his pointy hat. ""You have got to be kidding me!” it said. ""No tree in their right root would agree to that!”
+",What is the most likely setting for this passage?,A forest,The Great Oak Tree.,0.0
+271,"The great oak tree looked down at the small wizard in his pointy hat. ""You have got to be kidding me!” it said. ""No tree in their right root would agree to that!”
+",What do you think happened in the story right before this scene?,The wizard offered the tree a deal.,I think the wizard was trying to get the tree to agree to the plan.,0.07432998184513635
+273,"Suddenly the broom came to life! 
+
+""I’m alive!” the broom shouted with glee. ""But...um...so...what do I do now?”
+","What is the purpose of the ellipses (...) in the sentence, ""'But...um...so...what do I do now?'""?",To show that the broom is uncertain and unsure.,The ellipses are used to indicate that the sentence is a question.,0.08054496384843701
+273,"Suddenly the broom came to life! 
+
+""I’m alive!” the broom shouted with glee. ""But...um...so...what do I do now?”
+",How does the broom feel about coming to life?,"First he feels gleeful, then he feels a bit uncertain.",It's,0.0
+273,"Suddenly the broom came to life! 
+
+""I’m alive!” the broom shouted with glee. ""But...um...so...what do I do now?”
+",What is the genre of this passage?,Fantasy,It's a short story.,0.0
+273,"Suddenly the broom came to life! 
+
+""I’m alive!” the broom shouted with glee. ""But...um...so...what do I do now?”
+","What aspects of this passage make it ""fantasy""?",Both B and C.,"The broom is a magical creature, and the ""fantasy"" is that it is a",0.028398387225677897
+273,"Suddenly the broom came to life! 
+
+""I’m alive!” the broom shouted with glee. ""But...um...so...what do I do now?”
+",Which of the titles could also work for this passage?,The Talking Broom,"""The Great and Powerful Magician""",0.10682175159905853
+273,"Suddenly the broom came to life! 
+
+""I’m alive!” the broom shouted with glee. ""But...um...so...what do I do now?”
+",Why did the author most likely write this passage?,To entertain readers with a tale about a household object that comes to life.,The author was trying to make the reader sympathize with the character.,0.03408991996483855
+273,"Suddenly the broom came to life! 
+
+""I’m alive!” the broom shouted with glee. ""But...um...so...what do I do now?”
+","Which of the following author's craft techniques were used to create an exciting, fast-moving mood in the passage?",Both A and B.,The author,0.0
+288,"The little girl looked up at the big rock. The big rock just sat there.
+
+""How am I ever going to make a rock sing?” she asked it. But the rock didn’t answer. The big rock just sat there.
+
+The little girl tried singing to the rock. She tried humming near the rock. She got two sticks and played drums on the rock. She got mad and kicked the rock! But no matter what she tried, the rock did not sing. Like always, the big rock just sat there.
+",What happened first in the story?,The little girl looked up at the big rock.,The little girl was trying to sing to the rock.,0.17747405280050263
+288,"The little girl looked up at the big rock. The big rock just sat there.
+
+""How am I ever going to make a rock sing?” she asked it. But the rock didn’t answer. The big rock just sat there.
+
+The little girl tried singing to the rock. She tried humming near the rock. She got two sticks and played drums on the rock. She got mad and kicked the rock! But no matter what she tried, the rock did not sing. Like always, the big rock just sat there.
+",The little girl DID NOT _________.,Sit on the rock,The little girl DID NOT _________.,0.08116697886877472
+288,"The little girl looked up at the big rock. The big rock just sat there.
+
+""How am I ever going to make a rock sing?” she asked it. But the rock didn’t answer. The big rock just sat there.
+
+The little girl tried singing to the rock. She tried humming near the rock. She got two sticks and played drums on the rock. She got mad and kicked the rock! But no matter what she tried, the rock did not sing. Like always, the big rock just sat there.
+",What did the little girl want the rock to do?,Sing,She wanted the rock to sing.,0.08116697886877472
+288,"The little girl looked up at the big rock. The big rock just sat there.
+
+""How am I ever going to make a rock sing?” she asked it. But the rock didn’t answer. The big rock just sat there.
+
+The little girl tried singing to the rock. She tried humming near the rock. She got two sticks and played drums on the rock. She got mad and kicked the rock! But no matter what she tried, the rock did not sing. Like always, the big rock just sat there.
+",Which kind of story is this?,Fable,It is a story about a little girl who wants to,0.0
+288,"The little girl looked up at the big rock. The big rock just sat there.
+
+""How am I ever going to make a rock sing?” she asked it. But the rock didn’t answer. The big rock just sat there.
+
+The little girl tried singing to the rock. She tried humming near the rock. She got two sticks and played drums on the rock. She got mad and kicked the rock! But no matter what she tried, the rock did not sing. Like always, the big rock just sat there.
+",What happened first in the story?,The little girl looked up at the big rock.,The little girl was trying to sing to the rock.,0.17747405280050263
+288,"The little girl looked up at the big rock. The big rock just sat there.
+
+""How am I ever going to make a rock sing?” she asked it. But the rock didn’t answer. The big rock just sat there.
+
+The little girl tried singing to the rock. She tried humming near the rock. She got two sticks and played drums on the rock. She got mad and kicked the rock! But no matter what she tried, the rock did not sing. Like always, the big rock just sat there.
+",What is the same about the end of each part of the story?,"They all end with ""the big rock just sat there.""",The end of each part of the story is the same,0.044568827606990644
+288,"The little girl looked up at the big rock. The big rock just sat there.
+
+""How am I ever going to make a rock sing?” she asked it. But the rock didn’t answer. The big rock just sat there.
+
+The little girl tried singing to the rock. She tried humming near the rock. She got two sticks and played drums on the rock. She got mad and kicked the rock! But no matter what she tried, the rock did not sing. Like always, the big rock just sat there.
+",Why did the author most likely write this passage?,To entertain us.,Because it is a perfect example of the author's lack,0.0
+288,"The little girl looked up at the big rock. The big rock just sat there.
+
+""How am I ever going to make a rock sing?” she asked it. But the rock didn’t answer. The big rock just sat there.
+
+The little girl tried singing to the rock. She tried humming near the rock. She got two sticks and played drums on the rock. She got mad and kicked the rock! But no matter what she tried, the rock did not sing. Like always, the big rock just sat there.
+",How did the little girl feel at the end of the story?,Mad,She was so happy.,0.0
+295,"Marcie pulled her shoebox out from under the bed. It was blue and orange with her name on it. It was the box she kept all her secrets in. She lifted off the lid. 
+	She had been away at camp all summer. She had to make sure that all her secrets were still safe.
+	She took each object out, one at a time. 
+	Notebook? Check! 
+	Photos? Check! 
+	Mood ring? Check! 
+	Letter from her alien pen-pal? Not check! It was gone!
+",What is a “pen-pal”?,Friends who exchange letters but don't live in the same place.,A pen-pal.,0.0
+295,"Marcie pulled her shoebox out from under the bed. It was blue and orange with her name on it. It was the box she kept all her secrets in. She lifted off the lid. 
+	She had been away at camp all summer. She had to make sure that all her secrets were still safe.
+	She took each object out, one at a time. 
+	Notebook? Check! 
+	Photos? Check! 
+	Mood ring? Check! 
+	Letter from her alien pen-pal? Not check! It was gone!
+",Which description of Marcie’s secrets box is NOT correct? ,It was blue and red.,"The one that says ""I have a secret box that",0.0
+295,"Marcie pulled her shoebox out from under the bed. It was blue and orange with her name on it. It was the box she kept all her secrets in. She lifted off the lid. 
+	She had been away at camp all summer. She had to make sure that all her secrets were still safe.
+	She took each object out, one at a time. 
+	Notebook? Check! 
+	Photos? Check! 
+	Mood ring? Check! 
+	Letter from her alien pen-pal? Not check! It was gone!
+",True or false: Marcie's mood ring was missing.,False,False.,0.3535533905932738
+355,"I have a pet bunny. He lives in a cage. I take bunny outside. Bunny hops into the garden. Hop. Hop. Hop.
+
+“I am hungry,” says bunny. 
+
+Bunny eats a stick. Crunch. Crunch. Crunch.
+
+“Sticks are not bunny food,” I say.
+
+Bunny eats a flower. Munch. Munch. Munch.
+
+“Flowers are not bunny food,” I say.
+
+Bunny eats a tomato. Chomp. Chomp. Chomp.
+
+“Tomatoes are not bunny food,” I say.
+
+I pick a carrot from the garden.
+
+“Now that is a good lunch,” says bunny. 
+
+
+",Where does bunny live?,In a cage,In a cage.,0.8408964152537145
+355,"I have a pet bunny. He lives in a cage. I take bunny outside. Bunny hops into the garden. Hop. Hop. Hop.
+
+“I am hungry,” says bunny. 
+
+Bunny eats a stick. Crunch. Crunch. Crunch.
+
+“Sticks are not bunny food,” I say.
+
+Bunny eats a flower. Munch. Munch. Munch.
+
+“Flowers are not bunny food,” I say.
+
+Bunny eats a tomato. Chomp. Chomp. Chomp.
+
+“Tomatoes are not bunny food,” I say.
+
+I pick a carrot from the garden.
+
+“Now that is a good lunch,” says bunny. 
+
+
+",What is a good lunch for bunny?,Carrots,A carrot.,0.0
+355,"I have a pet bunny. He lives in a cage. I take bunny outside. Bunny hops into the garden. Hop. Hop. Hop.
+
+“I am hungry,” says bunny. 
+
+Bunny eats a stick. Crunch. Crunch. Crunch.
+
+“Sticks are not bunny food,” I say.
+
+Bunny eats a flower. Munch. Munch. Munch.
+
+“Flowers are not bunny food,” I say.
+
+Bunny eats a tomato. Chomp. Chomp. Chomp.
+
+“Tomatoes are not bunny food,” I say.
+
+I pick a carrot from the garden.
+
+“Now that is a good lunch,” says bunny. 
+
+
+",How does the author create a rhythm through the story?,By repeating a word three times at the end of every second line.,The rhythm is created by the author.,0.03314288201886802
+355,"I have a pet bunny. He lives in a cage. I take bunny outside. Bunny hops into the garden. Hop. Hop. Hop.
+
+“I am hungry,” says bunny. 
+
+Bunny eats a stick. Crunch. Crunch. Crunch.
+
+“Sticks are not bunny food,” I say.
+
+Bunny eats a flower. Munch. Munch. Munch.
+
+“Flowers are not bunny food,” I say.
+
+Bunny eats a tomato. Chomp. Chomp. Chomp.
+
+“Tomatoes are not bunny food,” I say.
+
+I pick a carrot from the garden.
+
+“Now that is a good lunch,” says bunny. 
+
+
+","If bunny was given a stick, a flower, a tomato, and a carrot all side by side, which do you think he would choose to eat?",The carrot,I think he would choose the carrot.,0.13134549472120793
+355,"I have a pet bunny. He lives in a cage. I take bunny outside. Bunny hops into the garden. Hop. Hop. Hop.
+
+“I am hungry,” says bunny. 
+
+Bunny eats a stick. Crunch. Crunch. Crunch.
+
+“Sticks are not bunny food,” I say.
+
+Bunny eats a flower. Munch. Munch. Munch.
+
+“Flowers are not bunny food,” I say.
+
+Bunny eats a tomato. Chomp. Chomp. Chomp.
+
+“Tomatoes are not bunny food,” I say.
+
+I pick a carrot from the garden.
+
+“Now that is a good lunch,” says bunny. 
+
+
+","Why does the author use the words ""crunch,"" ""munch,"" and ""chomp""?",To show the sounds of bunny eating.,"The words ""crunch,"" ""m",0.07545383788761363
+357,"At the playground I can be a lot of things. 
+	I can walk like a bear. 
+	I can run like a cheetah. 
+	I can jump like a kangaroo.
+ 	I can swing like a monkey. 
+	I can hop like a bunny. 
+	I can slide like a snake. 
+	I can gallop like a horse. 
+	At the playground I can be a lot of things. At the playground I can have fun!
+","Which word was at the end of this line: ""Hop like a _______.""",Bunny,"""Hop like a _______.""",0.0
+357,"At the playground I can be a lot of things. 
+	I can walk like a bear. 
+	I can run like a cheetah. 
+	I can jump like a kangaroo.
+ 	I can swing like a monkey. 
+	I can hop like a bunny. 
+	I can slide like a snake. 
+	I can gallop like a horse. 
+	At the playground I can be a lot of things. At the playground I can have fun!
+",Which animal is in the story?,Snake,The dog.,0.0
+357,"At the playground I can be a lot of things. 
+	I can walk like a bear. 
+	I can run like a cheetah. 
+	I can jump like a kangaroo.
+ 	I can swing like a monkey. 
+	I can hop like a bunny. 
+	I can slide like a snake. 
+	I can gallop like a horse. 
+	At the playground I can be a lot of things. At the playground I can have fun!
+",Which of these words from the story has 3 syllables (beats)?,Kangaroo,I can be a bear.,0.0
+357,"At the playground I can be a lot of things. 
+	I can walk like a bear. 
+	I can run like a cheetah. 
+	I can jump like a kangaroo.
+ 	I can swing like a monkey. 
+	I can hop like a bunny. 
+	I can slide like a snake. 
+	I can gallop like a horse. 
+	At the playground I can be a lot of things. At the playground I can have fun!
+",Most of the animals in the story are zoo animals. Which of the animals below would NOT be in this group?,"Cows, pigs, horses","The elephant, the giraffe, the giraffe,",0.0
+357,"At the playground I can be a lot of things. 
+	I can walk like a bear. 
+	I can run like a cheetah. 
+	I can jump like a kangaroo.
+ 	I can swing like a monkey. 
+	I can hop like a bunny. 
+	I can slide like a snake. 
+	I can gallop like a horse. 
+	At the playground I can be a lot of things. At the playground I can have fun!
+",Where is the child playing?,Playground,At the playground.,0.2259005009024612
+357,"At the playground I can be a lot of things. 
+	I can walk like a bear. 
+	I can run like a cheetah. 
+	I can jump like a kangaroo.
+ 	I can swing like a monkey. 
+	I can hop like a bunny. 
+	I can slide like a snake. 
+	I can gallop like a horse. 
+	At the playground I can be a lot of things. At the playground I can have fun!
+",How does the main character have fun at the playground?,Pretending to be different animals.,He has fun at the playground.,0.0
+357,"At the playground I can be a lot of things. 
+	I can walk like a bear. 
+	I can run like a cheetah. 
+	I can jump like a kangaroo.
+ 	I can swing like a monkey. 
+	I can hop like a bunny. 
+	I can slide like a snake. 
+	I can gallop like a horse. 
+	At the playground I can be a lot of things. At the playground I can have fun!
+",The child in the story is having: _________.,Fun,_________.,0.0
+357,"At the playground I can be a lot of things. 
+	I can walk like a bear. 
+	I can run like a cheetah. 
+	I can jump like a kangaroo.
+ 	I can swing like a monkey. 
+	I can hop like a bunny. 
+	I can slide like a snake. 
+	I can gallop like a horse. 
+	At the playground I can be a lot of things. At the playground I can have fun!
+",Why do you think the author most likely wrote this story?,To entertain you with a story about a kid at the park.,I think it's because he was a child.,0.0334950357084578
+357,"At the playground I can be a lot of things. 
+	I can walk like a bear. 
+	I can run like a cheetah. 
+	I can jump like a kangaroo.
+ 	I can swing like a monkey. 
+	I can hop like a bunny. 
+	I can slide like a snake. 
+	I can gallop like a horse. 
+	At the playground I can be a lot of things. At the playground I can have fun!
+",Which of these things would someone NOT do at the playground?,Wash the car.,I don't know.,0.0
+833,"She splashed up the river. She looked this way and that. 
+	""Is anyone there?"" she called.
+",What is the main character's name?,It is impossible to know,"""I don't know.",0.11598118436136108
+833,"She splashed up the river. She looked this way and that. 
+	""Is anyone there?"" she called.
+",What is the setting of this scene?,A river,The setting is the city of New York.,0.0
+833,"She splashed up the river. She looked this way and that. 
+	""Is anyone there?"" she called.
+",What is the girl/woman in the story doing?,Looking for someone,She is a young woman who is trying to get to the other side of the river.,0.0
+833,"She splashed up the river. She looked this way and that. 
+	""Is anyone there?"" she called.
+","What does the word ""splash"" describe about the water?",The sound of the water,It's a splash.,0.0
+833,"She splashed up the river. She looked this way and that. 
+	""Is anyone there?"" she called.
+","What does it mean that she ""looked this way and that""?","She looked to the left, and to the right.",It means that she was looking for someone.,0.04873498938813619
+836,"""Where?s the light switch in here?? Ted asked.
+""There are none!? came an angry voice. ""This is a cave. MY cave, in fact.?
+",How many characters are in this scene?,2,There are four.,0.0
+836,"""Where?s the light switch in here?? Ted asked.
+""There are none!? came an angry voice. ""This is a cave. MY cave, in fact.?
+",Where does this scene take place?,A cave,In the cave.,0.2259005009024612
+836,"""Where?s the light switch in here?? Ted asked.
+""There are none!? came an angry voice. ""This is a cave. MY cave, in fact.?
+",Why do you think the voice is angry?,Because Ted is in their cave.,Because I'm a caveman.,0.0968846456343324
+836,"""Where?s the light switch in here?? Ted asked.
+""There are none!? came an angry voice. ""This is a cave. MY cave, in fact.?
+","Why is the word ""MY"" in capital letters?",To show that the character is saying it loudly.,Because it's the name of the cave.,0.04935157841536379
+837,"The trees shook. The ground rumbled. Sal spun around. 
+	""STAMPEDE!? she yelled.
+",Who is the main character of this story?,Sal,The main character is a girl named Sal.,0.05522397783539471
+837,"The trees shook. The ground rumbled. Sal spun around. 
+	""STAMPEDE!? she yelled.
+",Why did the trees shake and the ground rumble?,Because the stampede was coming.,Because the ground was moving.,0.23643540225079396
+837,"The trees shook. The ground rumbled. Sal spun around. 
+	""STAMPEDE!? she yelled.
+","What is a ""stampede""?",A group of animals all running together,A stampede is a stampede of people.,0.07809849842300641
+840,"Sam saw the lion through the grass. And the lion saw Sam.
+",Sam and the lion were probably ______________.,crouching low to the ground,Yes.,0.0
+840,"Sam saw the lion through the grass. And the lion saw Sam.
+",What will most likely happen next?,The lion will attack Sam.,The lion will kill Sam.,0.42728700639623407
+840,"Sam saw the lion through the grass. And the lion saw Sam.
+",Which word pairs start with the same sound?,Sam saw,"The word ""s"" and the word ""r"" are the same sound.",0.0
+840,"Sam saw the lion through the grass. And the lion saw Sam.
+",How do the first two words of this passage match the last two words?,"They are exactly the same, in reverse order.",The first two words are the same.,0.12600736402830257
+841,"	""The map says left"", said Bri.
+	""But my heart says right!"" cried Rob.
+	""Is your heart full of hidden treasure?"" asked Bri.
+	""Yes."" Rob replied. ""At least, that's what my mom says.""
+","What does Rob mean by ""my heart says right""?","He believes they should go right, not left.",He means that his heart is telling him that he should go to the right place.,0.05816635421147516
+841,"	""The map says left"", said Bri.
+	""But my heart says right!"" cried Rob.
+	""Is your heart full of hidden treasure?"" asked Bri.
+	""Yes."" Rob replied. ""At least, that's what my mom says.""
+",Where is the map leading them?,To hidden treasure,To the treasure.,0.2686424829558855
+841,"	""The map says left"", said Bri.
+	""But my heart says right!"" cried Rob.
+	""Is your heart full of hidden treasure?"" asked Bri.
+	""Yes."" Rob replied. ""At least, that's what my mom says.""
+","Why are some sentences inside of quotation marks ("")?",To show that a character is speaking.,Because they are not part of the sentence.,0.0
+841,"	""The map says left"", said Bri.
+	""But my heart says right!"" cried Rob.
+	""Is your heart full of hidden treasure?"" asked Bri.
+	""Yes."" Rob replied. ""At least, that's what my mom says.""
+",What does Rob's mom say?,The Rob's heart is full of hidden treasure.,"""I'm not sure.",0.0
+844,"Beth peeked through the crack in the door. A group of people stood on the ship's deck. Some had big hats. Some had pet parrots. Some had peg legs. 
+	""Pirates!""
+
+
+","Who do you think is saying ""Pirates!""?",Beth,I don't know.,0.0
+844,"Beth peeked through the crack in the door. A group of people stood on the ship's deck. Some had big hats. Some had pet parrots. Some had peg legs. 
+	""Pirates!""
+
+
+",Why is Beth most likely looking through a crack in the door?,Because she is hiding.,Because she's a pirate.,0.15973577606156814
+844,"Beth peeked through the crack in the door. A group of people stood on the ship's deck. Some had big hats. Some had pet parrots. Some had peg legs. 
+	""Pirates!""
+
+
+",Where is Beth?,On a pirate ship,She's in the back of the ship.,0.06567274736060397
+846,"""Where do I look for clues?"" Jen thought. ""In a tree? In the closet? Under my bed? I don't even know where the crime scene is!""
+",True or False: Jen knows where the crime scene is.,False,False.,0.3535533905932738
+846,"""Where do I look for clues?"" Jen thought. ""In a tree? In the closet? Under my bed? I don't even know where the crime scene is!""
+",What does Jen want to do?,Solve a crime.,She wants to find out what happened to her.,0.0
+846,"""Where do I look for clues?"" Jen thought. ""In a tree? In the closet? Under my bed? I don't even know where the crime scene is!""
+",Which of the following sentences is NOT a question?,"""I don't even know where the crime scene is!""","""Where",0.00011860394951226284
+846,"""Where do I look for clues?"" Jen thought. ""In a tree? In the closet? Under my bed? I don't even know where the crime scene is!""
+","What is a ""crime scene""?",The place where a crime happened.,A crime scene is a place where a crime occurred.,0.2626909894424158
+848,"The footprints led down the path. They led around the corner. They led up the steps. 
+	Silas put his hand on the door. ""Thief!"" he cried. ""I?ve got you now!""
+",What was Silas doing?,Following a trail of footprints.,He was trying to get the thief to open the door.,0.0
+848,"The footprints led down the path. They led around the corner. They led up the steps. 
+	Silas put his hand on the door. ""Thief!"" he cried. ""I?ve got you now!""
+",Whose footprints was Silas following?,A thief's,The footprints of the thief.,0.0
+848,"The footprints led down the path. They led around the corner. They led up the steps. 
+	Silas put his hand on the door. ""Thief!"" he cried. ""I?ve got you now!""
+",Which action happened first?,The thief walked by.,The thief ran.,0.32372956394183194
+848,"The footprints led down the path. They led around the corner. They led up the steps. 
+	Silas put his hand on the door. ""Thief!"" he cried. ""I?ve got you now!""
+",What does Silas want to do?,Catch the thief.,He wants to kill the thief.,0.16233395773754944
+849,"Gabby swam along the ocean floor. All was dark and silent. She stared into shadows. She looked under rocks. 
+	At last she saw it. The golden ring!
+",What was Gabby doing?,Looking for a golden ring,She was swimming.,0.0
+849,"Gabby swam along the ocean floor. All was dark and silent. She stared into shadows. She looked under rocks. 
+	At last she saw it. The golden ring!
+",Where does this story take place?,Underwater,The story takes place in the year 20XX.,0.0
+849,"Gabby swam along the ocean floor. All was dark and silent. She stared into shadows. She looked under rocks. 
+	At last she saw it. The golden ring!
+","Which sentence could best replace: ""All was dark and silent"" in the story?","""All was dim and quiet.""","""All was dark and silent"" is the best sentence.",0.10552670315936319
+849,"Gabby swam along the ocean floor. All was dark and silent. She stared into shadows. She looked under rocks. 
+	At last she saw it. The golden ring!
+","Reread the sentence: ""At last she saw it."" What does the word ""it"" stand in for here?",The ring,It stands for the ring.,0.21364350319811704
+851,"Levi held his breath. They crept down the hall. They reached the drawer. He reached out his hand? But David tripped! The flashlight flew out of his hand! It spun in the air! Then it hit the floor with a loud CRASH!
+",What do you think most likely happens next in the story?,Other people hear the loud noise and come find Levi and David.,The flashlight is still spinning in the air.,0.0334950357084578
+851,"Levi held his breath. They crept down the hall. They reached the drawer. He reached out his hand? But David tripped! The flashlight flew out of his hand! It spun in the air! Then it hit the floor with a loud CRASH!
+","Which sense does the word ""CRASH"" relate to?",Sound,"The sense of ""crash"" is the sense of ""crash"" that",0.0
+851,"Levi held his breath. They crept down the hall. They reached the drawer. He reached out his hand? But David tripped! The flashlight flew out of his hand! It spun in the air! Then it hit the floor with a loud CRASH!
+","Why is the word ""CRASH"" written all in uppercase letters?",To show that the sound was really loud.,Because it's a good way to identify the flashlight.,0.05669791110976
+851,"Levi held his breath. They crept down the hall. They reached the drawer. He reached out his hand? But David tripped! The flashlight flew out of his hand! It spun in the air! Then it hit the floor with a loud CRASH!
+",Which character tripped and dropped the flashlight?,David,David.,0.3535533905932738
+852,"Arra glared at Ms. Lim. Ms. Lim glared at Arra. Arra kept her lips shut tight so no secrets would fall out.
+	""Arra, do you have something to tell me?""
+	""No.?
+	""Do you know where Spot is?""
+	""No.?
+	""Are you sure, Arra?""
+	""No. I mean, yes!""
+","What does this sentence mean? ""Arra kept her lips shut tight so no secrets would fall out.""",Arra was trying not to tell any secrets by mistake.,Arra kept her lips shut tight so no secrets would fall out,0.040272481924218506
+852,"Arra glared at Ms. Lim. Ms. Lim glared at Arra. Arra kept her lips shut tight so no secrets would fall out.
+	""Arra, do you have something to tell me?""
+	""No.?
+	""Do you know where Spot is?""
+	""No.?
+	""Are you sure, Arra?""
+	""No. I mean, yes!""
+",What secret is Arra keeping from Ms. Lim?,That she knows where Spot is.,She's keeping it from herself.,0.0
+852,"Arra glared at Ms. Lim. Ms. Lim glared at Arra. Arra kept her lips shut tight so no secrets would fall out.
+	""Arra, do you have something to tell me?""
+	""No.?
+	""Do you know where Spot is?""
+	""No.?
+	""Are you sure, Arra?""
+	""No. I mean, yes!""
+",Which word does Arra keep repeating when answering Ms. Lim's questions?,No,"""I'm sure.""",0.0
+852,"Arra glared at Ms. Lim. Ms. Lim glared at Arra. Arra kept her lips shut tight so no secrets would fall out.
+	""Arra, do you have something to tell me?""
+	""No.?
+	""Do you know where Spot is?""
+	""No.?
+	""Are you sure, Arra?""
+	""No. I mean, yes!""
+",Which in this story do you think is the adult?,Ms. Lim,I think it's Arra.,0.0
+852,"Arra glared at Ms. Lim. Ms. Lim glared at Arra. Arra kept her lips shut tight so no secrets would fall out.
+	""Arra, do you have something to tell me?""
+	""No.?
+	""Do you know where Spot is?""
+	""No.?
+	""Are you sure, Arra?""
+	""No. I mean, yes!""
+",What does Ms. Lim want?,She wants Arra to tell her where Spot is.,She wants to know where Spot is.,0.24177237023718662
+858,"The proud lion looked up at the sun. 
+	""The sun looks just like me!"" he said. ""The sky must be nothing more than a mirror. A mirror to reflect all my beauty!""
+",Who is the main character of this story?,The lion,The main character is a lion.,0.09652434877402241
+858,"The proud lion looked up at the sun. 
+	""The sun looks just like me!"" he said. ""The sky must be nothing more than a mirror. A mirror to reflect all my beauty!""
+","Which word could best replace ""proud"" in this sentence: ""The proud lion looked up at the sun.""?",Cocky,"""The sun looks just like me!""",0.0
+858,"The proud lion looked up at the sun. 
+	""The sun looks just like me!"" he said. ""The sky must be nothing more than a mirror. A mirror to reflect all my beauty!""
+",Which word best describes how the lion sees himself?,Beautiful,"""I see myself as a lion.""",0.0
+859,"The cactus held his arms up in a shrug. 
+	""I know I seem sharp and prickly"", he cried. ""But on the inside I'm a mushy mess!""
+
+
+",How do you think the cactus is feeling?,Upset,"He's feeling very, very good.",0.0
+859,"The cactus held his arms up in a shrug. 
+	""I know I seem sharp and prickly"", he cried. ""But on the inside I'm a mushy mess!""
+
+
+","What makes the words ""mushy mess"" sound good together?",They have the same starting sound.,It's a good question.,0.0
+859,"The cactus held his arms up in a shrug. 
+	""I know I seem sharp and prickly"", he cried. ""But on the inside I'm a mushy mess!""
+
+
+","The word ""cried"" is used in the text instead of the word ""said."" Why?",To show that the cactus was upset as he spoke.,"The word ""cried"" is used in the text instead of the word ""said",0.03089055318156698
+859,"The cactus held his arms up in a shrug. 
+	""I know I seem sharp and prickly"", he cried. ""But on the inside I'm a mushy mess!""
+
+
+",Who is speaking in this scene?,The cactus,The voice is that of the cactus.,0.13134549472120793
+863,"There used to be a shadow world. It was not part of our world. But one day all that changed. 
+
+
+","Based on the title, what is this story likely about?",How shadows came to be,It's about a girl who is a part of a group of people who are trying to find a way to save,0.017272237992167865
+863,"There used to be a shadow world. It was not part of our world. But one day all that changed. 
+
+
+","In this story, where did shadows come from?",The shadow world,The shadow world was created by the gods.,0.20556680845025987
+863,"There used to be a shadow world. It was not part of our world. But one day all that changed. 
+
+
+","In the story, why did shadows become part of our world?",It does not say.,The shadow world was created by the gods.,0.0
+863,"There used to be a shadow world. It was not part of our world. But one day all that changed. 
+
+
+","The phrase ""used to be"" means this part of the story happened __________.",In the past,Yes.,0.0
+864,"The marble glass. It was smooth. A streak of yellow shot through its center. The cat stared. As she did, the marble winked in the light.
+
+
+",Who was looking at the marble?,The cat,The cat.,0.5946035575013605
+864,"The marble glass. It was smooth. A streak of yellow shot through its center. The cat stared. As she did, the marble winked in the light.
+
+
+",Which word describes how the marble would feel to the touch?,Smooth,It would feel like a piece of glass.,0.0
+864,"The marble glass. It was smooth. A streak of yellow shot through its center. The cat stared. As she did, the marble winked in the light.
+
+
+","What does this phrase mean? ""A streak of yellow shot through it.""",The marble had a streak of yellow in it.,It means that the marble is a little bit yellow.,0.10552670315936319
+865,"The ox liked to wear socks. 
+The ox liked long walks. The ox liked loooong talks. 
+So the ox opened his mouth up wide like a box. But the other oxen just threw rocks in.
+
+","Which phrase from the story rhymes with ""oxen""?","""Rocks in""","""The ox likes to wear socks.""",0.0
+865,"The ox liked to wear socks. 
+The ox liked long walks. The ox liked loooong talks. 
+So the ox opened his mouth up wide like a box. But the other oxen just threw rocks in.
+
+",Which phrase from the story is repeated 3 times?,"""The ox liked""","""The ox likes to wear socks.""",0.16233395773754944
+865,"The ox liked to wear socks. 
+The ox liked long walks. The ox liked loooong talks. 
+So the ox opened his mouth up wide like a box. But the other oxen just threw rocks in.
+
+","Why is the word ""long"" written with so many extra Os in it?",To show that the word should be stretched out when read.,Because the ox was a long-lived animal.,0.0370865905565703
+865,"The ox liked to wear socks. 
+The ox liked long walks. The ox liked loooong talks. 
+So the ox opened his mouth up wide like a box. But the other oxen just threw rocks in.
+
+",Why did the ox open his mouth?,To have a long talk,Because he was hungry.,0.0
+865,"The ox liked to wear socks. 
+The ox liked long walks. The ox liked loooong talks. 
+So the ox opened his mouth up wide like a box. But the other oxen just threw rocks in.
+
+","Why is the word ""long"" written with so many extra Os in it in the text?",To show the reader that it should be stretched out when read.,Because the ox was a long-lived animal.,0.03214954573057458
+866,"The chimp hung on a branch. 
+	""What's up?"" said the chimp to the tree.
+	But the tree did not answer.
+	""What's up?"" said the chimp to the sky.
+	But the sky did not answer.
+	""What's up?"" said the chimp to the bat.
+	""Not much"", said the bat. ""Just hangin? out.?
+
+
+",Where does this story most likely take place?,In a jungle,The story is most likely about a chimp who was hanging,0.03747776736677922
+866,"The chimp hung on a branch. 
+	""What's up?"" said the chimp to the tree.
+	But the tree did not answer.
+	""What's up?"" said the chimp to the sky.
+	But the sky did not answer.
+	""What's up?"" said the chimp to the bat.
+	""Not much"", said the bat. ""Just hangin? out.?
+
+
+",Who is the main character in this story?,The chimp,The main character is a chimp.,0.09652434877402241
+869,"He cast the spell. There was a loud <i>WHOOSH</i>. All the locked doors sprang open!
+
+
+",What did the spell do?,Unlock all the doors.,It made the doors open.,0.21364350319811704
+869,"He cast the spell. There was a loud <i>WHOOSH</i>. All the locked doors sprang open!
+
+
+","Which sense does the word ""whoosh"" relate to?",Sound,The sound of a jet engine.,0.08116697886877472
+869,"He cast the spell. There was a loud <i>WHOOSH</i>. All the locked doors sprang open!
+
+
+","Why is the word ""WHOOSH"" written in all uppercase letters?",To show that it should be read loudly.,Because it's a spell.,0.0
+869,"He cast the spell. There was a loud <i>WHOOSH</i>. All the locked doors sprang open!
+
+
+","Why is the word ""WHOOSH"" written in italics (slanted letters)?",To show that this word should be read with emphasis.,Because it's a very important part of the spell.,0.0
+870,"The dragon bent down. Her large yellow eye was as tall as the knight. She looked at him.
+	Then she said: ""You should not have come here. This place is ours.?
+
+
+",What is the problem in this story?,The dragon is angry that the knight came to her place.,The dragon is a very powerful creature.,0.13805184551789743
+870,"The dragon bent down. Her large yellow eye was as tall as the knight. She looked at him.
+	Then she said: ""You should not have come here. This place is ours.?
+
+
+",Which object is likely the closest in size to the dragon? Use the hints in the story to help you.,A building,The dragon's head.,0.0
+870,"The dragon bent down. Her large yellow eye was as tall as the knight. She looked at him.
+	Then she said: ""You should not have come here. This place is ours.?
+
+
+","Who said: ""You should not have come here. This place is ours.”?",The dragon,The dragon.,0.5946035575013605
+870,"The dragon bent down. Her large yellow eye was as tall as the knight. She looked at him.
+	Then she said: ""You should not have come here. This place is ours.?
+
+
+",Which sentence gives details about what the dragon looks like?,"""Her large yellow eye was as tall as the knight.""","""The dragon bent down.",0.03564186929405142
+870,"The dragon bent down. Her large yellow eye was as tall as the knight. She looked at him.
+	Then she said: ""You should not have come here. This place is ours.?
+
+
+",How do you think the knight felt in this scene?,Afraid,He was very happy.,0.0
+872,"Clemt put the ring in his pocket. 
+	""How will I know when to use it?"" he asked.
+	""You'll know"", the wizard said. ""Its power is yours. You'll know when it's time.? And with that, he was gone.
+
+
+",Where did Clemt put the ring?,In his pocket,He put it in his pocket.,0.3021375397356768
+872,"Clemt put the ring in his pocket. 
+	""How will I know when to use it?"" he asked.
+	""You'll know"", the wizard said. ""Its power is yours. You'll know when it's time.? And with that, he was gone.
+
+
+",What does Clemt want to know?,When to use the ring,What is the meaning of the ring?,0.13134549472120793
+872,"Clemt put the ring in his pocket. 
+	""How will I know when to use it?"" he asked.
+	""You'll know"", the wizard said. ""Its power is yours. You'll know when it's time.? And with that, he was gone.
+
+
+","Why are some sentences written between quotation marks ("")?",To show that a character is speaking these words.,This is a common practice in the English language.,0.05669791110976
+875,"On the planet Plimp, it rains socks. On a good day they?re clean. On a bad day, they?re not.
+
+
+",Was is unusual about the rain on planet Plimp?,It rains socks.,No.,0.0
+875,"On the planet Plimp, it rains socks. On a good day they?re clean. On a bad day, they?re not.
+
+
+",Which setting (place) is this story about?,Planet Plimp,It?s about a place called Plimp.,0.08116697886877472
+875,"On the planet Plimp, it rains socks. On a good day they?re clean. On a bad day, they?re not.
+
+
+",Why would it be a bad day when it rains dirty socks?,Because they would smell bad.,Because it?s a bad day.,0.1270331870386537
+875,"On the planet Plimp, it rains socks. On a good day they?re clean. On a bad day, they?re not.
+
+
+","Which feature connects the word ""socks"" to the word ""not""?",They have the same vowel sound.,"The word ""socks"" is a noun, not a verb.",0.04767707020457096
+875,"On the planet Plimp, it rains socks. On a good day they?re clean. On a bad day, they?re not.
+
+
+",What happens on a GOOD day on planet Plimp?,It rains clean socks.,The socks are clean.,0.18995892141289816
+876,"""My robot is going to change the world!"" Wendy cried. ""It's the biggest! It's the best! It's the only one of its kind!""
+	""What does it do?"" Elsie asked.
+	""I don't know"", Wendy replied, flicking the ?ON? switch. ""Let's find out!""
+
+
+",Who built the robot?,Wendy,"The robot was built by a group of students at the University of California,",0.0
+876,"""My robot is going to change the world!"" Wendy cried. ""It's the biggest! It's the best! It's the only one of its kind!""
+	""What does it do?"" Elsie asked.
+	""I don't know"", Wendy replied, flicking the ?ON? switch. ""Let's find out!""
+
+
+",How is Wendy going to find out what her robot does?,By turning it on,She's going to use the?ON? switch to turn it on,0.08392229812593097
+876,"""My robot is going to change the world!"" Wendy cried. ""It's the biggest! It's the best! It's the only one of its kind!""
+	""What does it do?"" Elsie asked.
+	""I don't know"", Wendy replied, flicking the ?ON? switch. ""Let's find out!""
+
+
+",How do you think Wendy feels in this scene?,Excited,"She's a little bit sad, but she's also a little bit happy",0.0
+881,"""Who says <i>I'm</i> the alien?"" said Tlonk. ""Why not you?""
+	""'Cause I'm not!"" Mina laughed. ""I'm a human!""
+	""But you?re not from this world. And you don't look like us. You only have two arms!""
+	Mina thought.
+	""Exactly!"" said Tlonk. ""An alien!""
+
+
+",Who does Tlonk think is an alien?,Mina,He doesn't know.,0.0
+881,"""Who says <i>I'm</i> the alien?"" said Tlonk. ""Why not you?""
+	""'Cause I'm not!"" Mina laughed. ""I'm a human!""
+	""But you?re not from this world. And you don't look like us. You only have two arms!""
+	Mina thought.
+	""Exactly!"" said Tlonk. ""An alien!""
+
+
+","Why is the word ""I'm"" written in italics (slanted letters) in the first sentence of the text?",To show that Tlonk was saying it with emphasis.,This is a common mistake.,0.0
+881,"""Who says <i>I'm</i> the alien?"" said Tlonk. ""Why not you?""
+	""'Cause I'm not!"" Mina laughed. ""I'm a human!""
+	""But you?re not from this world. And you don't look like us. You only have two arms!""
+	Mina thought.
+	""Exactly!"" said Tlonk. ""An alien!""
+
+
+",What does Mina think about Tlonk saying she's an alien?,She thinks it's funny.,She thinks he's a jerk.,0.21364350319811704
+881,"""Who says <i>I'm</i> the alien?"" said Tlonk. ""Why not you?""
+	""'Cause I'm not!"" Mina laughed. ""I'm a human!""
+	""But you?re not from this world. And you don't look like us. You only have two arms!""
+	Mina thought.
+	""Exactly!"" said Tlonk. ""An alien!""
+
+
+",True or False: Mina and Tlonk are the same species.,False,True.,0.0
+882,"Dr. Gupta slid open the door. ""This is where we do tests"", she said. ""We test all kinds of things.?
+	""What's this for?"" Perry asked. He pressed his nose against a tank.
+	""A test on alien dung.?
+	Perry took a big step back.
+",What is happening in this scene?,Dr. Gupta is showing Perry around the space lab.,The alien dung is being tested on Perry.,0.06413885305524152
+882,"Dr. Gupta slid open the door. ""This is where we do tests"", she said. ""We test all kinds of things.?
+	""What's this for?"" Perry asked. He pressed his nose against a tank.
+	""A test on alien dung.?
+	Perry took a big step back.
+","What hint about the story can we get from the title, ""Space Lab""?",The setting (place),The title is a reference to the space program.,0.04767707020457096
+882,"Dr. Gupta slid open the door. ""This is where we do tests"", she said. ""We test all kinds of things.?
+	""What's this for?"" Perry asked. He pressed his nose against a tank.
+	""A test on alien dung.?
+	Perry took a big step back.
+",Why do you think Perry took a big step back?,Because he was grossed out.,Because he was scared.,0.4630777161991027
+882,"Dr. Gupta slid open the door. ""This is where we do tests"", she said. ""We test all kinds of things.?
+	""What's this for?"" Perry asked. He pressed his nose against a tank.
+	""A test on alien dung.?
+	Perry took a big step back.
+",Who works at the lab?,Dr. Gupta,Dr.,0.13006502375572224
+882,"Dr. Gupta slid open the door. ""This is where we do tests"", she said. ""We test all kinds of things.?
+	""What's this for?"" Perry asked. He pressed his nose against a tank.
+	""A test on alien dung.?
+	Perry took a big step back.
+","Who said ""A test on alien dung""?",Dr. Gupta,Dr.,0.13006502375572224
+883,"The red rocket was tall. Taller than the tallest building Dawn had seen. It was shiny. It looked fast. It was going to Mars. And she was going with it!
+",Who is the main character of this story?,Dawn,It's a girl.,0.0
+883,"The red rocket was tall. Taller than the tallest building Dawn had seen. It was shiny. It looked fast. It was going to Mars. And she was going with it!
+",How do you think Dawn feels about going to Mars?,Excited,I don't know.,0.0
+883,"The red rocket was tall. Taller than the tallest building Dawn had seen. It was shiny. It looked fast. It was going to Mars. And she was going with it!
+","Which feature of the rocket does this sentence tell us about? ""Taller than the tallest building Dawn had seen.""",Its size,The rocket is going to Mars.,0.0
+883,"The red rocket was tall. Taller than the tallest building Dawn had seen. It was shiny. It looked fast. It was going to Mars. And she was going with it!
+",Where is Dawn going?,Into space,She's going to Mars.,0.0
+884,"There was once a robot named Rob. Rob woke himself up. Rob made himself toast. Rob rolled to work. At work, Rob made more robots.
+
+
+","""Rob rolled to work."" What does the word ""rolled"" tell us about Rob?",That Rob moves on wheels.,It tells us that Rob is a robot.,0.11044795567078944
+884,"There was once a robot named Rob. Rob woke himself up. Rob made himself toast. Rob rolled to work. At work, Rob made more robots.
+
+
+","What is the same about all three of these sentences? ""Rob woke himself up. Rob made himself toast. Rob rolled to work.""",They all start with the same word.,They are all the same.,0.17030578356760864
+885,"Once upon a time there was a flame. It was a small flame. But it never, <i>ever</i>, went out.
+
+
+","Why is the word ""ever"" written in italics (slanted letters)?",To show emphasis.,Because it's a very important word.,0.0
+885,"Once upon a time there was a flame. It was a small flame. But it never, <i>ever</i>, went out.
+
+
+","Which genre of story usually starts with the phrase, ""Once upon a time""?",Fairy Tales,I don't know.,0.0
+885,"Once upon a time there was a flame. It was a small flame. But it never, <i>ever</i>, went out.
+
+
+","Why do the words ""never"" and ""ever"" sound good together?",Because they rhyme.,Because they're both adjectives.,0.15973577606156814
+885,"Once upon a time there was a flame. It was a small flame. But it never, <i>ever</i>, went out.
+
+
+","Why do the words ""forever"" and ""flame"" sound good together?",Because they start with the same sound.,"Because they're both words that mean ""forever.""",0.06567274736060397
+887,"""Why can't I pass?"" the boy asked.
+	The troll stumped forward. ?""Cause this is my bridge!"" he said. ""And you gotta pass a test.?
+	""What kind of test?"" asked the boy.
+	""A riddle!"" said the troll.
+	""OK"", said the boy. ""What's the riddle?""
+	""Uhhh"", said the troll. ""Lemme think.?
+
+
+",What is the problem in this story?,"The boy wants to pass over the troll's bridge, but the troll won't let him.",The troll is a troll.,0.02891350401697934
+887,"""Why can't I pass?"" the boy asked.
+	The troll stumped forward. ?""Cause this is my bridge!"" he said. ""And you gotta pass a test.?
+	""What kind of test?"" asked the boy.
+	""A riddle!"" said the troll.
+	""OK"", said the boy. ""What's the riddle?""
+	""Uhhh"", said the troll. ""Lemme think.?
+
+
+","Why does the troll say ""Uhhh""?",Because he is thinking.,Because he's a troll.,0.15973577606156814
+887,"""Why can't I pass?"" the boy asked.
+	The troll stumped forward. ?""Cause this is my bridge!"" he said. ""And you gotta pass a test.?
+	""What kind of test?"" asked the boy.
+	""A riddle!"" said the troll.
+	""OK"", said the boy. ""What's the riddle?""
+	""Uhhh"", said the troll. ""Lemme think.?
+
+
+",What is the troll trying to do at the end of this passage?,Remember his riddle,The troll is trying to get the boy to pass the test,0.0
+888,"The witch threw more items into the pot. First was a small stone. Then a blade of grass. Next an old boot and a patched witch's hat! The stew bubbled and burped.
+	""Nearly done!"" cried the witch.
+
+
+",What is this passage about?,A witch making a magic stew.,The witch is saying that she is going to make a new batch of bread.,0.031251907639724415
+888,"The witch threw more items into the pot. First was a small stone. Then a blade of grass. Next an old boot and a patched witch's hat! The stew bubbled and burped.
+	""Nearly done!"" cried the witch.
+
+
+","Which feature connects the words ""grass"" and ""hat""?",They have the same vowel sound.,"The word ""grass"" is a common word in the English language.",0.03747776736677922
+889,"People came from all over town. People came from the next town over. People came from far off farms. Everyone came to see the girl.
+	""Her hair just grows and grows!"" they?d crow.
+	""It's coming out of her ears!"" they?d cheer.
+	""It's down to the floor!"" they?d roar.
+","What connects all of these word pairs from the text: ""grow/crow,"" ""ear/cheer,"" ""floor/roar""?",They rhyme.,"The word ""grow"" is a contraction of the word ""grow",0.0
+889,"People came from all over town. People came from the next town over. People came from far off farms. Everyone came to see the girl.
+	""Her hair just grows and grows!"" they?d crow.
+	""It's coming out of her ears!"" they?d cheer.
+	""It's down to the floor!"" they?d roar.
+",What is the same about the first three sentences of this text?,"They all start with the phrase, ""People came from...""",The first three sentences are the same.,0.04935157841536379
+889,"People came from all over town. People came from the next town over. People came from far off farms. Everyone came to see the girl.
+	""Her hair just grows and grows!"" they?d crow.
+	""It's coming out of her ears!"" they?d cheer.
+	""It's down to the floor!"" they?d roar.
+",Why did so many people come to see the girl?,Because her hair wouldn't stop growing.,Because she was a girl.,0.08745825313180632
+889,"People came from all over town. People came from the next town over. People came from far off farms. Everyone came to see the girl.
+	""Her hair just grows and grows!"" they?d crow.
+	""It's coming out of her ears!"" they?d cheer.
+	""It's down to the floor!"" they?d roar.
+","What do the words ""crow,"" ""cheer,"" and ""roar"" have in common, as they are used in the text?","They are all words that mean ""said loudly.""",They are all used to describe the girl's hair.,0.17747405280050263
+892,"The queen chose to be kind. She gave the swan some bread. Then she lifted its head and broke the curse.
+
+
+",Who was cursed?,The swan,The swan.,0.5946035575013605
+892,"The queen chose to be kind. She gave the swan some bread. Then she lifted its head and broke the curse.
+
+
+",Who lifted the curse?,The queen,The queen.,0.5946035575013605
+892,"The queen chose to be kind. She gave the swan some bread. Then she lifted its head and broke the curse.
+
+
+",Who is the main character of this story?,The queen,The swan.,0.2973017787506803
+894,"	""We don't go near that house"", Milo said.
+	""Nuh-uh"", said Naya.
+	""Why not?"" asked Paul.
+	Milo leaned in closer. ""My brother says it's haunted. By ghosts!""
+
+
+","Which word or phrase means the same thing as ""Nuh-uh,"" as Naya uses it?","""No way""","""N",0.0
+894,"	""We don't go near that house"", Milo said.
+	""Nuh-uh"", said Naya.
+	""Why not?"" asked Paul.
+	Milo leaned in closer. ""My brother says it's haunted. By ghosts!""
+
+
+",Why don't they want to go near the house?,Because they think it's haunted.,Because it's haunted.,0.256708559516296
+894,"	""We don't go near that house"", Milo said.
+	""Nuh-uh"", said Naya.
+	""Why not?"" asked Paul.
+	Milo leaned in closer. ""My brother says it's haunted. By ghosts!""
+
+
+","What does it mean that the house is ""haunted""?",Ghosts live there,It means that the house is haunted.,0.0
+894,"	""We don't go near that house"", Milo said.
+	""Nuh-uh"", said Naya.
+	""Why not?"" asked Paul.
+	Milo leaned in closer. ""My brother says it's haunted. By ghosts!""
+
+
+","Which movement would Milo likely be doing when he said ""We don't go near that house""?",Pointing to the house,"The ""Occupy"" movement.",0.16186478197091597
+896,"The lady next door is odd. She has long, sharp nails. She drags her heels. She wears dark glasses. And I never see her sleep.
+",True or False: This story is being told by the lady next door.,False,True.,0.0
+897,"Ady heard a howl. He looked out of his dark window. 
+	""It's just the wind"", he whispered.
+",How do you think Ady is feeling?,Scared,He's feeling good.,0.0
+897,"Ady heard a howl. He looked out of his dark window. 
+	""It's just the wind"", he whispered.
+",What is the most likely reason for Ady's window being dark? ,It is nighttime. ,The wind.,0.0
+897,"Ady heard a howl. He looked out of his dark window. 
+	""It's just the wind"", he whispered.
+","Why do the words ""heard"" and ""howl"" sound good next to each other?",Because they start with the same sound.,Because they're the same sound.,0.28641904579795413
+897,"Ady heard a howl. He looked out of his dark window. 
+	""It's just the wind"", he whispered.
+","Which sense does the word ""howl"" relate to?",Sound,"The word ""howl"" is a combination of the words ""howl"" and ""wind"".",0.0
+897,"Ady heard a howl. He looked out of his dark window. 
+	""It's just the wind"", he whispered.
+","What does the word ""whispered"" mean?",Spoke softly and quietly,"It means ""to whisper"" or ""to whisper something"".",0.0
+898,"The shadow grew longer. And wider. It grew and grew! It grew until it covered the whole town!
+
+
+",Which word would best describe a shadow?,Dark,A shadow is a shadow.,0.0
+898,"The shadow grew longer. And wider. It grew and grew! It grew until it covered the whole town!
+
+
+","The words ""longer and ""wider"" describe the shadow's __________.",Size and shape,The shadow was long and wide.,0.08116697886877472
+898,"The shadow grew longer. And wider. It grew and grew! It grew until it covered the whole town!
+
+
+","Why did the author repeat the word ""grew"" in this sentence: ""It grew and grew""?",To show that the shadow kept on growing.,Because it,0.0
+898,"The shadow grew longer. And wider. It grew and grew! It grew until it covered the whole town!
+
+
+",How big did the shadow grow to be?,The size of the town,It was a lot bigger than I thought it would be.,0.0
+898,"The shadow grew longer. And wider. It grew and grew! It grew until it covered the whole town!
+
+
+",What is this story about?,A shadow that wouldn't stop growing.,It's about a girl who is a witch.,0.05522397783539471
+899,"Tim walked home alone in the dark. He talked as he walked. He sang. He joked. 
+	But someone else giggled.
+
+
+",What is the mood of this passage?,Spooky,It's a bit of a downer.,0.0
+899,"Tim walked home alone in the dark. He talked as he walked. He sang. He joked. 
+	But someone else giggled.
+
+
+",Why is it strange that someone giggled?,Because Tim thought he was alone.,Because it's a very strange thing to do.,0.05522397783539471
+899,"Tim walked home alone in the dark. He talked as he walked. He sang. He joked. 
+	But someone else giggled.
+
+
+","What feature connects the words ""talked"" and ""walked""?",They rhyme.,"The word ""talked"" is a verb.",0.0
+900,"It rained. And rained. And rained. Then it rained some more. 
+	""I'm BORED"", Taye shouted. 
+	""You've got two choices,"" said Dad. ""Be dry and bored, or wet and happy. You pick.""
+
+
+","What choice does Dad mean when he says ""dry and bored""?",Stay in the house,The choice to be dry and bored.,0.06567274736060397
+900,"It rained. And rained. And rained. Then it rained some more. 
+	""I'm BORED"", Taye shouted. 
+	""You've got two choices,"" said Dad. ""Be dry and bored, or wet and happy. You pick.""
+
+
+","What choice does Dad mean when he says ""wet and happy""?",Go out in the rain,It's a choice that's not easy to make.,0.0
+900,"It rained. And rained. And rained. Then it rained some more. 
+	""I'm BORED"", Taye shouted. 
+	""You've got two choices,"" said Dad. ""Be dry and bored, or wet and happy. You pick.""
+
+
+",Where is this scene most likely taking place?,Inside their house,It's probably in the middle of the desert.,0.0
+900,"It rained. And rained. And rained. Then it rained some more. 
+	""I'm BORED"", Taye shouted. 
+	""You've got two choices,"" said Dad. ""Be dry and bored, or wet and happy. You pick.""
+
+
+","Why is the word ""bored"" written all in uppercase letters?",To show that Taye was speaking loudly.,Because it's the only way to write it.,0.05522397783539471
+900,"It rained. And rained. And rained. Then it rained some more. 
+	""I'm BORED"", Taye shouted. 
+	""You've got two choices,"" said Dad. ""Be dry and bored, or wet and happy. You pick.""
+
+
+",Why is Taye bored?,Because the rain meant he couldn't play outside.,Because he's bored.,0.04266709328925954
+901,"Kay clipped in her helmet. She snapped on her gloves. She pulled up her socks. She tied on her mask.
+	She was ready.
+	Ready for what? Even she didn't know.
+
+
+","Which sense does the word ""snapped"" most relate to when used in the sentence: ""She snapped on her gloves""?",Sound,"The sense of ""snapped"" is most related to the sense of ""to",0.0
+901,"Kay clipped in her helmet. She snapped on her gloves. She pulled up her socks. She tied on her mask.
+	She was ready.
+	Ready for what? Even she didn't know.
+
+
+",What was Kay getting ready for?,She didn't know,A new helmet.,0.0
+901,"Kay clipped in her helmet. She snapped on her gloves. She pulled up her socks. She tied on her mask.
+	She was ready.
+	Ready for what? Even she didn't know.
+
+
+",Who is the main character of this story?,Kay,The main character is a girl named Miki.,0.0
+902,"Amir stood at the plate. The bat felt very heavy. The sun seemed very hot. He looked out at the in-field. 
+	The pitcher stared him down. Amir smiled. The pitcher did not. 
+	Then the pitcher pulled back her hand? and threw!
+
+
+",What are these characters doing?,Playing baseball,They are trying to get the ball to the plate.,0.0
+902,"Amir stood at the plate. The bat felt very heavy. The sun seemed very hot. He looked out at the in-field. 
+	The pitcher stared him down. Amir smiled. The pitcher did not. 
+	Then the pitcher pulled back her hand? and threw!
+
+
+",Who is the main character in this story?,Amir,Amir.,0.3535533905932738
+902,"Amir stood at the plate. The bat felt very heavy. The sun seemed very hot. He looked out at the in-field. 
+	The pitcher stared him down. Amir smiled. The pitcher did not. 
+	Then the pitcher pulled back her hand? and threw!
+
+
+",How do you think Amir is feeling?,Nervous,He is feeling very good.,0.0
+902,"Amir stood at the plate. The bat felt very heavy. The sun seemed very hot. He looked out at the in-field. 
+	The pitcher stared him down. Amir smiled. The pitcher did not. 
+	Then the pitcher pulled back her hand? and threw!
+
+
+",Why did the author use an ellipsis [...] in the last sentence?,To show a long pause,Because the ellipsis is a way of indicating that the reader is not,0.03089055318156698
+902,"Amir stood at the plate. The bat felt very heavy. The sun seemed very hot. He looked out at the in-field. 
+	The pitcher stared him down. Amir smiled. The pitcher did not. 
+	Then the pitcher pulled back her hand? and threw!
+
+
+",Which position is Amir playing?,Batter,He is playing first base.,0.0
+903,"Aida stared up at the horse. She had to tilt her head back so far that her neck hurt. The horse looked as tall as a building. 
+	""You want me to ride this thing?"" she asked. She couldn't believe it.
+
+
+","Complete this sentence: Based on the text, Aida is ___________ the horse.",Shorter than,___________ the horse.,0.0
+903,"Aida stared up at the horse. She had to tilt her head back so far that her neck hurt. The horse looked as tall as a building. 
+	""You want me to ride this thing?"" she asked. She couldn't believe it.
+
+
+",True or False: The horse was as tall as a building.,False,False.,0.3535533905932738
+903,"Aida stared up at the horse. She had to tilt her head back so far that her neck hurt. The horse looked as tall as a building. 
+	""You want me to ride this thing?"" she asked. She couldn't believe it.
+
+
+","When Aida says, ""You want me to ride this thing,"" what is the ""thing""?",The horse,The horse.,0.5946035575013605
+903,"Aida stared up at the horse. She had to tilt her head back so far that her neck hurt. The horse looked as tall as a building. 
+	""You want me to ride this thing?"" she asked. She couldn't believe it.
+
+
+",Who is telling this story?,The narrator,The story is told by the horse.,0.06567274736060397
+905,"Jing hung from the tree branch. She was so high up! She could feel the breeze. She could see into the yard next door. Her feet swayed back and forth.
+	""So what if I can’t get down,” she said. ""Maybe I just live up here now. It’s nice!”
+
+
+",Who is Jing talking to?,Herself,She is talking to a man in the yard.,0.0
+905,"Jing hung from the tree branch. She was so high up! She could feel the breeze. She could see into the yard next door. Her feet swayed back and forth.
+	""So what if I can’t get down,” she said. ""Maybe I just live up here now. It’s nice!”
+
+
+",What is the problem in this story?,Jing is stuck hanging from a tree branch.,The story,0.0
+905,"Jing hung from the tree branch. She was so high up! She could feel the breeze. She could see into the yard next door. Her feet swayed back and forth.
+	""So what if I can’t get down,” she said. ""Maybe I just live up here now. It’s nice!”
+
+
+",How is Jing most likely feeling?,Scared,She is feeling very happy.,0.0
+905,"Jing hung from the tree branch. She was so high up! She could feel the breeze. She could see into the yard next door. Her feet swayed back and forth.
+	""So what if I can’t get down,” she said. ""Maybe I just live up here now. It’s nice!”
+
+
+",What is Jing trying to do?,Calm herself down,She is trying to get down.,0.08116697886877472
+905,"Jing hung from the tree branch. She was so high up! She could feel the breeze. She could see into the yard next door. Her feet swayed back and forth.
+	""So what if I can’t get down,” she said. ""Maybe I just live up here now. It’s nice!”
+
+
+",What will likely happen if Jing lets go of the branch?,She will fall down and hurt herself.,She will fall to her death.,0.2557539057896621
+906,"The boys looked at their piles.
+	Red. Blue. Purple. Orange. ""I sort my candy by color,” said Youssef.
+	Chocolate. Gum. Caramel. Lollipop. ""I sort my candy by type,” said Toby.
+	""Hmmmm,” said Youssef.
+	""Hmmmm,” said Toby. ""Ready to trade?”
+	""I was born ready!” said Youssef.
+
+
+",What are these boys doing?,Trading candy,They are playing with their candy.,0.08116697886877472
+906,"The boys looked at their piles.
+	Red. Blue. Purple. Orange. ""I sort my candy by color,” said Youssef.
+	Chocolate. Gum. Caramel. Lollipop. ""I sort my candy by type,” said Toby.
+	""Hmmmm,” said Youssef.
+	""Hmmmm,” said Toby. ""Ready to trade?”
+	""I was born ready!” said Youssef.
+
+
+","What does Youssef mean when he says ""I was born ready""?","""Yes, I'm ready""",Youssef is saying that he was born ready to be,0.041961149062965476
+906,"The boys looked at their piles.
+	Red. Blue. Purple. Orange. ""I sort my candy by color,” said Youssef.
+	Chocolate. Gum. Caramel. Lollipop. ""I sort my candy by type,” said Toby.
+	""Hmmmm,” said Youssef.
+	""Hmmmm,” said Toby. ""Ready to trade?”
+	""I was born ready!” said Youssef.
+
+
+",Which color of candy does Youssef NOT have? ,Green,Youssef does not have any candy.,0.0
+910,"	""They say there’s a man in the moon,” Elle said.
+	""Who says?” asked John.
+	""No clue. Everyone, I guess,” said Elle.
+	""I thought the moon was made of cheese,” said John.
+	""Maybe,” said Elle. ""But we’ll never know. Not until someone goes up there to see.”
+
+
+",What are Elle and John talking about?,The moon,The moon.,0.5946035575013605
+910,"	""They say there’s a man in the moon,” Elle said.
+	""Who says?” asked John.
+	""No clue. Everyone, I guess,” said Elle.
+	""I thought the moon was made of cheese,” said John.
+	""Maybe,” said Elle. ""But we’ll never know. Not until someone goes up there to see.”
+
+
+","What does Elle mean when she says ""No clue""?","""I don't know""","She means ""I don't know.""",0.3976353643835253
+910,"	""They say there’s a man in the moon,” Elle said.
+	""Who says?” asked John.
+	""No clue. Everyone, I guess,” said Elle.
+	""I thought the moon was made of cheese,” said John.
+	""Maybe,” said Elle. ""But we’ll never know. Not until someone goes up there to see.”
+
+
+",Which word would best describe these two characters?,Curious,"""I'm not sure,"" said Elle.",0.0
+910,"	""They say there’s a man in the moon,” Elle said.
+	""Who says?” asked John.
+	""No clue. Everyone, I guess,” said Elle.
+	""I thought the moon was made of cheese,” said John.
+	""Maybe,” said Elle. ""But we’ll never know. Not until someone goes up there to see.”
+
+
+",True or False: This story takes place before the first humans walked on the moon.,True,True.,0.3535533905932738
+914,"The cowboy jumped off his horse. Dust rose around his boots. He tied up the horse. He looked up at the sun.
+	""Just ‘bout high noon,” he said.
+
+
+","Which word is ""'bout"" a short form of?",About,"""bout"" is a short form of ""bout.""",0.0
+914,"The cowboy jumped off his horse. Dust rose around his boots. He tied up the horse. He looked up at the sun.
+	""Just ‘bout high noon,” he said.
+
+
+",What hint about the story can we get from its title?,The main character,The story is about a cowboy who is a cowboy.,0.041961149062965476
+914,"The cowboy jumped off his horse. Dust rose around his boots. He tied up the horse. He looked up at the sun.
+	""Just ‘bout high noon,” he said.
+
+
+","Which meaning of the word ""rose"" is used in this sentence: ""Dust rose around his boots.""?",To move from lower to higher,"The meaning of the word ""rose"" is ""to rise.""",0.04767707020457096
+914,"The cowboy jumped off his horse. Dust rose around his boots. He tied up the horse. He looked up at the sun.
+	""Just ‘bout high noon,” he said.
+
+
+",What had the cowboy likely been doing just before this scene?,Riding his horse,He was riding his horse.,0.3976353643835253
+916,"Hans packed a bag. He put in a compass. He put in a map. He put in a quill and an ink pot. He put in some paper. He put in his last two coins. He was ready to go.
+",Why would Hans need a map and compass?,Because he is going somewhere he has never been before.,Because he was going to be in the middle of nowhere.,0.08295193507109859
+916,"Hans packed a bag. He put in a compass. He put in a map. He put in a quill and an ink pot. He put in some paper. He put in his last two coins. He was ready to go.
+",Where is Hans going?,The text does not say,He's going to the store.,0.10682175159905853
+917,"Mona walked between the shelves. There were many odd items.
+	She pointed at a brass tube. ""What’s that?”
+	The shop owner turned. ""That’s a spyglass,” he said.
+	""What’s it for?”
+	""To see the stars,” he said. ""As if they were beside you.”
+	""But how?""
+	He smiled. ""Almost like magic. Almost.""
+
+
+
+",Where does this scene take place?,In a shop,The scene takes place in the middle of the night.,0.041961149062965476
+917,"Mona walked between the shelves. There were many odd items.
+	She pointed at a brass tube. ""What’s that?”
+	The shop owner turned. ""That’s a spyglass,” he said.
+	""What’s it for?”
+	""To see the stars,” he said. ""As if they were beside you.”
+	""But how?""
+	He smiled. ""Almost like magic. Almost.""
+
+
+
+",How do you think Mona is feeling in this scene?,Curious,I think she's feeling a little bit of relief.,0.0
+917,"Mona walked between the shelves. There were many odd items.
+	She pointed at a brass tube. ""What’s that?”
+	The shop owner turned. ""That’s a spyglass,” he said.
+	""What’s it for?”
+	""To see the stars,” he said. ""As if they were beside you.”
+	""But how?""
+	He smiled. ""Almost like magic. Almost.""
+
+
+
+","Which character says ""What's it for""?",Mona,The shop owner.,0.0
+917,"Mona walked between the shelves. There were many odd items.
+	She pointed at a brass tube. ""What’s that?”
+	The shop owner turned. ""That’s a spyglass,” he said.
+	""What’s it for?”
+	""To see the stars,” he said. ""As if they were beside you.”
+	""But how?""
+	He smiled. ""Almost like magic. Almost.""
+
+
+
+",What hints about this story can the reader get from its title?,An important object,The story is about a man who is a spy.,0.0
+918,"	""This game is called ‘jacks’,” Ida said. ""These weird little things are the jacks.” She pointed. ""First you bounce the ball. While it’s in the air, you grab the jacks. When the ball lands, you have to stop. Try to get as many jacks as you can! Get it?”
+
+
+",What is Ida doing?,Explaining the rules of a game,She is holding the jacks.,0.08745825313180632
+918,"	""This game is called ‘jacks’,” Ida said. ""These weird little things are the jacks.” She pointed. ""First you bounce the ball. While it’s in the air, you grab the jacks. When the ball lands, you have to stop. Try to get as many jacks as you can! Get it?”
+
+
+","What does Ida mean when she says ""Get it""?","""Do you understand?""","""Get it"" is a reference to the game ""Get It",0.0
+918,"	""This game is called ‘jacks’,” Ida said. ""These weird little things are the jacks.” She pointed. ""First you bounce the ball. While it’s in the air, you grab the jacks. When the ball lands, you have to stop. Try to get as many jacks as you can! Get it?”
+
+
+",What is most likely going to happen next in the story?,Ida is going to play jacks with someone else.,"""Ida"" said.",0.008977735805071597
+918,"	""This game is called ‘jacks’,” Ida said. ""These weird little things are the jacks.” She pointed. ""First you bounce the ball. While it’s in the air, you grab the jacks. When the ball lands, you have to stop. Try to get as many jacks as you can! Get it?”
+
+
+","Why is the game called ""jacks""?","Because you use objects called ""jacks"" to play.",Because it's a game of jacks.,0.06916271812933181
+919,"	""We only get a little sugar each week,” Papa said. ""The shops don't have much. But I’ve been saving up! And I’m baking us a cake!”
+",Why is the cake special?,Because they usually don't have enough sugar to bake a cake.,It's a special cake for the children.,0.04410363736106613
+919,"	""We only get a little sugar each week,” Papa said. ""The shops don't have much. But I’ve been saving up! And I’m baking us a cake!”
+",What has Papa been saving?,Sugar,A lot of money.,0.0
+919,"	""We only get a little sugar each week,” Papa said. ""The shops don't have much. But I’ve been saving up! And I’m baking us a cake!”
+","Which word means the same thing as ""Papa""?",Father,"""Papa"" is the name of the person who is the father of the child",0.028398387225677897
+919,"	""We only get a little sugar each week,” Papa said. ""The shops don't have much. But I’ve been saving up! And I’m baking us a cake!”
+",How is Papa feeling in this scene?,Excited,He's happy.,0.0
+919,"	""We only get a little sugar each week,” Papa said. ""The shops don't have much. But I’ve been saving up! And I’m baking us a cake!”
+",What hints about the story can we get from the title?,An important object,"The title is a reference to the song ""The Little Mermaid"" by Disney.",0.0
+923,"Bragi is a god from Norse myth. He is the god of poetry.
+
+
+",Which culture does the myth of Bragi come from?,Norse,The myth of Bragi is a myth of the Norse gods.,0.03747776736677922
+923,"Bragi is a god from Norse myth. He is the god of poetry.
+
+
+",What is Bragi the god of?,Poetry,He is the god of poetry.,0.08116697886877472
+923,"Bragi is a god from Norse myth. He is the god of poetry.
+
+
+","The word ""myth"" is short for the word ______________.",Mythology,"The word ""myth"" is short for the word ______________.",0.0
+923,"Bragi is a god from Norse myth. He is the god of poetry.
+
+
+",Bragi is a ___________.,God,Bragi is a god from Norse myth.,0.06567274736060397
+923,"Bragi is a god from Norse myth. He is the god of poetry.
+
+
+","What does the word ""myth"" mean?",A cultural story that often involves magic or the supernatural.,Myth is,0.0
+924,"Tyr is a god from Norse myth. He is the god of war.
+
+
+",Which culture does the story of Tyr come from?,Norse,The story of Tyr is a myth from the Norse mythology.,0.03747776736677922
+924,"Tyr is a god from Norse myth. He is the god of war.
+
+
+",What is Tyr the god of?,War,Tyr is the god of war.,0.08116697886877472
+924,"Tyr is a god from Norse myth. He is the god of war.
+
+
+",Which object would be the best symbol for Tyr?,A weapon,The sword of Tyr.,0.0
+924,"Tyr is a god from Norse myth. He is the god of war.
+
+
+",Which hint about the text can we get from the title?,An important character or figure,"The text is a reference to the poem ""The Battle of the Gods"" by J.",0.0
+924,"Tyr is a god from Norse myth. He is the god of war.
+
+
+","True or False: Tyr was a real, historical figure.",False,True.,0.0
+929,"There is no sound in space.
+
+
+",What is the topic of this passage?,Sound in space,The topic of this passage is the nature of the universe.,0.0
+929,"There is no sound in space.
+
+
+","Which part of the text means the same thing as the word ""silent""?","""no sound""","The word ""silent"" is the same as the word ""silent"" in the sentence ""The moon is silent.""",0.0
+929,"There is no sound in space.
+
+
+","Why do the words ""silent"" and ""space"" in the title sound good together?",Because they have the same starting sound,Because they are the same word.,0.19433094436376075
+929,"There is no sound in space.
+
+
+",Which sense is most important to the topic of this text?,Hearing,The sense of the universe.,0.0
+929,"There is no sound in space.
+
+
+",Which question is NOT answered by the text?,Why is there no sound in space?,The question is not answered by the text.,0.05522397783539471
+932,"A dog’s nose has two air tubes. One is for breath. One is for smells. That means dogs can smell even when they breathe out!
+","What connects the words ""nose"" and ""knows"" in the title of this passage?","They are homophones (words that sound the same, but look different).",The word,0.0033027244309545875
+932,"A dog’s nose has two air tubes. One is for breath. One is for smells. That means dogs can smell even when they breathe out!
+","Based on the text, what special thing do a dog's two nose tubes help them to do?",Smell while they breathe out,They help them to smell.,0.1270331870386537
+932,"A dog’s nose has two air tubes. One is for breath. One is for smells. That means dogs can smell even when they breathe out!
+",True or False: Human noses can also smell while they breathe out.,False,False.,0.3535533905932738
+932,"A dog’s nose has two air tubes. One is for breath. One is for smells. That means dogs can smell even when they breathe out!
+",Which part of the text gives details about WHY a dog can smell while it breathes out?,"""A dog’s nose has two air tubes. One is for breath. One is for smells.""",The first part of the text says that dogs can smell even when they breathe out.,0.024455939372403618
+933,"All mammals have hair. Even the ones that live in the sea!
+
+
+","Based on this text, what do all mammals have?",Hair,Hair.,0.3535533905932738
+933,"All mammals have hair. Even the ones that live in the sea!
+
+
+",Which group of animals is this passage about?,Mammals,The sea mammals.,0.2259005009024612
+933,"All mammals have hair. Even the ones that live in the sea!
+
+
+",What does this passage say about mammals that live in the sea?,That they have hair,It says that they have hair.,0.5081327481546147
+933,"All mammals have hair. Even the ones that live in the sea!
+
+
+",Why do you think the author wrote this passage?,To teach the reader about mammals,Because it's a good story.,0.0
+933,"All mammals have hair. Even the ones that live in the sea!
+
+
+",Which sentence states the main topic of the text?,"""All mammals have hair.""","""The sea is a sea.""",0.0
+934,"Birds are very light. They must be to fly. That’s why their bones are ""hollow"": that means empty inside!
+
+
+",What is the main topic of this passage?,Bird bones,"The main topic of this passage is the ""hollow bones"" of birds.",0.033864985683445356
+934,"Birds are very light. They must be to fly. That’s why their bones are ""hollow"": that means empty inside!
+
+
+","Based on the text, why are bird bones hollow?",Because birds have to be very light to fly.,Birds are very light.,0.10129474235115735
+934,"Birds are very light. They must be to fly. That’s why their bones are ""hollow"": that means empty inside!
+
+
+","What does the word ""hollow"" mean?",Empty on the inside,It means empty inside.,0.18995892141289816
+934,"Birds are very light. They must be to fly. That’s why their bones are ""hollow"": that means empty inside!
+
+
+","Based on clues in the text, which kind of bones are lighter?",Hollow bones,The bones of birds are lighter than those of mammals.,0.041961149062965476
+934,"Birds are very light. They must be to fly. That’s why their bones are ""hollow"": that means empty inside!
+
+
+","Which meaning of the word ""light"" is being used in the sentence: ""Birds are very light.""?",Not heavy,"The meaning of the word ""light"" is ""lightness.""",0.0
+935,"No birds have lips. All birds have either a bill or a beak.
+
+
+","Based on the text, what do no birds have?",Lips,They have no lips.,0.15973577606156814
+935,"No birds have lips. All birds have either a bill or a beak.
+
+
+","Why is the word ""duck"" in the title of this passage?",Because ducks are a kind of bird,"The word ""duck"" is a common name for a bird.",0.049900497019368314
+935,"No birds have lips. All birds have either a bill or a beak.
+
+
+",Which sentence states what birds DO NOT have?,"""No birds have lips.""","The sentence ""All birds have a bill"" is incorrect.",0.09535414040914189
+935,"No birds have lips. All birds have either a bill or a beak.
+
+
+","How does the phrase ""no birds"" relate to the phrase ""all birds""?",They are opposites,"The phrase ""no birds"" is a reference to the fact that birds do not have lips.",0.0
+936,"Bamboo is a plant. It grows very fast. Some kinds grow three feet in one day!
+
+
+",What is the main idea of this passage?,Bamboo is a fast growing plant,The main idea of this passage is that the Buddha is not a person.,0.03377156414337853
+936,"Bamboo is a plant. It grows very fast. Some kinds grow three feet in one day!
+
+
+","Which sentence gives detailed proof for the statement that bamboo grows ""very fast""?","""Some kinds grow three feet in one day!""","""Bamboo is a plant.",0.0
+936,"Bamboo is a plant. It grows very fast. Some kinds grow three feet in one day!
+
+
+",This passage suggests that bamboo grows __________ many other plants.,Faster than,Yes.,0.0
+936,"Bamboo is a plant. It grows very fast. Some kinds grow three feet in one day!
+
+
+","Based on the text, how high can bamboo grow in a day?",3 feet,It depends on the type of bamboo.,0.0
+937,"Hypnos is a Greek god. He is the god of sleep. He lives in the cave where it is said that day and night meet.
+
+
+",Who is Hypnos?,The Greek god of sleep,Hypnos is the god of sleep.,0.32466791547509893
+937,"Hypnos is a Greek god. He is the god of sleep. He lives in the cave where it is said that day and night meet.
+
+
+",Which item would be the best symbol to represent Hypnos?,A bed,The symbol of the god of sleep.,0.0
+937,"Hypnos is a Greek god. He is the god of sleep. He lives in the cave where it is said that day and night meet.
+
+
+","True or False: ""the cave where day and night meet"" is not a real place.",True,False.,0.0
+937,"Hypnos is a Greek god. He is the god of sleep. He lives in the cave where it is said that day and night meet.
+
+
+",Where does Hypnos live?,In a cave,He lives in the cave of the dead.,0.06567274736060397
+937,"Hypnos is a Greek god. He is the god of sleep. He lives in the cave where it is said that day and night meet.
+
+
+","Why do you think Hypnos' cave is said to be where ""day and night meet""?",Because that is when sleep happens.,Because it is the place where the sun rises and sets.,0.044568827606990644
+938,"Eros is the Greek god of love. His Roman name is Cupid!
+
+
+",Which item would be the best symbol for Eros?,A heart,The most,0.0
+938,"Eros is the Greek god of love. His Roman name is Cupid!
+
+
+",Which holiday is often connected to this character?,Valentine's Day,Christmas.,0.0
+938,"Eros is the Greek god of love. His Roman name is Cupid!
+
+
+",What is Eros the god of?,Love,Love.,0.3535533905932738
+943,"Who was the first U.S. president? It was George Washington! He took office in 1789. He left office in 1797. Now his face is on the $1 bill!
+",What is the topic of this passage?,George Washington,The first president of the United States was George Washington.,0.08392229812593097
+943,"Who was the first U.S. president? It was George Washington! He took office in 1789. He left office in 1797. Now his face is on the $1 bill!
+",When did George Washington leave office?,1797,He left office in 1797.,0.10682175159905853
+943,"Who was the first U.S. president? It was George Washington! He took office in 1789. He left office in 1797. Now his face is on the $1 bill!
+",Which form of American money has George Washington's face on it?,The $1 bill,The $1 bill.,0.8408964152537145
+943,"Who was the first U.S. president? It was George Washington! He took office in 1789. He left office in 1797. Now his face is on the $1 bill!
+",True or False: This text is a work of fiction.,False,True.,0.0
+949,"Once there were two brothers: Orville and Wilbur Wright. They made the first airplane! 
+	But first they failed. They failed a lot. But they tried again. And again. And again. They kept trying. They built new wings. They built new tails. They tried and tried. Then one day, they flew!
+
+
+",What lesson can the reader learn from the true story of the Wright Brothers?,"Even if you fail, if you keep trying you will likely succeed.",The lesson is that you can't just keep trying.,0.07561318691530973
+949,"Once there were two brothers: Orville and Wilbur Wright. They made the first airplane! 
+	But first they failed. They failed a lot. But they tried again. And again. And again. They kept trying. They built new wings. They built new tails. They tried and tried. Then one day, they flew!
+
+
+","Why did the author repeat the phrase ""and again"" so many times?","To show that the brothers tried and failed many, many times.",Because it's a good story.,0.0
+949,"Once there were two brothers: Orville and Wilbur Wright. They made the first airplane! 
+	But first they failed. They failed a lot. But they tried again. And again. And again. They kept trying. They built new wings. They built new tails. They tried and tried. Then one day, they flew!
+
+
+",Which part of the text shows details about HOW the brothers rebuilt the plane?,"""They built new wings. They built new tails.""",The part about the wings.,0.05862502026550899
+949,"Once there were two brothers: Orville and Wilbur Wright. They made the first airplane! 
+	But first they failed. They failed a lot. But they tried again. And again. And again. They kept trying. They built new wings. They built new tails. They tried and tried. Then one day, they flew!
+
+
+",What did the Wright brothers do before they flew?,They failed at flying.,They built airplanes.,0.16186478197091597
+951,"Who took the first safe trip into space? People? Nope! Two Russian dogs! Their names were Belka and Strelka. The year was 1960. They spent a whole day up there. Then they came back safely.
+",What was special about Belka and Strelka?,They were the first creatures from Earth in space.,They were the first dogs to go into space.,0.3155984539112945
+951,"Who took the first safe trip into space? People? Nope! Two Russian dogs! Their names were Belka and Strelka. The year was 1960. They spent a whole day up there. Then they came back safely.
+","What connects the names ""Belka"" and ""Strelka""? ",They rhyme.,"The Russian word for ""dog"" is ""Strelka.""",0.0
+951,"Who took the first safe trip into space? People? Nope! Two Russian dogs! Their names were Belka and Strelka. The year was 1960. They spent a whole day up there. Then they came back safely.
+",Which part of the text tells the reader WHEN Belka and Strelka went to space?,"""The year was 1960.""",The first part.,0.16186478197091597
+951,"Who took the first safe trip into space? People? Nope! Two Russian dogs! Their names were Belka and Strelka. The year was 1960. They spent a whole day up there. Then they came back safely.
+","Why does the author begin by asking a question, and giving the wrong answer?",To show that what the reader might expect is not true.,I'm not sure.,0.0156963464356626
+952,"King Tut was a ruler in Egypt. But he was only nine years old! 
+
+
+","Which meaning of the word ""ruler"" is being used in the sentence: ""King Tut was a ruler in Egypt.""?",A person who is the leader of a place or group,"The meaning of the word ""ruler"" is ""a ruler of a country.""",0.08516593018819643
+952,"King Tut was a ruler in Egypt. But he was only nine years old! 
+
+
+",What was unusual about King Tut?,He was still a child when he was ruler.,He was the first king to be born in the New Kingdom.,0.06772997136689071
+952,"King Tut was a ruler in Egypt. But he was only nine years old! 
+
+
+",Which part of the text tells the reader WHAT PLACE King Tut was ruler of?,"""King Tut was a ruler in Egypt.""",The first part of the text tells us that King Tut was ruler of the Kingdom of Egypt.,0.09083627868206415
+952,"King Tut was a ruler in Egypt. But he was only nine years old! 
+
+
+",How old was King Tut when he ruled Egypt?,9 years old,He was only nine years old when he ruled Egypt.,0.08392229812593097
+953,"Mozart was a genius. He wrote music. He played music, too. By age five, he could play the piano! And he was good. So good that he played for kings and queen! He was a rock star (of the 1700s)!
+",Who was Mozart?,A famous musician,Mozart was a genius.,0.15973577606156814
+953,"Mozart was a genius. He wrote music. He played music, too. By age five, he could play the piano! And he was good. So good that he played for kings and queen! He was a rock star (of the 1700s)!
+",Which sentence shows the best proof that Mozart was extremely talented?,"""So good that he played for kings and queens.""","""He was a genius.""",0.045765066071824394
+953,"Mozart was a genius. He wrote music. He played music, too. By age five, he could play the piano! And he was good. So good that he played for kings and queen! He was a rock star (of the 1700s)!
+","What is meant by the phrase ""(of the 1700s)"" in the last sentence?",Mozart lived during the 1700s.,Mozart was a genius.,0.12440234748126783
+953,"Mozart was a genius. He wrote music. He played music, too. By age five, he could play the piano! And he was good. So good that he played for kings and queen! He was a rock star (of the 1700s)!
+","Why is the phrase ""(of the 1700s)"" written in brackets ""( )""?",To show that the phrase is a side note.,Because Mozart was a genius.,0.04799810699119213
+953,"Mozart was a genius. He wrote music. He played music, too. By age five, he could play the piano! And he was good. So good that he played for kings and queen! He was a rock star (of the 1700s)!
+",How old was Mozart when he learned to play the piano?,5,He was born in 1718.,0.0
+954,"Bobby Fischer loved chess. He was a World Champion. He set records. He was the best. And he was only 14!
+",What was Bobby Fischer the best at?,Chess,He was the best at chess.,0.08116697886877472
+954,"Bobby Fischer loved chess. He was a World Champion. He set records. He was the best. And he was only 14!
+",What information can the reader get about this passage from the title?,The name of the person who the text is about,Fischer's father was a chess player.,0.0
+954,"Bobby Fischer loved chess. He was a World Champion. He set records. He was the best. And he was only 14!
+",What was unusual about Bobby Fischer?,He was extremely good at chess for someone so young.,He was a very good chess player.,0.10175282441454783
+954,"Bobby Fischer loved chess. He was a World Champion. He set records. He was the best. And he was only 14!
+","What does the word ""champion"" mean?",Someone who is the very best at something.,It means something.,0.04266709328925954
+955,"The black cat dashed across the road right in front of Lyle. He froze on the spot. His mouth hung open.
+	""Oh no!” he gasped. ""That’s bad luck! Really bad! I'm cursed!”
+",What hints about the story get the reader get from the title?,An important object or symbol,The title is a reference to the story's title.,0.0
+955,"The black cat dashed across the road right in front of Lyle. He froze on the spot. His mouth hung open.
+	""Oh no!” he gasped. ""That’s bad luck! Really bad! I'm cursed!”
+",Why does Lyle think he is cursed?,Because a black cat crossed his path.,Because he is a black cat.,0.2748254571080018
+955,"The black cat dashed across the road right in front of Lyle. He froze on the spot. His mouth hung open.
+	""Oh no!” he gasped. ""That’s bad luck! Really bad! I'm cursed!”
+","What is the meaning of the word ""dash"" as it is used here: ""The black cat dashed across the road...""?",To run quickly,"The word ""dash"" is used here to describe a sudden and unexpected movement.",0.03089055318156698
+956,"Mel held the sweaty sticks. She beat the snare drum with her left hand. She crashed the cymbal with her right hand. She kicked the bass drum with the pedal. It was so LOUD!
+	She loved it!
+
+
+",What is Mel doing in this story?,Playing the drums,Mel is a musician.,0.0
+956,"Mel held the sweaty sticks. She beat the snare drum with her left hand. She crashed the cymbal with her right hand. She kicked the bass drum with the pedal. It was so LOUD!
+	She loved it!
+
+
+","Why is the word ""loud"" written all in uppercase letters?",To show that it was really loud.,Because it's the only way to write it.,0.06567274736060397
+956,"Mel held the sweaty sticks. She beat the snare drum with her left hand. She crashed the cymbal with her right hand. She kicked the bass drum with the pedal. It was so LOUD!
+	She loved it!
+
+
+",How do you think Mel is feeling?,Happy,She's feeling good.,0.0
+956,"Mel held the sweaty sticks. She beat the snare drum with her left hand. She crashed the cymbal with her right hand. She kicked the bass drum with the pedal. It was so LOUD!
+	She loved it!
+
+
+",What is the most likely reason for why Mel's drum sticks were sweaty?,Because she had already been playing the drums for a while.,It's because she was a drummer.,0.07807646168419154
+956,"Mel held the sweaty sticks. She beat the snare drum with her left hand. She crashed the cymbal with her right hand. She kicked the bass drum with the pedal. It was so LOUD!
+	She loved it!
+
+
+",What was Mel doing with her right hand?,Crashing the cymbal,She was playing the cymbal with her right hand.,0.09535414040914189
+957,"""If only you could talk,” Greg groaned to the plant. ""You could tell me who’s guilty. You must have seen the whole thing! If you only had eyes, that is…”
+	But then Greg saw it. A clue! A hair hanging from a leaf. A dark, curly hair!
+	""Aha!” Greg cried.
+
+",Who is Greg talking to?,The plant,The plant.,0.5946035575013605
+957,"""If only you could talk,” Greg groaned to the plant. ""You could tell me who’s guilty. You must have seen the whole thing! If you only had eyes, that is…”
+	But then Greg saw it. A clue! A hair hanging from a leaf. A dark, curly hair!
+	""Aha!” Greg cried.
+
+",What is Greg trying to do?,Solve a mystery or crime.,He's trying to get the plant to talk.,0.0
+957,"""If only you could talk,” Greg groaned to the plant. ""You could tell me who’s guilty. You must have seen the whole thing! If you only had eyes, that is…”
+	But then Greg saw it. A clue! A hair hanging from a leaf. A dark, curly hair!
+	""Aha!” Greg cried.
+
+","Why does Greg say ""Aha!"" at the end of this passage?",Because he found a clue that would help him solve the crime.,Because he's a genius.,0.025708144432736026
+957,"""If only you could talk,” Greg groaned to the plant. ""You could tell me who’s guilty. You must have seen the whole thing! If you only had eyes, that is…”
+	But then Greg saw it. A clue! A hair hanging from a leaf. A dark, curly hair!
+	""Aha!” Greg cried.
+
+","What does the ellipsis (...) mean in this sentence: ""If only you had eyes, that is...""?",Greg trailed off at the end of his sentence.,"It means ""if only you had eyes, that is...""",0.0
+958,"The cauldron hissed and spit. The potion's color changed: Blue! Red! Acid green! It smelled of mint… and moldy cheese. 
+	A strange sound rang from the pot. Faint voices sung within. But who?
+
+
+","Which word from the text is a synonym (different word that means the same thing), for ""cauldron""?",Pot,"The word ""cauldron"" is a synonym for ""pot.""",0.05522397783539471
+958,"The cauldron hissed and spit. The potion's color changed: Blue! Red! Acid green! It smelled of mint… and moldy cheese. 
+	A strange sound rang from the pot. Faint voices sung within. But who?
+
+
+",What is the question at the end of the passage asking about?,Whose voices are singing from inside the cauldron?,What is the question at the end of the passage asking about?,0.033864985683445356
+959,"The sock was wrong. She thought she was a mitten. But she wasn’t. She was a sock.
+	""But I’m made of cloth,” said the sock.
+	""So are lots of things,” I said.
+	""But I keep your fingers warm,” said the sock.
+	""My toes, you mean,” I said.
+	""Yes,” said the sock. ""Your hand toes.”
+	""No, my feet toes!” I said.
+	""How can you tell your hands from your feet?” said the sock.
+	""My feet are on the ground,” I said. ""My hands are up here.”
+	""What about when you do a handstand?” said the sock.
+	""Well, that doesn’t–” I said.
+	""Then your feet are your hands!” said the sock.
+	""No, but–” I said.
+	""And your toes are your fingers!” said the sock.
+	""No, you–” I said.
+	""So your socks are your mittens!” said the sock, proudly.
+	I looked at the proud sock. ""Yes,” I said. ""I guess you’re right.”
+
+
+",Who is telling this story?,The owner of a sock,The sock.,0.07888842466409754
+959,"The sock was wrong. She thought she was a mitten. But she wasn’t. She was a sock.
+	""But I’m made of cloth,” said the sock.
+	""So are lots of things,” I said.
+	""But I keep your fingers warm,” said the sock.
+	""My toes, you mean,” I said.
+	""Yes,” said the sock. ""Your hand toes.”
+	""No, my feet toes!” I said.
+	""How can you tell your hands from your feet?” said the sock.
+	""My feet are on the ground,” I said. ""My hands are up here.”
+	""What about when you do a handstand?” said the sock.
+	""Well, that doesn’t–” I said.
+	""Then your feet are your hands!” said the sock.
+	""No, but–” I said.
+	""And your toes are your fingers!” said the sock.
+	""No, you–” I said.
+	""So your socks are your mittens!” said the sock, proudly.
+	I looked at the proud sock. ""Yes,” I said. ""I guess you’re right.”
+
+
+",Who is the narrator talking to?,A sock,The narrator is the narrator.,0.0
+959,"The sock was wrong. She thought she was a mitten. But she wasn’t. She was a sock.
+	""But I’m made of cloth,” said the sock.
+	""So are lots of things,” I said.
+	""But I keep your fingers warm,” said the sock.
+	""My toes, you mean,” I said.
+	""Yes,” said the sock. ""Your hand toes.”
+	""No, my feet toes!” I said.
+	""How can you tell your hands from your feet?” said the sock.
+	""My feet are on the ground,” I said. ""My hands are up here.”
+	""What about when you do a handstand?” said the sock.
+	""Well, that doesn’t–” I said.
+	""Then your feet are your hands!” said the sock.
+	""No, but–” I said.
+	""And your toes are your fingers!” said the sock.
+	""No, you–” I said.
+	""So your socks are your mittens!” said the sock, proudly.
+	I looked at the proud sock. ""Yes,” I said. ""I guess you’re right.”
+
+
+",What are the different views of the sock and the narrator?,"The sock thinks it is a mitten, but the narrator does not agree.",The,2.1723071100442665e-06
+959,"The sock was wrong. She thought she was a mitten. But she wasn’t. She was a sock.
+	""But I’m made of cloth,” said the sock.
+	""So are lots of things,” I said.
+	""But I keep your fingers warm,” said the sock.
+	""My toes, you mean,” I said.
+	""Yes,” said the sock. ""Your hand toes.”
+	""No, my feet toes!” I said.
+	""How can you tell your hands from your feet?” said the sock.
+	""My feet are on the ground,” I said. ""My hands are up here.”
+	""What about when you do a handstand?” said the sock.
+	""Well, that doesn’t–” I said.
+	""Then your feet are your hands!” said the sock.
+	""No, but–” I said.
+	""And your toes are your fingers!” said the sock.
+	""No, you–” I said.
+	""So your socks are your mittens!” said the sock, proudly.
+	I looked at the proud sock. ""Yes,” I said. ""I guess you’re right.”
+
+
+",What does it mean when the narrator's sentences end with a long dash (–)?,The sock is talking over the narrator.,When the narrator's sentences end,0.07160476144948855
+959,"The sock was wrong. She thought she was a mitten. But she wasn’t. She was a sock.
+	""But I’m made of cloth,” said the sock.
+	""So are lots of things,” I said.
+	""But I keep your fingers warm,” said the sock.
+	""My toes, you mean,” I said.
+	""Yes,” said the sock. ""Your hand toes.”
+	""No, my feet toes!” I said.
+	""How can you tell your hands from your feet?” said the sock.
+	""My feet are on the ground,” I said. ""My hands are up here.”
+	""What about when you do a handstand?” said the sock.
+	""Well, that doesn’t–” I said.
+	""Then your feet are your hands!” said the sock.
+	""No, but–” I said.
+	""And your toes are your fingers!” said the sock.
+	""No, you–” I said.
+	""So your socks are your mittens!” said the sock, proudly.
+	I looked at the proud sock. ""Yes,” I said. ""I guess you’re right.”
+
+
+",What happens at the end of this story?,The narrator gives up and agrees with the sock.,The sock is a sock.,0.09599621398238424
+959,"The sock was wrong. She thought she was a mitten. But she wasn’t. She was a sock.
+	""But I’m made of cloth,” said the sock.
+	""So are lots of things,” I said.
+	""But I keep your fingers warm,” said the sock.
+	""My toes, you mean,” I said.
+	""Yes,” said the sock. ""Your hand toes.”
+	""No, my feet toes!” I said.
+	""How can you tell your hands from your feet?” said the sock.
+	""My feet are on the ground,” I said. ""My hands are up here.”
+	""What about when you do a handstand?” said the sock.
+	""Well, that doesn’t–” I said.
+	""Then your feet are your hands!” said the sock.
+	""No, but–” I said.
+	""And your toes are your fingers!” said the sock.
+	""No, you–” I said.
+	""So your socks are your mittens!” said the sock, proudly.
+	I looked at the proud sock. ""Yes,” I said. ""I guess you’re right.”
+
+
+",How do you think the narrator feels during most of this scene?,Frustrated,I think he feels like he's,0.0
+959,"The sock was wrong. She thought she was a mitten. But she wasn’t. She was a sock.
+	""But I’m made of cloth,” said the sock.
+	""So are lots of things,” I said.
+	""But I keep your fingers warm,” said the sock.
+	""My toes, you mean,” I said.
+	""Yes,” said the sock. ""Your hand toes.”
+	""No, my feet toes!” I said.
+	""How can you tell your hands from your feet?” said the sock.
+	""My feet are on the ground,” I said. ""My hands are up here.”
+	""What about when you do a handstand?” said the sock.
+	""Well, that doesn’t–” I said.
+	""Then your feet are your hands!” said the sock.
+	""No, but–” I said.
+	""And your toes are your fingers!” said the sock.
+	""No, you–” I said.
+	""So your socks are your mittens!” said the sock, proudly.
+	I looked at the proud sock. ""Yes,” I said. ""I guess you’re right.”
+
+
+",Why do you think the narrator agrees with the sock at the end of the passage?,Because the narrator thought it would make the sock happy.,Because the sock is right.,0.10343690622931698
+959,"The sock was wrong. She thought she was a mitten. But she wasn’t. She was a sock.
+	""But I’m made of cloth,” said the sock.
+	""So are lots of things,” I said.
+	""But I keep your fingers warm,” said the sock.
+	""My toes, you mean,” I said.
+	""Yes,” said the sock. ""Your hand toes.”
+	""No, my feet toes!” I said.
+	""How can you tell your hands from your feet?” said the sock.
+	""My feet are on the ground,” I said. ""My hands are up here.”
+	""What about when you do a handstand?” said the sock.
+	""Well, that doesn’t–” I said.
+	""Then your feet are your hands!” said the sock.
+	""No, but–” I said.
+	""And your toes are your fingers!” said the sock.
+	""No, you–” I said.
+	""So your socks are your mittens!” said the sock, proudly.
+	I looked at the proud sock. ""Yes,” I said. ""I guess you’re right.”
+
+
+",The sock says that it must be a mitten because it is made of cloth. How does the narrator argue with this point?,"By saying that many things are made from cloth, not just mittens.",The sock says that it must be,0.03214954573057458
+960,"The table lay in two pieces. 
+	""I hope someone fixes us,” one half said. ""But they’ill have to be careful.”
+	""Why is that?” asked the other half.
+	""So they don’t fall in the hole!” it said.
+	""What hole?”
+	""The one we would make! You know, two halves make a whole!”
+
+
+",Who are the main characters in this story?,Two halves of a table,The main characters are the two halves of the table.,0.16784459625186196
+960,"The table lay in two pieces. 
+	""I hope someone fixes us,” one half said. ""But they’ill have to be careful.”
+	""Why is that?” asked the other half.
+	""So they don’t fall in the hole!” it said.
+	""What hole?”
+	""The one we would make! You know, two halves make a whole!”
+
+
+","What is the meaning of the word ""hole"" as it is used here: ""So they don't fall in the hole!""?",A hollow or empty place; a pit.,"The word ""hole"" is used here to mean """,0.0
+960,"The table lay in two pieces. 
+	""I hope someone fixes us,” one half said. ""But they’ill have to be careful.”
+	""Why is that?” asked the other half.
+	""So they don’t fall in the hole!” it said.
+	""What hole?”
+	""The one we would make! You know, two halves make a whole!”
+
+
+","What is the meaning of the word ""whole"" as it is used here: ""You know, two halves make a whole!""?",A complete or unbroken item,"The word ""whole"" is used here to indicate",0.0
+960,"The table lay in two pieces. 
+	""I hope someone fixes us,” one half said. ""But they’ill have to be careful.”
+	""Why is that?” asked the other half.
+	""So they don’t fall in the hole!” it said.
+	""What hole?”
+	""The one we would make! You know, two halves make a whole!”
+
+
+","How do the words ""hole"" and ""whole"" relate to each other?","They are homophones (words that look different, but sound the same).","The word ""hole"" is a contraction of the word """,0.0379680177759557
+960,"The table lay in two pieces. 
+	""I hope someone fixes us,” one half said. ""But they’ill have to be careful.”
+	""Why is that?” asked the other half.
+	""So they don’t fall in the hole!” it said.
+	""What hole?”
+	""The one we would make! You know, two halves make a whole!”
+
+
+","The joke in this passage is based on a _______, using the words ""hole"" and ""whole.""",Pun,The joke in this passage is based on a _______,0.0
+960,"The table lay in two pieces. 
+	""I hope someone fixes us,” one half said. ""But they’ill have to be careful.”
+	""Why is that?” asked the other half.
+	""So they don’t fall in the hole!” it said.
+	""What hole?”
+	""The one we would make! You know, two halves make a whole!”
+
+
+",This story has pieces of a table talking to each other. This detail suggests that the story is likely _______.,Fable,_______.,0.0
+961,"Esh ran with the river. It ran through forests. It ran across fields. It ran down hills. But Esh reached its end at last. The river ended at the sky's edge.
+
+
+",Who is the main character of this story?,Esh,Esh is the main character.,0.10682175159905853
+961,"Esh ran with the river. It ran through forests. It ran across fields. It ran down hills. But Esh reached its end at last. The river ended at the sky's edge.
+
+
+",Where did the river end?,At the sky's edge,It ended at the sky's edge.,0.5081327481546147
+961,"Esh ran with the river. It ran through forests. It ran across fields. It ran down hills. But Esh reached its end at last. The river ended at the sky's edge.
+
+
+","Which word could best replace ""ran"" in each of these sentences: ""The river ran through forests. It ran across fields. It ran down hills.""?",Flowed,"""The river ran through forests.",0.0
+961,"Esh ran with the river. It ran through forests. It ran across fields. It ran down hills. But Esh reached its end at last. The river ended at the sky's edge.
+
+
+",What hints about the story can the reader learn from its title?,An important object or symbol,The story is about a man who has lost his way.,0.0
+961,"Esh ran with the river. It ran through forests. It ran across fields. It ran down hills. But Esh reached its end at last. The river ended at the sky's edge.
+
+
+",Which detail in the text suggests that this story is a fairy tale or fable?,"It includes the sky's edge, which is not a real place.",The story is told in the form of a fairy tale.,0.04932351569489709
+962,"The sky train whizzed through the clouds. A bird zoomed by the window. Lil sighed.
+	""This is so lame,” she said. ""I wish I had my jetpack.”
+
+
+",Where does this story take place?,In a train in the sky,It takes place in the year 2071.,0.13134549472120793
+962,"The sky train whizzed through the clouds. A bird zoomed by the window. Lil sighed.
+	""This is so lame,” she said. ""I wish I had my jetpack.”
+
+
+",How do you think Lil is feeling?,Bored,She's feeling pretty good.,0.0
+962,"The sky train whizzed through the clouds. A bird zoomed by the window. Lil sighed.
+	""This is so lame,” she said. ""I wish I had my jetpack.”
+
+
+","Based on the details in the text, when does this story most likely take place?",The future,I'm not sure.,0.0
+962,"The sky train whizzed through the clouds. A bird zoomed by the window. Lil sighed.
+	""This is so lame,” she said. ""I wish I had my jetpack.”
+
+
+","Which sense does the word ""whizzed"" most relate to?",Sound,"The sense of ""to fly.""",0.0
+962,"The sky train whizzed through the clouds. A bird zoomed by the window. Lil sighed.
+	""This is so lame,” she said. ""I wish I had my jetpack.”
+
+
+","Which word could best replace ""zoomed"" as it is used here: ""A bird zoomed by the window.""?",Flew,"""A bird zoomed by the window.""",0.0
+963,"Nestor ran into the temple. He was out of breath.
+	""Why are you late?” Troy asked.
+	""It’s cloudy!” Nestor said. 
+	""So what?""
+	""So I couldn’t read my sundial! That's what!”
+
+",What is a sundial?,"An object that tells time with shadows, based on how the sun moves through the sky.",A sundial is a device that measures the time of day.,0.03130743172172377
+963,"Nestor ran into the temple. He was out of breath.
+	""Why are you late?” Troy asked.
+	""It’s cloudy!” Nestor said. 
+	""So what?""
+	""So I couldn’t read my sundial! That's what!”
+
+",Who was late?,Nestor,The sun.,0.0
+963,"Nestor ran into the temple. He was out of breath.
+	""Why are you late?” Troy asked.
+	""It’s cloudy!” Nestor said. 
+	""So what?""
+	""So I couldn’t read my sundial! That's what!”
+
+","Who said, ""So what?""?",Troy,The sun.,0.0
+963,"Nestor ran into the temple. He was out of breath.
+	""Why are you late?” Troy asked.
+	""It’s cloudy!” Nestor said. 
+	""So what?""
+	""So I couldn’t read my sundial! That's what!”
+
+",Why was Nestor late?,"Because he couldn't read his sundial, so he didn't know the time.",Because he was out of breath.,0.05971932565563823
+963,"Nestor ran into the temple. He was out of breath.
+	""Why are you late?” Troy asked.
+	""It’s cloudy!” Nestor said. 
+	""So what?""
+	""So I couldn’t read my sundial! That's what!”
+
+",Where does this story take place?,The temple,The story takes place in the year 20XX.,0.05522397783539471
+964,"Winnie stared hard at the old man. ""So,” she said. ""If you’re right, there’s only one way out of here. Well, at least one way out <i>alive</i>.”
+	""Yup,” he growled.
+	""We’ve got to get a gem–”
+	""Yup.”
+	""From each cave–”
+	""Yup.”
+	""And line them up–”
+	""Yup.”
+	""In exactly the right spot–”
+	""Yup.”
+	""At exactly the right time–”
+	""Yup.”
+	""For the sun beam to hit them juuuuust right.”
+	""Uh huh. Yup.”
+	""Great,” she sighed. ""What could go wrong?”
+
+
+",Who is the main character of this story?,Winne,The main character is a young man,0.0
+964,"Winnie stared hard at the old man. ""So,” she said. ""If you’re right, there’s only one way out of here. Well, at least one way out <i>alive</i>.”
+	""Yup,” he growled.
+	""We’ve got to get a gem–”
+	""Yup.”
+	""From each cave–”
+	""Yup.”
+	""And line them up–”
+	""Yup.”
+	""In exactly the right spot–”
+	""Yup.”
+	""At exactly the right time–”
+	""Yup.”
+	""For the sun beam to hit them juuuuust right.”
+	""Uh huh. Yup.”
+	""Great,” she sighed. ""What could go wrong?”
+
+
+",Which statement is the best retelling of this story?,Winnie and the old man have to collect gems from the caves and set them up exactly right in order to escape.,The best retelling is the one,0.00670684487985247
+964,"Winnie stared hard at the old man. ""So,” she said. ""If you’re right, there’s only one way out of here. Well, at least one way out <i>alive</i>.”
+	""Yup,” he growled.
+	""We’ve got to get a gem–”
+	""Yup.”
+	""From each cave–”
+	""Yup.”
+	""And line them up–”
+	""Yup.”
+	""In exactly the right spot–”
+	""Yup.”
+	""At exactly the right time–”
+	""Yup.”
+	""For the sun beam to hit them juuuuust right.”
+	""Uh huh. Yup.”
+	""Great,” she sighed. ""What could go wrong?”
+
+
+",What hints about the story can the reader get from its title?,The plot,The title is a reference to the,0.06567274736060397
+964,"Winnie stared hard at the old man. ""So,” she said. ""If you’re right, there’s only one way out of here. Well, at least one way out <i>alive</i>.”
+	""Yup,” he growled.
+	""We’ve got to get a gem–”
+	""Yup.”
+	""From each cave–”
+	""Yup.”
+	""And line them up–”
+	""Yup.”
+	""In exactly the right spot–”
+	""Yup.”
+	""At exactly the right time–”
+	""Yup.”
+	""For the sun beam to hit them juuuuust right.”
+	""Uh huh. Yup.”
+	""Great,” she sighed. ""What could go wrong?”
+
+
+",Which character knows more about what they need to do to escape?,The old man,The character who knows more about what,0.06567274736060397
+964,"Winnie stared hard at the old man. ""So,” she said. ""If you’re right, there’s only one way out of here. Well, at least one way out <i>alive</i>.”
+	""Yup,” he growled.
+	""We’ve got to get a gem–”
+	""Yup.”
+	""From each cave–”
+	""Yup.”
+	""And line them up–”
+	""Yup.”
+	""In exactly the right spot–”
+	""Yup.”
+	""At exactly the right time–”
+	""Yup.”
+	""For the sun beam to hit them juuuuust right.”
+	""Uh huh. Yup.”
+	""Great,” she sighed. ""What could go wrong?”
+
+
+","Why is the word ""alive"" written in italics (slanted letters)?",To show that Winnie put focus on that word.,Because it's a little hard to,0.049230261240159306
+964,"Winnie stared hard at the old man. ""So,” she said. ""If you’re right, there’s only one way out of here. Well, at least one way out <i>alive</i>.”
+	""Yup,” he growled.
+	""We’ve got to get a gem–”
+	""Yup.”
+	""From each cave–”
+	""Yup.”
+	""And line them up–”
+	""Yup.”
+	""In exactly the right spot–”
+	""Yup.”
+	""At exactly the right time–”
+	""Yup.”
+	""For the sun beam to hit them juuuuust right.”
+	""Uh huh. Yup.”
+	""Great,” she sighed. ""What could go wrong?”
+
+
+","Why is the word ""just"" written with so many extra ""u""s in this sentence: ""For the sun beam to hit them juuuuust right.”?",To show that Winnie was stretching out the word as she said it.,Because it's a sentence.,0.0
+964,"Winnie stared hard at the old man. ""So,” she said. ""If you’re right, there’s only one way out of here. Well, at least one way out <i>alive</i>.”
+	""Yup,” he growled.
+	""We’ve got to get a gem–”
+	""Yup.”
+	""From each cave–”
+	""Yup.”
+	""And line them up–”
+	""Yup.”
+	""In exactly the right spot–”
+	""Yup.”
+	""At exactly the right time–”
+	""Yup.”
+	""For the sun beam to hit them juuuuust right.”
+	""Uh huh. Yup.”
+	""Great,” she sighed. ""What could go wrong?”
+
+
+",Which one of the characters is more talkative?,Winnie,The one who talks the most.,0.0
+964,"Winnie stared hard at the old man. ""So,” she said. ""If you’re right, there’s only one way out of here. Well, at least one way out <i>alive</i>.”
+	""Yup,” he growled.
+	""We’ve got to get a gem–”
+	""Yup.”
+	""From each cave–”
+	""Yup.”
+	""And line them up–”
+	""Yup.”
+	""In exactly the right spot–”
+	""Yup.”
+	""At exactly the right time–”
+	""Yup.”
+	""For the sun beam to hit them juuuuust right.”
+	""Uh huh. Yup.”
+	""Great,” she sighed. ""What could go wrong?”
+
+
+",Why do many of Winnie's sentences end in a long dash (–)?,To show that the old man is cutting her off.,Because she,0.0
+965,"Tom crashed through the brush. He jumped! He rolled! He ducked! But the lion kept up behind him!
+",What is happening in this story?,A lion is chasing Tom through the woods.,The lion is trying to kill the boy.,0.12223075560872526
+965,"Tom crashed through the brush. He jumped! He rolled! He ducked! But the lion kept up behind him!
+","Why do the words ""lion"" and ""leapt"" in the title sound good together?",They have the same starting sound.,Because they are.,0.08310415003234632
+965,"Tom crashed through the brush. He jumped! He rolled! He ducked! But the lion kept up behind him!
+",What do you think will most likely happen if the lion catches up with Tom?,The lion will attack Tom.,I think the lion will kill him.,0.24446151121745052
+965,"Tom crashed through the brush. He jumped! He rolled! He ducked! But the lion kept up behind him!
+","Which meaning of the word ""brush"" makes most sense for how it is used here: ""Tom crashed through the brush.""?",A grouping of trees or bushes,"""Brush"" is a noun, and ""brush"" is a verb.",0.04767707020457096
+967,"The moth broke free. It cracked its cocoon. It spread its new wings. It flew into the air. It rose and rose.
+	And then it forgot. It forgot ever being any other way.
+
+
+",What did the moth break free from?,A cocoon,It broke free from the cocoon.,0.08116697886877472
+967,"The moth broke free. It cracked its cocoon. It spread its new wings. It flew into the air. It rose and rose.
+	And then it forgot. It forgot ever being any other way.
+
+
+","Which meaning of the word ""rose"" makes most sense for the way it is used here: ""It flew into the air. It rose and rose.""?",Moved from lower to higher,"The meaning of the word ""rose"" is ""to rise."" It is",0.03747776736677922
+967,"The moth broke free. It cracked its cocoon. It spread its new wings. It flew into the air. It rose and rose.
+	And then it forgot. It forgot ever being any other way.
+
+
+",How do you think the moth felt?,Happy,It felt like it was being reborn.,0.0
+968,"Every day Reg watched over his plant with great care. 
+	He saw it sprout. He saw it grow. He saw it bloom.
+	He measured it. He watered it. He turned it in the sun. 
+	That plant was his pride and joy.
+
+
+",Who is the main character of this story?,Reg,Reg is the main character.,0.10682175159905853
+968,"Every day Reg watched over his plant with great care. 
+	He saw it sprout. He saw it grow. He saw it bloom.
+	He measured it. He watered it. He turned it in the sun. 
+	That plant was his pride and joy.
+
+
+",How did Reg feel about the plant?,Proud,He was proud of it.,0.10682175159905853
+968,"Every day Reg watched over his plant with great care. 
+	He saw it sprout. He saw it grow. He saw it bloom.
+	He measured it. He watered it. He turned it in the sun. 
+	That plant was his pride and joy.
+
+
+",True or False: Reg's plant will likely grow to be large and healthy.,True,True.,0.3535533905932738
+969,"Niv flipped through the book. Then the pages fell open. There lay a folded note. It had a gold ex on the front.
+
+
+",Where did Niv find the folded note?,Inside the book,He found it in the library.,0.08116697886877472
+969,"Niv flipped through the book. Then the pages fell open. There lay a folded note. It had a gold ex on the front.
+
+
+",What do you think Niv will most likely do next?,Unfold the note to see what's inside.,I think he'll go back to the city.,0.06567274736060397
+969,"Niv flipped through the book. Then the pages fell open. There lay a folded note. It had a gold ex on the front.
+
+
+",Who is the main character of this story?,Niv,I don't know.,0.0
+969,"Niv flipped through the book. Then the pages fell open. There lay a folded note. It had a gold ex on the front.
+
+
+",What hint about the story can the reader get from its title?,An important object or symbol,The story is about a man who is a thief.,0.0
+969,"Niv flipped through the book. Then the pages fell open. There lay a folded note. It had a gold ex on the front.
+
+
+",Which word best describes this story?,Mysterious,It's a story about a man who is a hero.,0.0
+970,"The sun rose. The doves gently lifted the girl from her bed. They sang sweetly to her. They gave her a gourd of cool water. They lay out a dress for her to wear.
+	""EW!” the girl cried. ""I’m NOT wearing that.”
+
+
+","Why are the words ""ew"" and ""not"" written all in uppercase letters?",To show that the girl is saying them very loudly,Because they are the words that the girl is supposed to say.,0.22416933501922293
+970,"The sun rose. The doves gently lifted the girl from her bed. They sang sweetly to her. They gave her a gourd of cool water. They lay out a dress for her to wear.
+	""EW!” the girl cried. ""I’m NOT wearing that.”
+
+
+",Which details from the text give hints that this story is likely a fairy tale?,There are birds that take care of a human girl.,"The girl is described as being ""very beautiful"" and ""very pretty",0.03747776736677922
+971,"The fuzzy thing had eyes. It looked up at Kal from the palm of his hand. It cooed. Then it grinned. Then it crawled up his arm and onto his back! It sat on his shoulder. It pointed a stubby finger.
+	""That way!” it squeaked.
+
+
+","The word ""squeaked"" tells the reader that the fuzzy thing's voice was ____________.",Small and high,That's right.,0.0
+971,"The fuzzy thing had eyes. It looked up at Kal from the palm of his hand. It cooed. Then it grinned. Then it crawled up his arm and onto his back! It sat on his shoulder. It pointed a stubby finger.
+	""That way!” it squeaked.
+
+
+",Whose point of view is this story being told from?,Kal's,It's,0.0
+971,"The fuzzy thing had eyes. It looked up at Kal from the palm of his hand. It cooed. Then it grinned. Then it crawled up his arm and onto his back! It sat on his shoulder. It pointed a stubby finger.
+	""That way!” it squeaked.
+
+
+","Which sense does the word ""cooed"" relate to?",Sound,The sense,0.0
+971,"The fuzzy thing had eyes. It looked up at Kal from the palm of his hand. It cooed. Then it grinned. Then it crawled up his arm and onto his back! It sat on his shoulder. It pointed a stubby finger.
+	""That way!” it squeaked.
+
+
+",How do you think Kal is feeling?,Confused,He's feeling good.,0.0
