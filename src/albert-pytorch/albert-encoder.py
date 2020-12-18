@@ -21,22 +21,22 @@ encoder_max_length=512
 decoder_max_length=128
 batch_size = 4
 
-def process_data_to_model_inputs(batch, gpu=False):
+def process_data_to_model_inputs(batch):
   # tokenize the inputs and labels
-  inputs = tokenizer(batch["inputs"], padding="longest", truncation=False, return_tensors="pt")
-  outputs = tokenizer(batch["outputs"], padding="longest", truncation=False, return_tensors="pt")
+  inputs = tokenizer(batch["inputs"], padding="max_length", truncation=True, max_length=encoder_max_length)
+  outputs = tokenizer(batch["outputs"], padding="max_length", truncation=True, max_length=decoder_max_length)
 
-  batch["input_ids"] = inputs.input_ids if not gpu else inputs.input_ids.to('cuda')
-  batch["attention_mask"] = inputs.attention_mask if not gpu else inputs.attention_mask.to('cuda')
-  batch["decoder_input_ids"] = outputs.input_ids if not gpu else outputs.input_ids.to('cuda')
-  batch["decoder_attention_mask"] = outputs.attention_mask if not gpu else outputs.attention_mask.to('cuda')
-  batch["labels"] = outputs.input_ids.clone() if not gpu else outputs.input_ids.clone().to('cuda')
+  batch["input_ids"] = inputs.input_ids
+  batch["attention_mask"] = inputs.attention_mask
+  batch["decoder_input_ids"] = outputs.input_ids
+  batch["decoder_attention_mask"] = outputs.attention_mask
+  batch["labels"] = outputs.input_ids.copy()
 
   # because BERT automatically shifts the labels, the labels correspond exactly to `decoder_input_ids`.
   # We have to make sure that the PAD token is ignored
  
-  labels = torch.tensor([[torch.tensor(-100) if token == tokenizer.pad_token_id else token for token in labels] for labels in batch["labels"]])
-  batch["labels"] = labels if not gpu else labels.to('cuda')
+  labels = [[-100 if token == tokenizer.pad_token_id else token for token in labels] for labels in batch["labels"]]
+  batch["labels"] = labels
   return batch
 
 def glue_passage_question(bos_token, eos_token, passage, question=None):
@@ -162,13 +162,12 @@ class Seq2SeqTrainingArguments(TrainingArguments):
     )
 
 # set training arguments - these params are not really tuned, feel free to change
-'''
 training_args = Seq2SeqTrainingArguments(
     output_dir="./",
     per_device_train_batch_size=batch_size,
     per_device_eval_batch_size=batch_size,
     predict_with_generate=True,
-    evaluate_during_training=True,
+    #evaluate_during_training=True,
     do_train=True,
     do_eval=True,
     logging_steps=2,  # set to 1000 for full training
@@ -178,74 +177,56 @@ training_args = Seq2SeqTrainingArguments(
     max_steps=16, # delete for full training
     overwrite_output_dir=True,
     save_total_limit=3 
-)'''
+)
 
 albert2albert = create_albert2albert(tokenizer, gpu=False)
 
-train_dataset = load_dataset('race', 'all', split='train')
-train_dataset = [process_race_row(train_dataset[i]) for i in range(len(train_dataset))]
 
-dev_dataset = load_dataset('race', 'all', split='validation')
-dev_dataset = [process_race_row(dev_dataset[i]) for i in range(len(dev_dataset))]
+def create_race_dataset():
+    train_dataset = load_dataset('race', 'all', split='train')
+    train_dataset = train_dataset.map(process_race_row, remove_columns=["article", 'options', 'question', 'answer', 'example_id'])
+    train_dataset = train_dataset.map(
+        process_data_to_model_inputs, 
+        batched=True, 
+        batch_size=batch_size, 
+        remove_columns=["inputs", "outputs"]
+    )
+    train_dataset.set_format(type="torch", columns=["input_ids", "attention_mask", "decoder_input_ids", "decoder_attention_mask", "labels"],
+    )
 
-test_dataset = load_dataset('race', 'all', split='test')
-test_dataset = [process_race_row(test_dataset[i]) for i in range(len(test_dataset))]
-print(test_dataset[0])
+    dev_dataset = load_dataset('race', 'all', split='validation')
+    dev_dataset = dev_dataset.map(process_race_row, remove_columns=["article", 'options', 'question', 'answer', 'example_id'])
+    dev_dataset = dev_dataset.map(
+        process_data_to_model_inputs, 
+        batched=True, 
+        batch_size=batch_size, 
+        remove_columns=["inputs", "outputs"]
+    )
+    dev_dataset.set_format(type="torch", columns=["input_ids", "attention_mask", "decoder_input_ids", "decoder_attention_mask", "labels"])
 
-exit()
 
-train_data = train_dataset.map(
-    process_data_to_model_inputs, 
-    batched=True, 
-    batch_size=batch_size, 
-    remove_columns=["article", "highlights", "id"]
-)
-train_data.set_format(
-    type="torch", columns=["input_ids", "attention_mask", "decoder_input_ids", "decoder_attention_mask", "labels"],
-)
+    test_dataset = load_dataset('race', 'all', split='test')
+    test_dataset = test_dataset.map(process_race_row, remove_columns=["article", 'options', 'question', 'answer', 'example_id'])
+    test_dataset = test_dataset.map(
+        process_data_to_model_inputs, 
+        batched=True, 
+        batch_size=batch_size, 
+        remove_columns=["inputs", "outputs"]
+    )
+    test_dataset.set_format(type="torch", columns=["input_ids", "attention_mask", "decoder_input_ids", "decoder_attention_mask", "labels"])
+    return train_dataset, dev_dataset, test_dataset
 
-exit()
+train_dataset, dev_dataset, test_dataset = create_race_dataset()
+
+print(dev_dataset[0]['input_ids'].size())
+print(dev_dataset[1]['input_ids'].size())
+
 # instantiate trainer
 trainer = Seq2SeqTrainer(
     model=albert2albert,
     args=training_args,
     compute_metrics=compute_metrics,
-    train_dataset=train_data,
-    eval_dataset=val_data,
+    train_dataset=dev_dataset,
+    eval_dataset=dev_dataset,
 )
 trainer.train()
-
-
-passage = 'This is a long article to summarize'
-question = 'What are we doing in this article ?'
-answer = 'to summarize'
-passage2 = 'This is a long article'
-question2 = 'What are we doing here ?'
-answer2 = 'to clearup my mind.'
-batch = {}
-batch['inputs'] = [glue_passage_question(tokenizer.bos_token, tokenizer.eos_token, passage, question)]
-batch['outputs'] = [glue_passage_question(tokenizer.bos_token, tokenizer.eos_token, answer)]
-batch['inputs'].append(glue_passage_question(tokenizer.bos_token, tokenizer.eos_token, passage2, question2))
-batch['outputs'].append(glue_passage_question(tokenizer.bos_token, tokenizer.eos_token, answer2))
-new_batch = process_data_to_model_inputs(batch, tokenizer)
-del new_batch['inputs']
-del new_batch['outputs']
-optimizer = optim.Adam(filter(lambda p: p.requires_grad, albert2albert.parameters()), lr=0.001)
-seq2seq = albert2albert(**new_batch)
-loss = seq2seq.loss
-predictions = seq2seq.logits.detach().cpu().tolist()
-preds = predictions[0]
-preds = np.argmax(preds, axis=1)
-print(preds)
-print(loss)
-for i in range(3):
-    optimizer.zero_grad()
-    loss.backward()
-    optimizer.step()
-    seq2seq = albert2albert(**new_batch)
-    loss = seq2seq.loss
-    predictions = seq2seq.logits.detach().cpu().tolist()
-    preds = predictions[0]
-    preds = np.argmax(preds, axis=1)
-    print(preds)
-    print(loss)
