@@ -1,3 +1,5 @@
+# Generate GPT2 responses to questions
+
 import json
 import pandas as pd
 
@@ -14,6 +16,9 @@ with open(clean_dir/'passages_questions_answers.json') as input_file:
 
 
 def get_rows(passage):
+    """
+    Generates rows for a given passage
+    """
     rows = []
     passage_id= passage['passageId']
     print(f"Processing: {passage_id}")
