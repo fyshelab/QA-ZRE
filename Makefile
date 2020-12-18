@@ -1,9 +1,9 @@
 .PHONY: install
 install:
 
-	python3 -m venv env; \
+	python3.7 -m venv env; \
 	. env/bin/activate; \
-	pip3 install -r requirements.txt; \
+	python3.7 -m pip install -r requirements.txt; \
 
 .PHONY: clean_code
 clean_code:
