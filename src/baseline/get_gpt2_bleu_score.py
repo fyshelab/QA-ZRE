@@ -1,8 +1,13 @@
+#%% 
+# Generate bleu and nist scores for gpt2 daat
+# VS Code Notebook
+
 #%%
 import pandas as pd
 import re
 
 from nltk.translate.bleu_score import sentence_bleu, SmoothingFunction
+from nltk.translate.nist_score import sentence_nist
 from pathlib import Path
 
 clean_regex = re.compile(r'[^\w\s]')
@@ -14,26 +19,41 @@ clean_dir = repo_root/'data/dreamscape-clean'
 chencherry = SmoothingFunction()
 
 def tokenize_string(string):
+    """
+    Breaks strings up into tokens and cleans them
+    """
     clean_string = clean_regex.sub('',string.lower())
     return split_regex.split(clean_string)
 
+df = pd.read_csv(clean_dir/'gpt2_predictions.csv')
+# %%
 def get_bleu_score(row):
+    """
+    Generate bleu score for row
+    """
     correct_tokens = tokenize_string(row['correct_answer'])
     gpt2_tokens = tokenize_string(row['gpt2_answer'])
 
-    # Handle division by 0 case with smoothing
-    # if len(gpt2_tokens)==1:
-    #     return sentence_bleu([correct_tokens],gpt2_tokens, weights=(1,))
-
-    # Method 4 should penalize longer answers less
+    # Maybe there is a better smoothing method other than 3
     return sentence_bleu([correct_tokens],gpt2_tokens,smoothing_function=chencherry.method3)
 
-df = pd.read_csv(clean_dir/'gpt2_predictions.csv')
-# %%
 df['bleu_score'] = df.apply(get_bleu_score,axis=1)
-# %%
 print(f"Mean: {df['bleu_score'].mean()}")
 print(f"Median: {df['bleu_score'].median()}")
+#%%
+def get_nist_score(row):
+    """
+    Generate nist score for row
+    """
+    correct_tokens = tokenize_string(row['correct_answer'])
+    gpt2_tokens = tokenize_string(row['gpt2_answer'])
+
+    return sentence_nist([correct_tokens],gpt2_tokens,n=min(len(correct_tokens),len(gpt2_tokens),5))
+
+df['nist_score'] = df.apply(get_nist_score,axis=1)
+print(f"Mean: {df['nist_score'].mean()}")
+print(f"Median: {df['nist_score'].median()}")
 # %%
-df.to_csv(clean_dir/'gpt2_bleu_scores.csv',encoding='utf8', index = False)
+# %%
+df.to_csv(clean_dir/'gpt2_scores.csv',encoding='utf8', index = False)
 # %%
