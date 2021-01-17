@@ -683,7 +683,7 @@ class AlbertModel(nn.Module):
         )
 
 
-class AlbertEncoderDecoder(object):
+class AlbertEncoderDecoder(nn.Module):
     """Complete Albert Model used as encoder and decoder."""
 
     def __init__(self, config):
@@ -691,8 +691,31 @@ class AlbertEncoderDecoder(object):
 
         config: `AlbertConfig` instance.
         """
+        super(AlbertEncoderDecoder, self).__init__()
         config.is_decoder = False
         self.encoder = AlbertModel(config)
 
         config.is_decoder = True
         self.decoder = AlbertModel(config)
+
+    def forward(
+        self,
+        input_ids,
+        target_ids,
+        input_mask=None,
+        target_mask=None,
+        token_type_ids=None,
+        target_token_type_ids=None,
+    ) -> torch.FloatTensor:
+        """Overall computation in the encoder decoder model."""
+        encoder_output = self.encoder(
+            input_ids=input_ids, input_mask=input_mask, token_type_ids=token_type_ids
+        )
+        decoder_output = self.decoder(
+            input_ids=target_ids,
+            input_mask=target_mask,
+            token_type_ids=target_token_type_ids,
+            encoder_hidden_output=encoder_output,
+            encoder_input_mask=input_mask,
+        )
+        return decoder_output
