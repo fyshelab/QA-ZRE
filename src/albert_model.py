@@ -4,6 +4,9 @@ Some parts are from:
 https://github.com/jadore801120/attention-is-all-you-need-pytorch/tree/master/transformer
 https://github.com/google-research/albert
 """
+import copy
+import io
+import json
 import math
 import random
 from dataclasses import dataclass
@@ -11,6 +14,7 @@ from typing import Any, List, Optional, Tuple
 
 import numpy
 import numpy as np
+import six
 import torch
 import torch.nn as nn
 
@@ -77,7 +81,6 @@ class AlbertEmbedding(nn.Module):
         word_pad_id: int,
         token_type_pad_id: int,
         embedding_size: Optional[int] = 128,
-        initializer_range: Optional[float] = 0.02,
         token_type_vocab_size: Optional[int] = 16,
         use_position_embeddings: Optional[bool] = True,
         max_position_embeddings: Optional[int] = 512,
@@ -485,3 +488,211 @@ class TransformerModel(nn.Module):
             )
 
         return layer_input
+
+
+class AlbertConfig(object):
+    """Configuration for `AlbertModel`.
+
+    The default settings match the configuration of model
+    `albert_xxlarge`.
+    """
+
+    def __init__(
+        self,
+        vocab_size,
+        embedding_size=128,
+        hidden_size=4096,
+        num_hidden_layers=12,
+        num_hidden_groups=1,
+        num_attention_heads=64,
+        intermediate_size=16384,
+        inner_group_num=1,
+        down_scale_factor=1,
+        hidden_act="gelu",
+        hidden_dropout_prob=0,
+        attention_probs_dropout_prob=0,
+        max_position_embeddings=512,
+        type_vocab_size=2,
+        initializer_range=0.02,
+        go_symbol_id=None,
+        is_decoder=False,
+        word_pad_id=0,
+        token_type_pad_id=0,
+        use_position_embeddings=True,
+    ):
+        """Constructs AlbertConfig.
+
+        Args:
+          vocab_size: Vocabulary size of `inputs_ids` in `AlbertModel`.
+          embedding_size: size of voc embeddings.
+          hidden_size: Size of the encoder layers and the pooler layer.
+          num_hidden_layers: Number of hidden layers in the Transformer encoder.
+          num_hidden_groups: Number of group for the hidden layers, parameters in
+            the same group are shared.
+          num_attention_heads: Number of attention heads for each attention layer in
+            the Transformer encoder.
+          intermediate_size: The size of the "intermediate" (i.e., feed-forward)
+            layer in the Transformer encoder.
+          inner_group_num: int, number of inner repetition of attention and ffn.
+          down_scale_factor: float, the scale to apply
+          hidden_act: The non-linear activation function (function or string) in the
+            encoder and pooler.
+          hidden_dropout_prob: The dropout probability for all fully connected
+            layers in the embeddings, encoder, and pooler.
+          attention_probs_dropout_prob: The dropout ratio for the attention
+            probabilities.
+          max_position_embeddings: The maximum sequence length that this model might
+            ever be used with. Typically set this to something large just in case
+            (e.g., 512 or 1024 or 2048).
+          type_vocab_size: The vocabulary size of the `token_type_ids` passed into
+            `AlbertModel`.
+          initializer_range: The stdev of the truncated_normal_initializer for
+            initializing all weight matrices.
+          is_decoder: will this model used as decoder or encoder. The default is False (encoder).
+          go_symbol_id: the id for the go symbol token used as the first input to decoder transformer.
+        """
+        self.vocab_size = vocab_size
+        self.embedding_size = embedding_size
+        self.hidden_size = hidden_size
+        self.num_hidden_layers = num_hidden_layers
+        self.num_hidden_groups = num_hidden_groups
+        self.num_attention_heads = num_attention_heads
+        self.inner_group_num = inner_group_num
+        self.down_scale_factor = down_scale_factor
+        self.hidden_act = hidden_act
+        self.intermediate_size = intermediate_size
+        self.hidden_dropout_prob = hidden_dropout_prob
+        self.attention_probs_dropout_prob = attention_probs_dropout_prob
+        self.use_position_embeddings = use_position_embeddings
+        self.max_position_embeddings = max_position_embeddings
+        self.token_type_vocab_size = type_vocab_size
+        self.initializer_range = initializer_range
+        self.is_decoder = is_decoder
+        self.go_symbol_id = go_symbol_id
+        self.word_pad_id = word_pad_id
+        self.token_type_pad_id = token_type_pad_id
+
+    @classmethod
+    def from_dict(cls, json_object):
+        """Constructs a `AlbertConfig` from a Python dictionary of
+        parameters."""
+        config = AlbertConfig(vocab_size=None)
+        for (key, value) in six.iteritems(json_object):
+            config.__dict__[key] = value
+        return config
+
+    @classmethod
+    def from_json_file(cls, json_file):
+        """Constructs a `AlbertConfig` from a json file of parameters."""
+        with io.open(json_file, mode="r", encoding="utf-8") as reader:
+            text = reader.read()
+        return cls.from_dict(json.loads(text))
+
+    def to_dict(self):
+        """Serializes this instance to a Python dictionary."""
+        output = copy.deepcopy(self.__dict__)
+        return output
+
+    def to_json_string(self):
+        """Serializes this instance to a JSON string."""
+        return json.dumps(self.to_dict(), indent=2, sort_keys=True) + "\n"
+
+
+class AlbertModel(nn.Module):
+    """Complete Albert Model used as encoder or decoder."""
+
+    def __init__(self, config):
+        """Constructor for AlbertModel.
+
+        config: `AlbertConfig` instance.
+        """
+        super(AlbertModel, self).__init__()
+        config = copy.deepcopy(config)
+        self.embedding = AlbertEmbedding(
+            vocab_size=config.vocab_size,
+            word_pad_id=config.word_pad_id,
+            token_type_pad_id=config.token_type_pad_id,
+            embedding_size=config.embedding_size,
+            token_type_vocab_size=config.token_type_vocab_size,
+            use_position_embeddings=config.use_position_embeddings,
+            max_position_embeddings=config.max_position_embeddings,
+            dropout=config.attention_probs_dropout_prob,
+        )
+
+        if config.embedding_size != config.hidden_size:
+            self.embed_to_hidden = torch.nn.Linear(
+                config.embedding_size, config.hidden_size, bias=False
+            )
+
+        self.main_block = TransformerModel(
+            hidden_size=config.hidden_size,
+            is_decoder=config.is_decoder,
+            num_hidden_layers=config.num_hidden_layers,
+            num_attention_heads=config.num_attention_heads,
+            attention_probs_dropout_prob=config.attention_probs_dropout_prob,
+            intermediate_size=config.intermediate_size,
+            hidden_dropout_prob=config.hidden_dropout_prob,
+        )
+
+        self.config = config
+
+    def forward(
+        self,
+        input_ids,
+        input_mask=None,
+        token_type_ids=None,
+        encoder_input_mask=None,
+        encoder_hidden_output=None,
+    ) -> torch.FloatTensor:
+        """Create mask or type id if not given, also shift to right the decoder
+        inputs."""
+        batch_size, seq_length = input_ids.size()
+        if input_mask is None:
+            input_mask = torch.ones((batch_size, seq_length), dtype=torch.long)
+
+        if token_type_ids is None:
+            token_type_ids = torch.ones((batch_size, seq_length), dtype=torch.long)
+
+        # For the decoder, shift right the input_ids, input_mask, and token_type_ids.
+        if self.config.is_decoder:
+            token_type_ids = torch.roll(token_type_ids, shifts=1, dims=1)
+            token_type_ids[:, 0:1] = torch.zeros((batch_size, 1), dtype=torch.long).to(
+                token_type_ids.device
+            )
+
+            input_mask = torch.roll(input_mask, shifts=1, dims=1)
+            input_mask[:, 0:1] = torch.ones((batch_size, 1), dtype=torch.long).to(
+                input_mask.device
+            )
+
+            input_ids = torch.roll(input_ids, shifts=1, dims=1)
+            input_ids[:, 0:1] = (
+                torch.ones((batch_size, 1), dtype=torch.long) * self.config.go_symbol_id
+            ).to(input_ids.device)
+
+        emb_output = self.embedding(input_ids, token_type_ids)
+
+        if self.config.embedding_size != self.config.hidden_size:
+            emb_output = self.embed_to_hidden(emb_output)
+
+        return self.main_block(
+            layer_input=emb_output,
+            attention_mask=input_mask,
+            encoder_hidden_output=encoder_hidden_output,
+            encoder_input_mask=encoder_input_mask,
+        )
+
+
+class AlbertEncoderDecoder(object):
+    """Complete Albert Model used as encoder and decoder."""
+
+    def __init__(self, config):
+        """Constructor for EncoderDecoder Model.
+
+        config: `AlbertConfig` instance.
+        """
+        config.is_decoder = False
+        self.encoder = AlbertModel(config)
+
+        config.is_decoder = True
+        self.decoder = AlbertModel(config)
