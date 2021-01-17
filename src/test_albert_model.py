@@ -1,8 +1,9 @@
 """Tests for the albert model."""
 import torch
 
-from src.albert_model import (AlbertEmbedding, AlbertTokenEmbedding,
-                              AttentionBlock, AttentionConfig, AttentionData,
+from src.albert_model import (AlbertConfig, AlbertEmbedding, AlbertModel,
+                              AlbertTokenEmbedding, AttentionBlock,
+                              AttentionConfig, AttentionData,
                               MultiHeadAttention, PositionwiseFeedForward,
                               TransformerModel, set_random_seed)
 
@@ -178,7 +179,6 @@ def test_transformer_models():
         [[-1.0, -1.0], [-1.0, -1.0], [-1.0, -1.0], [-1.0, -1.0]],
     ]
     matrix = torch.FloatTensor(matrix)
-
     mask = [[0, 0, 0, 1], [0, 0, 1, 1], [0, 0, 0, 0]]
     mask = torch.ByteTensor(mask)
     output = model(
@@ -188,3 +188,48 @@ def test_transformer_models():
         encoder_input_mask=mask,
     )
     assert output.size() == (3, 4, 2)
+
+
+def test_full_model():
+    """Test the full albert model."""
+    config = AlbertConfig(
+        is_decoder=False,
+        vocab_size=100,
+        go_symbol_id=1,
+        embedding_size=16,
+        hidden_size=32,
+        num_hidden_layers=4,
+        num_attention_heads=2,
+        intermediate_size=64,
+    )
+    model = AlbertModel(config)
+
+    input_ids = [[2, 3, 4, 5], [5, 4, 3, 2], [10, 11, 12, 13]]
+    input_ids = torch.LongTensor(input_ids)
+
+    mask = [[0, 0, 0, 1], [0, 0, 1, 1], [0, 0, 0, 0]]
+    mask = torch.ByteTensor(mask)
+
+    output = model(input_ids=input_ids, input_mask=mask)
+    assert output.size() == (3, 4, 32)
+
+    decoder_config = AlbertConfig(
+        is_decoder=True,
+        vocab_size=100,
+        go_symbol_id=1,
+        embedding_size=16,
+        hidden_size=32,
+        num_hidden_layers=4,
+        num_attention_heads=2,
+        intermediate_size=64,
+    )
+
+    decoder_model = AlbertModel(decoder_config)
+    output = decoder_model(
+        input_ids=input_ids,
+        input_mask=mask,
+        encoder_hidden_output=torch.ones((3, 4, 32), dtype=torch.float),
+        encoder_input_mask=mask,
+    )
+
+    assert output.size() == (3, 4, 32)

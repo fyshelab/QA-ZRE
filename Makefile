@@ -3,12 +3,15 @@ install:
 
 	python3.7 -m venv env; \
 	. env/bin/activate; \
-	python3.7 -m pip install -r requirements.txt; \
+	pip3 install -e .[dev]
+
 
 .PHONY: clean_code
 clean_code:
 
-	. env/bin/activate; \
-	isort src; \
-	black src; \
-	docformatter --in-place -r src;
+	source env/bin/activate; \
+	black src/*py; \
+	isort src/*py; \
+	docformatter --in-place src/*py
+
+
