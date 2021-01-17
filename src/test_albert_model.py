@@ -1,7 +1,8 @@
 """Tests for the albert model."""
 import torch
 
-from src.albert_model import (AlbertConfig, AlbertEmbedding, AlbertModel,
+from src.albert_model import (AlbertConfig, AlbertEmbedding,
+                              AlbertEncoderDecoder, AlbertModel,
                               AlbertTokenEmbedding, AttentionBlock,
                               AttentionConfig, AttentionData,
                               MultiHeadAttention, PositionwiseFeedForward,
@@ -232,4 +233,23 @@ def test_full_model():
         encoder_input_mask=mask,
     )
 
+    assert output.size() == (3, 4, 32)
+
+    config = AlbertConfig(
+        vocab_size=100,
+        go_symbol_id=1,
+        embedding_size=16,
+        hidden_size=32,
+        num_hidden_layers=4,
+        num_attention_heads=2,
+        intermediate_size=64,
+    )
+
+    model = AlbertEncoderDecoder(config)
+    output = model(
+        input_ids=input_ids,
+        input_mask=mask,
+        target_mask=mask,
+        target_ids=input_ids,
+    )
     assert output.size() == (3, 4, 32)
