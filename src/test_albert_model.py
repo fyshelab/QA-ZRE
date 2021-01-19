@@ -6,7 +6,8 @@ from src.albert_model import (AlbertConfig, AlbertEmbedding,
                               AlbertTokenEmbedding, AttentionBlock,
                               AttentionConfig, AttentionData,
                               MultiHeadAttention, PositionwiseFeedForward,
-                              TransformerModel, set_random_seed)
+                              TransformerModel, list_parameters,
+                              set_random_seed)
 
 set_random_seed(len("dreamscape-qa"))
 
