@@ -800,7 +800,7 @@ def load_albert_encoder_decoder(mask_token_id):
     model = AlbertEncoderDecoder(config)
 
     pretrained_state_dict = torch.load(
-        "./albert-xxlarge-v2-pytorch", map_location=lambda storage, loc: storage
+        "./albert-xxlarge-v2-pytorch.model", map_location=lambda storage, loc: storage
     )["model_state_dict"]
 
     model_dict = model.state_dict()
