@@ -514,7 +514,7 @@ class AlbertConfig(object):
         max_position_embeddings=512,
         type_vocab_size=2,
         initializer_range=0.02,
-        go_symbol_id=None,
+        go_symbol_id=2,
         is_decoder=False,
         word_pad_id=0,
         token_type_pad_id=0,
@@ -700,10 +700,15 @@ class AlbertEncoderDecoder(nn.Module):
         config.is_decoder = True
         self.decoder = AlbertModel(config)
 
+        self.lm_head = nn.Linear(config.hidden_size, config.vocab_size)
+
+        self.loss_fn = nn.CrossEntropyLoss()
+
     def forward(
         self,
         input_ids,
         target_ids,
+        labels=None,
         input_mask=None,
         target_mask=None,
         token_type_ids=None,
@@ -720,7 +725,13 @@ class AlbertEncoderDecoder(nn.Module):
             encoder_hidden_output=encoder_output,
             encoder_input_mask=input_mask,
         )
-        return decoder_output
+        if labels is None:
+            return decoder_output
+        return self.compute_loss(labels, decoder_output)
+
+    def compute_loss(self, labels, decoder_output):
+        logits = self.lm_head(decoder_output)
+        return self.loss_fn(logits, labels)
 
 
 def list_parameters(model: nn.Module):
@@ -783,9 +794,9 @@ param_mapper = {
 }
 
 
-def load_albert_encoder_decoder():
+def load_albert_encoder_decoder(mask_token_id):
     """Load the pretrained model into a encoder-decoder model."""
-    config = AlbertConfig()
+    config = AlbertConfig(go_symbol_id=mask_token_id)
     model = AlbertEncoderDecoder(config)
 
     pretrained_state_dict = torch.load(
@@ -799,5 +810,4 @@ def load_albert_encoder_decoder():
 
     model.load_state_dict(model_dict)
 
-
-load_albert_encoder_decoder()
+    return model
