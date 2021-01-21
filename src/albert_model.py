@@ -126,7 +126,7 @@ class AlbertEmbedding(nn.Module):
         _, s_len, _ = embeddings.size()
 
         # [0, 1, 2, ..., s_len-1]
-        length_indices = torch.LongTensor(list(range(s_len)))
+        length_indices = torch.cuda.LongTensor(list(range(s_len)))
 
         # size: (1, s_len, hidden_size)
         position_embeddings = torch.index_select(
@@ -230,8 +230,7 @@ class MultiHeadAttention(nn.Module):
                            [0,  0,    0]]
             """
             future_mask = np.ones((q_length, kv_length))
-            future_mask = torch.FloatTensor(np.triu(future_mask, k=1))
-            future_mask.to(attn.device)
+            future_mask = torch.cuda.FloatTensor(np.triu(future_mask, k=1))
 
             future_mask = future_mask.expand_as(attn)
             attn = attn * (1.0 - future_mask)
@@ -514,7 +513,7 @@ class AlbertConfig(object):
         max_position_embeddings=512,
         type_vocab_size=2,
         initializer_range=0.02,
-        go_symbol_id=None,
+        go_symbol_id=2,
         is_decoder=False,
         word_pad_id=0,
         token_type_pad_id=0,
@@ -650,27 +649,38 @@ class AlbertModel(nn.Module):
         inputs."""
         batch_size, seq_length = input_ids.size()
         if input_mask is None:
-            input_mask = torch.ones((batch_size, seq_length), dtype=torch.long)
+            input_mask = torch.ones(
+                (batch_size, seq_length),
+                dtype=torch.long,
+                device=torch.device("cuda:0"),
+            )
 
         if token_type_ids is None:
-            token_type_ids = torch.ones((batch_size, seq_length), dtype=torch.long)
+            token_type_ids = torch.ones(
+                (batch_size, seq_length),
+                dtype=torch.long,
+                device=torch.device("cuda:0"),
+            )
 
         # For the decoder, shift right the input_ids, input_mask, and token_type_ids.
         if self.config.is_decoder:
             token_type_ids = torch.roll(token_type_ids, shifts=1, dims=1)
-            token_type_ids[:, 0:1] = torch.zeros((batch_size, 1), dtype=torch.long).to(
-                token_type_ids.device
+            token_type_ids[:, 0:1] = torch.zeros(
+                (batch_size, 1), dtype=torch.long, device=torch.device("cuda:0")
             )
 
             input_mask = torch.roll(input_mask, shifts=1, dims=1)
-            input_mask[:, 0:1] = torch.ones((batch_size, 1), dtype=torch.long).to(
-                input_mask.device
+            input_mask[:, 0:1] = torch.ones(
+                (batch_size, 1), dtype=torch.long, device=torch.device("cuda:0")
             )
 
             input_ids = torch.roll(input_ids, shifts=1, dims=1)
             input_ids[:, 0:1] = (
-                torch.ones((batch_size, 1), dtype=torch.long) * self.config.go_symbol_id
-            ).to(input_ids.device)
+                torch.ones(
+                    (batch_size, 1), dtype=torch.long, device=torch.device("cuda:0")
+                )
+                * self.config.go_symbol_id
+            )
 
         emb_output = self.embedding(input_ids, token_type_ids)
 
@@ -700,16 +710,33 @@ class AlbertEncoderDecoder(nn.Module):
         config.is_decoder = True
         self.decoder = AlbertModel(config)
 
+        self.lm_head = nn.Linear(config.hidden_size, config.vocab_size)
+
+        self.loss_fn = nn.CrossEntropyLoss()
+
     def forward(
         self,
         input_ids,
         target_ids,
+        labels=None,
         input_mask=None,
         target_mask=None,
         token_type_ids=None,
         target_token_type_ids=None,
     ) -> torch.FloatTensor:
         """Overall computation in the encoder decoder model."""
+        input_ids = input_ids.to("cuda:0")
+        target_ids = target_ids.to("cuda:0")
+        if labels is not None:
+            labels = labels.to("cuda:0")
+        if input_mask is not None:
+            input_mask = input_mask.to("cuda:0")
+        if target_mask is not None:
+            target_mask = target_mask.to("cuda:0")
+        if token_type_ids is not None:
+            token_type_ids = token_type_ids.to("cuda:0")
+        if target_token_type_ids is not None:
+            target_token_type_ids = target_token_type_ids.to("cuda:0")
         encoder_output = self.encoder(
             input_ids=input_ids, input_mask=input_mask, token_type_ids=token_type_ids
         )
@@ -720,7 +747,14 @@ class AlbertEncoderDecoder(nn.Module):
             encoder_hidden_output=encoder_output,
             encoder_input_mask=input_mask,
         )
-        return decoder_output
+        if labels is None:
+            return decoder_output
+        return self.cal_loss(labels, decoder_output)
+
+    def cal_loss(self, labels, decoder_output):
+        logits = self.lm_head(decoder_output)
+        logits = logits.permute(0, 2, 1)
+        return [self.loss_fn(logits, labels)]
 
 
 def list_parameters(model: nn.Module):
@@ -783,13 +817,13 @@ param_mapper = {
 }
 
 
-def load_albert_encoder_decoder():
+def load_albert_encoder_decoder(mask_token_id):
     """Load the pretrained model into a encoder-decoder model."""
-    config = AlbertConfig()
+    config = AlbertConfig(go_symbol_id=mask_token_id)
     model = AlbertEncoderDecoder(config)
 
     pretrained_state_dict = torch.load(
-        "./albert-xxlarge-v2-pytorch", map_location=lambda storage, loc: storage
+        "./albert-xxlarge-v2-pytorch.model", map_location=lambda storage, loc: storage
     )["model_state_dict"]
 
     model_dict = model.state_dict()
@@ -799,5 +833,4 @@ def load_albert_encoder_decoder():
 
     model.load_state_dict(model_dict)
 
-
-load_albert_encoder_decoder()
+    return model
