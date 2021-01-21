@@ -105,7 +105,7 @@ class AlbertEmbedding(nn.Module):
 
         if use_position_embeddings:
             self.pos_embedder = nn.Parameter(
-                torch.Tensor(max_position_embeddings, embedding_size),
+                torch.Tensor(512, embedding_size),
                 requires_grad=True,
             )
 

@@ -5,7 +5,7 @@ import datasets
 import numpy as np
 import torch
 import torch.optim as optim
-from datasets import load_dataset
+from datasets import load_dataset, load_metric
 from transformers import AlbertTokenizer, Trainer, TrainingArguments
 
 from src.albert_model import load_albert_encoder_decoder
@@ -17,6 +17,8 @@ tokenizer.eos_token = tokenizer.sep_token
 source_max_length = 512
 decoder_max_length = 128
 batch_size = 1
+
+rouge = load_metric("./src/rouge.py")
 
 
 def process_data_to_model_inputs(batch):
@@ -102,7 +104,7 @@ def process_race_row(row):
 
 
 # load rouge for validation
-rouge = datasets.load_metric("rouge")
+# rouge = datasets.load_metric("rouge")
 
 
 def compute_metrics(pred):
