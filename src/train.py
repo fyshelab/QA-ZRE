@@ -14,17 +14,24 @@ from src.albert_model import load_albert_encoder_decoder
 tokenizer = AlbertTokenizer.from_pretrained("albert-xxlarge-v2")
 tokenizer.bos_token = tokenizer.cls_token
 tokenizer.eos_token = tokenizer.sep_token
-max_length = 256
+source_max_length = 512
+decoder_max_length = 128
 batch_size = 1
 
 
 def process_data_to_model_inputs(batch):
     # tokenize the inputs and labels
     inputs = tokenizer(
-        batch["inputs"], padding="max_length", truncation=True, max_length=max_length
+        batch["inputs"],
+        padding="max_length",
+        truncation=True,
+        max_length=source_max_length,
     )
     outputs = tokenizer(
-        batch["outputs"], padding="max_length", truncation=True, max_length=max_length
+        batch["outputs"],
+        padding="max_length",
+        truncation=True,
+        max_length=decoder_max_length,
     )
 
     batch["input_ids"] = inputs.input_ids
@@ -171,7 +178,11 @@ def create_race_dataset():
 
 train_dataset, dev_dataset, test_dataset = create_race_dataset()
 
-albert2albert = load_albert_encoder_decoder(mask_token_id=tokenizer.mask_token_id)
+albert2albert = load_albert_encoder_decoder(
+    mask_token_id=tokenizer.mask_token_id,
+    source_max_length=source_max_length,
+    decoder_max_length=decoder_max_length,
+)
 
 albert2albert = albert2albert.to("cuda:0")
 

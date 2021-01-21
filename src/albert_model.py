@@ -126,7 +126,9 @@ class AlbertEmbedding(nn.Module):
         _, s_len, _ = embeddings.size()
 
         # [0, 1, 2, ..., s_len-1]
-        length_indices = torch.cuda.LongTensor(list(range(s_len)))
+        length_indices = torch.tensor(
+            list(range(s_len)), dtype=torch.long, device=input_ids.device
+        )
 
         # size: (1, s_len, hidden_size)
         position_embeddings = torch.index_select(
@@ -230,7 +232,9 @@ class MultiHeadAttention(nn.Module):
                            [0,  0,    0]]
             """
             future_mask = np.ones((q_length, kv_length))
-            future_mask = torch.cuda.FloatTensor(np.triu(future_mask, k=1))
+            future_mask = torch.tensor(
+                np.triu(future_mask, k=1), dtype=torch.float, device=attn.device
+            )
 
             future_mask = future_mask.expand_as(attn)
             attn = attn * (1.0 - future_mask)
@@ -510,7 +514,8 @@ class AlbertConfig(object):
         hidden_act="gelu",
         hidden_dropout_prob=0,
         attention_probs_dropout_prob=0,
-        max_position_embeddings=512,
+        source_max_position_embeddings=512,
+        decoder_max_position_embeddings=512,
         type_vocab_size=2,
         initializer_range=0.02,
         go_symbol_id=2,
@@ -565,7 +570,8 @@ class AlbertConfig(object):
         self.hidden_dropout_prob = hidden_dropout_prob
         self.attention_probs_dropout_prob = attention_probs_dropout_prob
         self.use_position_embeddings = use_position_embeddings
-        self.max_position_embeddings = max_position_embeddings
+        self.source_max_position_embeddings = source_max_position_embeddings
+        self.decoder_max_position_embeddings = decoder_max_position_embeddings
         self.token_type_vocab_size = type_vocab_size
         self.initializer_range = initializer_range
         self.is_decoder = is_decoder
@@ -609,6 +615,11 @@ class AlbertModel(nn.Module):
         """
         super(AlbertModel, self).__init__()
         config = copy.deepcopy(config)
+        max_position = (
+            config.decoder_max_position_embeddings
+            if config.is_decoder
+            else config.source_max_position_embeddings
+        )
         self.embedding = AlbertEmbedding(
             vocab_size=config.vocab_size,
             word_pad_id=config.word_pad_id,
@@ -616,7 +627,7 @@ class AlbertModel(nn.Module):
             embedding_size=config.embedding_size,
             token_type_vocab_size=config.token_type_vocab_size,
             use_position_embeddings=config.use_position_embeddings,
-            max_position_embeddings=config.max_position_embeddings,
+            max_position_embeddings=max_position,
             dropout=config.attention_probs_dropout_prob,
         )
 
@@ -652,33 +663,31 @@ class AlbertModel(nn.Module):
             input_mask = torch.ones(
                 (batch_size, seq_length),
                 dtype=torch.long,
-                device=torch.device("cuda:0"),
+                device=input_ids.device,
             )
 
         if token_type_ids is None:
             token_type_ids = torch.ones(
                 (batch_size, seq_length),
                 dtype=torch.long,
-                device=torch.device("cuda:0"),
+                device=input_ids.device,
             )
 
         # For the decoder, shift right the input_ids, input_mask, and token_type_ids.
         if self.config.is_decoder:
             token_type_ids = torch.roll(token_type_ids, shifts=1, dims=1)
             token_type_ids[:, 0:1] = torch.zeros(
-                (batch_size, 1), dtype=torch.long, device=torch.device("cuda:0")
+                (batch_size, 1), dtype=torch.long, device=input_ids.device
             )
 
             input_mask = torch.roll(input_mask, shifts=1, dims=1)
             input_mask[:, 0:1] = torch.ones(
-                (batch_size, 1), dtype=torch.long, device=torch.device("cuda:0")
+                (batch_size, 1), dtype=torch.long, device=input_ids.device
             )
 
             input_ids = torch.roll(input_ids, shifts=1, dims=1)
             input_ids[:, 0:1] = (
-                torch.ones(
-                    (batch_size, 1), dtype=torch.long, device=torch.device("cuda:0")
-                )
+                torch.ones((batch_size, 1), dtype=torch.long, device=input_ids.device)
                 * self.config.go_symbol_id
             )
 
@@ -725,18 +734,6 @@ class AlbertEncoderDecoder(nn.Module):
         target_token_type_ids=None,
     ) -> torch.FloatTensor:
         """Overall computation in the encoder decoder model."""
-        input_ids = input_ids.to("cuda:0")
-        target_ids = target_ids.to("cuda:0")
-        if labels is not None:
-            labels = labels.to("cuda:0")
-        if input_mask is not None:
-            input_mask = input_mask.to("cuda:0")
-        if target_mask is not None:
-            target_mask = target_mask.to("cuda:0")
-        if token_type_ids is not None:
-            token_type_ids = token_type_ids.to("cuda:0")
-        if target_token_type_ids is not None:
-            target_token_type_ids = target_token_type_ids.to("cuda:0")
         encoder_output = self.encoder(
             input_ids=input_ids, input_mask=input_mask, token_type_ids=token_type_ids
         )
@@ -817,9 +814,13 @@ param_mapper = {
 }
 
 
-def load_albert_encoder_decoder(mask_token_id):
+def load_albert_encoder_decoder(mask_token_id, source_max_length, decoder_max_length):
     """Load the pretrained model into a encoder-decoder model."""
-    config = AlbertConfig(go_symbol_id=mask_token_id)
+    config = AlbertConfig(
+        go_symbol_id=mask_token_id,
+        source_max_position_embeddings=source_max_length,
+        decoder_max_position_embeddings=decoder_max_length,
+    )
     model = AlbertEncoderDecoder(config)
 
     pretrained_state_dict = torch.load(
