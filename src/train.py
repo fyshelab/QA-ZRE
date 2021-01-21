@@ -14,8 +14,8 @@ from src.albert_model import load_albert_encoder_decoder
 tokenizer = AlbertTokenizer.from_pretrained("albert-xxlarge-v2")
 tokenizer.bos_token = tokenizer.cls_token
 tokenizer.eos_token = tokenizer.sep_token
-max_length = 512
-batch_size = 4
+max_length = 256
+batch_size = 1
 
 
 def process_data_to_model_inputs(batch):
@@ -41,6 +41,7 @@ def process_data_to_model_inputs(batch):
         for labels in batch["labels"]
     ]
     batch["labels"] = labels
+
     return batch
 
 
@@ -172,8 +173,9 @@ train_dataset, dev_dataset, test_dataset = create_race_dataset()
 
 albert2albert = load_albert_encoder_decoder(mask_token_id=tokenizer.mask_token_id)
 
-# instantiate trainer
+albert2albert = albert2albert.to("cuda:0")
 
+# instantiate trainer
 training_args = TrainingArguments(
     output_dir="./",
     per_device_train_batch_size=batch_size,
