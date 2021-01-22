@@ -241,6 +241,8 @@ def test_full_model():
         go_symbol_id=1,
         embedding_size=16,
         hidden_size=32,
+        source_max_position_embeddings=64,
+        decoder_max_position_embeddings=32,
         num_hidden_layers=4,
         num_attention_heads=2,
         intermediate_size=64,

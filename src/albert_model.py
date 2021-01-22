@@ -105,7 +105,7 @@ class AlbertEmbedding(nn.Module):
 
         if use_position_embeddings:
             self.pos_embedder = nn.Parameter(
-                torch.Tensor(max_position_embeddings, embedding_size),
+                torch.Tensor(512, embedding_size),
                 requires_grad=True,
             )
 
@@ -126,7 +126,9 @@ class AlbertEmbedding(nn.Module):
         _, s_len, _ = embeddings.size()
 
         # [0, 1, 2, ..., s_len-1]
-        length_indices = torch.cuda.LongTensor(list(range(s_len)))
+        length_indices = torch.tensor(
+            list(range(s_len)), dtype=torch.long, device=input_ids.device
+        )
 
         # size: (1, s_len, hidden_size)
         position_embeddings = torch.index_select(
@@ -154,6 +156,7 @@ class AttentionConfig:
     dim_key: int
     dim_value: int
     mask_future: Optional[bool] = False
+    cross_attention: Optional[bool] = False
 
 
 @dataclass
@@ -230,7 +233,9 @@ class MultiHeadAttention(nn.Module):
                            [0,  0,    0]]
             """
             future_mask = np.ones((q_length, kv_length))
-            future_mask = torch.cuda.FloatTensor(np.triu(future_mask, k=1))
+            future_mask = torch.tensor(
+                np.triu(future_mask, k=1), dtype=torch.float, device=attn.device
+            )
 
             future_mask = future_mask.expand_as(attn)
             attn = attn * (1.0 - future_mask)
@@ -248,34 +253,40 @@ class MultiHeadAttention(nn.Module):
                 * attn ``(num_heads * batch_size, sequence_length, sequence_length)``
         """
         attention_data = args[0]
-        b_sz, s_len, _ = attention_data.query.size()
+        b_sz, q_len, _ = attention_data.query.size()
+        _, k_len, _ = attention_data.key.size()
+        _, v_len, _ = attention_data.value.size()
 
-        attn_mask = attention_data.mask.repeat(1, s_len).view(-1, s_len, s_len)
-        attn_mask = attn_mask.masked_fill_(
-            attention_data.mask.unsqueeze(dim=2).to(torch.bool), 1
-        )
+        _, mask_len = attention_data.mask.size()
+
+        attn_mask = attention_data.mask.repeat(1, q_len).view(-1, q_len, mask_len)
+
+        if not self.config.cross_attention:
+            attn_mask = attn_mask.masked_fill_(
+                attention_data.mask.unsqueeze(dim=2).to(torch.bool), 1
+            )
         attn_mask = attn_mask.repeat(self.config.num_heads, 1, 1).float()
 
         multi_q = (
             self.w_qs(attention_data.query)
-            .view(b_sz, s_len, self.config.num_heads, self.config.dim_query)
+            .view(b_sz, q_len, self.config.num_heads, self.config.dim_query)
             .permute(2, 0, 1, 3)
             .contiguous()
-            .view(-1, s_len, self.config.dim_query)
+            .view(-1, q_len, self.config.dim_query)
         )
         multi_k = (
             self.w_ks(attention_data.key)
-            .view(b_sz, s_len, self.config.num_heads, self.config.dim_key)
+            .view(b_sz, k_len, self.config.num_heads, self.config.dim_key)
             .permute(2, 0, 1, 3)
             .contiguous()
-            .view(-1, s_len, self.config.dim_key)
+            .view(-1, k_len, self.config.dim_key)
         )
         multi_v = (
             self.w_vs(attention_data.value)
-            .view(b_sz, s_len, self.config.num_heads, self.config.dim_value)
+            .view(b_sz, v_len, self.config.num_heads, self.config.dim_value)
             .permute(2, 0, 1, 3)
             .contiguous()
-            .view(-1, s_len, self.config.dim_value)
+            .view(-1, v_len, self.config.dim_value)
         )
 
         output, attn = self.scaled_dot_product_attention(
@@ -283,10 +294,10 @@ class MultiHeadAttention(nn.Module):
         )
 
         output = (
-            output.view(self.config.num_heads, b_sz, s_len, self.config.dim_value)
+            output.view(self.config.num_heads, b_sz, q_len, self.config.dim_value)
             .permute(1, 2, 0, 3)
             .contiguous()
-            .view(b_sz, s_len, -1)
+            .view(b_sz, q_len, -1)
         )
 
         # for residual connection added to the output of attention values
@@ -389,6 +400,7 @@ class AttentionBlock(nn.Module):
             dim_key=q_size,
             dim_value=q_size,
             mask_future=is_decoder,
+            cross_attention=False,
         )
         self.self_attention = MultiHeadAttention(
             self_attn_cfg, dropout=attention_probs_dropout_prob
@@ -402,6 +414,7 @@ class AttentionBlock(nn.Module):
                 dim_key=q_size,
                 dim_value=q_size,
                 mask_future=False,
+                cross_attention=True,
             )
             self.cross_attention = MultiHeadAttention(
                 cross_attn_cfg, dropout=attention_probs_dropout_prob
@@ -510,7 +523,8 @@ class AlbertConfig(object):
         hidden_act="gelu",
         hidden_dropout_prob=0,
         attention_probs_dropout_prob=0,
-        max_position_embeddings=512,
+        source_max_position_embeddings=512,
+        decoder_max_position_embeddings=512,
         type_vocab_size=2,
         initializer_range=0.02,
         go_symbol_id=2,
@@ -565,7 +579,8 @@ class AlbertConfig(object):
         self.hidden_dropout_prob = hidden_dropout_prob
         self.attention_probs_dropout_prob = attention_probs_dropout_prob
         self.use_position_embeddings = use_position_embeddings
-        self.max_position_embeddings = max_position_embeddings
+        self.source_max_position_embeddings = source_max_position_embeddings
+        self.decoder_max_position_embeddings = decoder_max_position_embeddings
         self.token_type_vocab_size = type_vocab_size
         self.initializer_range = initializer_range
         self.is_decoder = is_decoder
@@ -609,6 +624,11 @@ class AlbertModel(nn.Module):
         """
         super(AlbertModel, self).__init__()
         config = copy.deepcopy(config)
+        max_position = (
+            config.decoder_max_position_embeddings
+            if config.is_decoder
+            else config.source_max_position_embeddings
+        )
         self.embedding = AlbertEmbedding(
             vocab_size=config.vocab_size,
             word_pad_id=config.word_pad_id,
@@ -616,7 +636,7 @@ class AlbertModel(nn.Module):
             embedding_size=config.embedding_size,
             token_type_vocab_size=config.token_type_vocab_size,
             use_position_embeddings=config.use_position_embeddings,
-            max_position_embeddings=config.max_position_embeddings,
+            max_position_embeddings=max_position,
             dropout=config.attention_probs_dropout_prob,
         )
 
@@ -652,33 +672,31 @@ class AlbertModel(nn.Module):
             input_mask = torch.ones(
                 (batch_size, seq_length),
                 dtype=torch.long,
-                device=torch.device("cuda:0"),
+                device=input_ids.device,
             )
 
         if token_type_ids is None:
             token_type_ids = torch.ones(
                 (batch_size, seq_length),
                 dtype=torch.long,
-                device=torch.device("cuda:0"),
+                device=input_ids.device,
             )
 
         # For the decoder, shift right the input_ids, input_mask, and token_type_ids.
         if self.config.is_decoder:
             token_type_ids = torch.roll(token_type_ids, shifts=1, dims=1)
             token_type_ids[:, 0:1] = torch.zeros(
-                (batch_size, 1), dtype=torch.long, device=torch.device("cuda:0")
+                (batch_size, 1), dtype=torch.long, device=input_ids.device
             )
 
             input_mask = torch.roll(input_mask, shifts=1, dims=1)
             input_mask[:, 0:1] = torch.ones(
-                (batch_size, 1), dtype=torch.long, device=torch.device("cuda:0")
+                (batch_size, 1), dtype=torch.long, device=input_ids.device
             )
 
             input_ids = torch.roll(input_ids, shifts=1, dims=1)
             input_ids[:, 0:1] = (
-                torch.ones(
-                    (batch_size, 1), dtype=torch.long, device=torch.device("cuda:0")
-                )
+                torch.ones((batch_size, 1), dtype=torch.long, device=input_ids.device)
                 * self.config.go_symbol_id
             )
 
@@ -725,18 +743,6 @@ class AlbertEncoderDecoder(nn.Module):
         target_token_type_ids=None,
     ) -> torch.FloatTensor:
         """Overall computation in the encoder decoder model."""
-        input_ids = input_ids.to("cuda:0")
-        target_ids = target_ids.to("cuda:0")
-        if labels is not None:
-            labels = labels.to("cuda:0")
-        if input_mask is not None:
-            input_mask = input_mask.to("cuda:0")
-        if target_mask is not None:
-            target_mask = target_mask.to("cuda:0")
-        if token_type_ids is not None:
-            token_type_ids = token_type_ids.to("cuda:0")
-        if target_token_type_ids is not None:
-            target_token_type_ids = target_token_type_ids.to("cuda:0")
         encoder_output = self.encoder(
             input_ids=input_ids, input_mask=input_mask, token_type_ids=token_type_ids
         )
@@ -817,9 +823,13 @@ param_mapper = {
 }
 
 
-def load_albert_encoder_decoder(mask_token_id):
+def load_albert_encoder_decoder(mask_token_id, source_max_length, decoder_max_length):
     """Load the pretrained model into a encoder-decoder model."""
-    config = AlbertConfig(go_symbol_id=mask_token_id)
+    config = AlbertConfig(
+        go_symbol_id=mask_token_id,
+        source_max_position_embeddings=source_max_length,
+        decoder_max_position_embeddings=decoder_max_length,
+    )
     model = AlbertEncoderDecoder(config)
 
     pretrained_state_dict = torch.load(
