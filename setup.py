@@ -9,6 +9,7 @@ VERSION = '0.1'
 # Publicly Available Packages (PyPi)
 INSTALL_REQUIRES = [
     'torch==1.7.0',
+    'cython',
     'scikit-learn',
     'scipy',
     'numpy',
