@@ -156,6 +156,7 @@ class AttentionConfig:
     dim_key: int
     dim_value: int
     mask_future: Optional[bool] = False
+    cross_attention: Optional[bool] = False
 
 
 @dataclass
@@ -252,34 +253,40 @@ class MultiHeadAttention(nn.Module):
                 * attn ``(num_heads * batch_size, sequence_length, sequence_length)``
         """
         attention_data = args[0]
-        b_sz, s_len, _ = attention_data.query.size()
+        b_sz, q_len, _ = attention_data.query.size()
+        _, k_len, _ = attention_data.key.size()
+        _, v_len, _ = attention_data.value.size()
 
-        attn_mask = attention_data.mask.repeat(1, s_len).view(-1, s_len, s_len)
-        attn_mask = attn_mask.masked_fill_(
-            attention_data.mask.unsqueeze(dim=2).to(torch.bool), 1
-        )
+        _, mask_len = attention_data.mask.size()
+
+        attn_mask = attention_data.mask.repeat(1, q_len).view(-1, q_len, mask_len)
+
+        if not self.config.cross_attention:
+            attn_mask = attn_mask.masked_fill_(
+                attention_data.mask.unsqueeze(dim=2).to(torch.bool), 1
+            )
         attn_mask = attn_mask.repeat(self.config.num_heads, 1, 1).float()
 
         multi_q = (
             self.w_qs(attention_data.query)
-            .view(b_sz, s_len, self.config.num_heads, self.config.dim_query)
+            .view(b_sz, q_len, self.config.num_heads, self.config.dim_query)
             .permute(2, 0, 1, 3)
             .contiguous()
-            .view(-1, s_len, self.config.dim_query)
+            .view(-1, q_len, self.config.dim_query)
         )
         multi_k = (
             self.w_ks(attention_data.key)
-            .view(b_sz, s_len, self.config.num_heads, self.config.dim_key)
+            .view(b_sz, k_len, self.config.num_heads, self.config.dim_key)
             .permute(2, 0, 1, 3)
             .contiguous()
-            .view(-1, s_len, self.config.dim_key)
+            .view(-1, k_len, self.config.dim_key)
         )
         multi_v = (
             self.w_vs(attention_data.value)
-            .view(b_sz, s_len, self.config.num_heads, self.config.dim_value)
+            .view(b_sz, v_len, self.config.num_heads, self.config.dim_value)
             .permute(2, 0, 1, 3)
             .contiguous()
-            .view(-1, s_len, self.config.dim_value)
+            .view(-1, v_len, self.config.dim_value)
         )
 
         output, attn = self.scaled_dot_product_attention(
@@ -287,10 +294,10 @@ class MultiHeadAttention(nn.Module):
         )
 
         output = (
-            output.view(self.config.num_heads, b_sz, s_len, self.config.dim_value)
+            output.view(self.config.num_heads, b_sz, q_len, self.config.dim_value)
             .permute(1, 2, 0, 3)
             .contiguous()
-            .view(b_sz, s_len, -1)
+            .view(b_sz, q_len, -1)
         )
 
         # for residual connection added to the output of attention values
@@ -393,6 +400,7 @@ class AttentionBlock(nn.Module):
             dim_key=q_size,
             dim_value=q_size,
             mask_future=is_decoder,
+            cross_attention=False,
         )
         self.self_attention = MultiHeadAttention(
             self_attn_cfg, dropout=attention_probs_dropout_prob
@@ -406,6 +414,7 @@ class AttentionBlock(nn.Module):
                 dim_key=q_size,
                 dim_value=q_size,
                 mask_future=False,
+                cross_attention=True,
             )
             self.cross_attention = MultiHeadAttention(
                 cross_attn_cfg, dropout=attention_probs_dropout_prob
