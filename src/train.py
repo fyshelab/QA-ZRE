@@ -16,7 +16,7 @@ tokenizer.bos_token = tokenizer.cls_token
 tokenizer.eos_token = tokenizer.sep_token
 source_max_length = 512
 decoder_max_length = 128
-batch_size = 1
+batch_size = 2
 
 
 def process_data_to_model_inputs(batch):
@@ -24,13 +24,13 @@ def process_data_to_model_inputs(batch):
     inputs = tokenizer(
         batch["inputs"],
         padding="max_length",
-        truncation=True,
+        truncation="only_first",
         max_length=source_max_length,
     )
     outputs = tokenizer(
         batch["outputs"],
         padding="max_length",
-        truncation=True,
+        truncation="only_first",
         max_length=decoder_max_length,
     )
 
@@ -115,8 +115,8 @@ def compute_metrics(pred):
     label_str = tokenizer.batch_decode(labels_ids, skip_special_tokens=True)
 
     rouge_output = rouge.compute(
-        predictions=pred_str, references=label_str, rouge_types=["rouge2"]
-    )["rouge2"].mid
+        predictions=pred_str, references=label_str, rouge_types=["rougeL"]
+    )["rougeL"].mid
 
     return {
         "rouge2_precision": round(rouge_output.precision, 4),
@@ -176,37 +176,45 @@ def create_race_dataset():
     return train_dataset, dev_dataset, test_dataset
 
 
-train_dataset, dev_dataset, test_dataset = create_race_dataset()
+def train():
+    """Main model to train."""
+    train_dataset, dev_dataset, test_dataset = create_race_dataset()
 
-albert2albert = load_albert_encoder_decoder(
-    mask_token_id=tokenizer.mask_token_id,
-    source_max_length=source_max_length,
-    decoder_max_length=decoder_max_length,
-)
+    albert2albert = load_albert_encoder_decoder(
+        mask_token_id=tokenizer.mask_token_id,
+        source_max_length=source_max_length,
+        decoder_max_length=decoder_max_length,
+    )
 
-# albert2albert = albert2albert.to("cuda:0")
+    albert2albert = albert2albert.to("cuda:0")
 
-# instantiate trainer
-training_args = TrainingArguments(
-    output_dir="./",
-    per_device_train_batch_size=batch_size,
-    per_device_eval_batch_size=batch_size,
-    do_train=True,
-    do_eval=True,
-    logging_steps=2,  # set to 1000 for full training
-    save_steps=16,  # set to 500 for full training
-    eval_steps=4,  # set to 8000 for full training
-    warmup_steps=1,  # set to 2000 for full training
-    max_steps=16,  # delete for full training
-    overwrite_output_dir=True,
-    save_total_limit=3,
-)
+    # instantiate trainer
+    training_args = TrainingArguments(
+        output_dir="./trained_models/",
+        per_device_train_batch_size=batch_size,
+        per_device_eval_batch_size=batch_size,
+        do_train=True,
+        do_eval=True,
+        seed=10,
+        gradient_accumulation_steps=1,
+        max_steps=500,
+        logging_steps=50,  # set to 1000 for full training
+        save_steps=50,  # set to 500 for full training
+        eval_steps=50,  # set to 8000 for full training
+        warmup_steps=50,  # set to 2000 for full training
+        overwrite_output_dir=True,
+        save_total_limit=3,
+        num_train_epochs=1,
+    )
 
-trainer = Trainer(
-    model=albert2albert,
-    args=training_args,
-    compute_metrics=compute_metrics,
-    train_dataset=dev_dataset,
-    eval_dataset=dev_dataset,
-)
-trainer.train()
+    trainer = Trainer(
+        model=albert2albert,
+        args=training_args,
+        compute_metrics=compute_metrics,
+        train_dataset=train_dataset,
+        eval_dataset=dev_dataset,
+    )
+    trainer.train()
+
+
+train()
