@@ -753,14 +753,16 @@ class AlbertEncoderDecoder(nn.Module):
             encoder_hidden_output=encoder_output,
             encoder_input_mask=input_mask,
         )
-        if labels is None:
-            return decoder_output
-        return self.cal_loss(labels, decoder_output)
+        ret = {}
+        ret["hidden_outputs"] = decoder_output
+        if labels is not None:
+            ret["loss"] = self.cal_loss(labels, decoder_output)
+        return ret
 
     def cal_loss(self, labels, decoder_output):
         logits = self.lm_head(decoder_output)
         logits = logits.permute(0, 2, 1)
-        return [self.loss_fn(logits, labels)]
+        return self.loss_fn(logits, labels)
 
 
 def list_parameters(model: nn.Module):
@@ -826,6 +828,7 @@ param_mapper = {
 def load_albert_encoder_decoder(mask_token_id, source_max_length, decoder_max_length):
     """Load the pretrained model into a encoder-decoder model."""
     config = AlbertConfig(
+        num_hidden_layers=6,
         go_symbol_id=mask_token_id,
         source_max_position_embeddings=source_max_length,
         decoder_max_position_embeddings=decoder_max_length,
