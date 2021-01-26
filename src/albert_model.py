@@ -847,3 +847,19 @@ def load_albert_encoder_decoder(mask_token_id, source_max_length, decoder_max_le
     model.load_state_dict(model_dict)
 
     return model
+
+
+def load_pretrained_race(path, mask_token_id, source_max_length, decoder_max_length):
+    """Load the pretrained model into a encoder-decoder model."""
+    config = AlbertConfig(
+        num_hidden_layers=6,
+        go_symbol_id=mask_token_id,
+        source_max_position_embeddings=source_max_length,
+        decoder_max_position_embeddings=decoder_max_length,
+    )
+    model = AlbertEncoderDecoder(config)
+
+    model_dict = torch.load(path, map_location=lambda storage, loc: storage)
+    model.load_state_dict(model_dict)
+
+    return model
