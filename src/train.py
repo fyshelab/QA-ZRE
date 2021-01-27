@@ -4,6 +4,7 @@ from typing import Optional
 
 import datasets
 import numpy as np
+import pandas as pd
 import torch
 import torch.optim as optim
 from datasets import load_dataset
@@ -61,8 +62,8 @@ def glue_passage_question(bos_token, eos_token, passage, question=None):
         "question": question,
     }
     if question is not None:
-        return "{passage} {sep} {question}".format(**entries)
-    return "{passage}".format(**entries)
+        return "{passage} {sep} {question} ".format(**entries)
+    return "{passage} ".format(**entries)
 
 
 def list_parameters(model):
@@ -230,6 +231,50 @@ def race_predict(args):
     )
 
     albert2albert = albert2albert.to("cuda:0")
+
+    test_dataset = train_dataset.select(range(16))
+
+    def generate_batch(batch):
+        input_ids = batch["input_ids"]
+        input_mask = batch["input_mask"]
+        input_ids = input_ids.to("cuda:0")
+        input_mask = input_mask.to("cuda:0")
+        predictions = albert2albert.greedy_decode(
+            input_ids=input_ids, input_mask=input_mask
+        )
+
+        # all special tokens including will be removed
+        predictions_str = tokenizer.batch_decode(predictions, skip_special_tokens=True)
+        input_str = tokenizer.batch_decode(input_ids, skip_special_tokens=False)
+
+        target_str = tokenizer.batch_decode(
+            batch["target_ids"], skip_special_tokens=True
+        )
+        output_batch = {
+            "predictions_str": predictions_str,
+            "input_str": input_str,
+            "target_str": target_str,
+        }
+        return output_batch
+
+    # instantiate trainer for prediction
+    eval_predictions = test_dataset.map(
+        generate_batch, batched=True, batch_size=batch_size
+    )
+
+    eval_predictions.set_format(
+        type="pandas", columns=["input_str", "predictions_str", "target_str"]
+    )
+    eval_predictions["predictions_str"].to_csv(
+        args.prediction_file, sep="\t", encoding="utf-8"
+    )
+    eval_predictions["input_str"].to_csv(
+        args.prediction_file + ".input.csv", sep="\t", encoding="utf-8"
+    )
+    eval_predictions["target_str"].to_csv(
+        args.prediction_file + ".target.csv", sep="\t", encoding="utf-8"
+    )
+    # test_predictions = predictor.predict(test_dataset)
 
 
 def run_main(args):
