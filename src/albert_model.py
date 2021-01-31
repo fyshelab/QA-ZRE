@@ -534,6 +534,7 @@ class AlbertConfig(object):
         use_position_embeddings=True,
         bos_token_id=2,
         eos_token_id=3,
+        right_shift=True,
     ):
         """Constructs AlbertConfig.
 
@@ -587,6 +588,9 @@ class AlbertConfig(object):
         self.go_symbol_id = go_symbol_id
         self.word_pad_id = word_pad_id
         self.token_type_pad_id = token_type_pad_id
+        self.right_shift = right_shift
+        self.bos_token_id = bos_token_id
+        self.eos_token_id = eos_token_id
 
     @classmethod
     def from_dict(cls, json_object):
@@ -683,7 +687,7 @@ class AlbertModel(nn.Module):
             )
 
         # For the decoder, shift right the input_ids, input_mask, and token_type_ids.
-        if self.config.is_decoder:
+        if self.config.is_decoder and self.config.right_shift:
             token_type_ids = torch.roll(token_type_ids, shifts=1, dims=1)
             token_type_ids[:, 0:1] = torch.zeros(
                 (batch_size, 1), dtype=torch.long, device=input_ids.device
@@ -753,14 +757,60 @@ class AlbertEncoderDecoder(nn.Module):
             encoder_hidden_output=encoder_output,
             encoder_input_mask=input_mask,
         )
-        if labels is None:
-            return decoder_output
-        return self.cal_loss(labels, decoder_output)
+        ret = {}
+        ret["hidden_outputs"] = decoder_output
+        if labels is not None:
+            ret["loss"] = self.cal_loss(labels, decoder_output)
+        return ret
 
     def cal_loss(self, labels, decoder_output):
         logits = self.lm_head(decoder_output)
         logits = logits.permute(0, 2, 1)
-        return [self.loss_fn(logits, labels)]
+        return self.loss_fn(logits, labels)
+
+    def greedy_decode(self, input_ids, input_mask=None, token_type_ids=None):
+        """generate the predictions doing greedy decoding."""
+        self.decoder.config.right_shift = False
+        encoder_output = self.encoder(
+            input_ids=input_ids, input_mask=input_mask, token_type_ids=token_type_ids
+        )
+        b_sz, s_len, hidden_size = encoder_output.size()
+        decoded_batch = (
+            torch.ones(
+                (b_sz, self.decoder.config.decoder_max_position_embeddings),
+                dtype=torch.long,
+                device=input_ids.device,
+            )
+            * self.decoder.config.word_pad_id
+        )
+        for b in range(b_sz):
+            decoder_input = torch.tensor(
+                [self.decoder.config.go_symbol_id],
+                device=input_ids.device,
+                dtype=torch.long,
+            )
+            for t in range(self.decoder.config.decoder_max_position_embeddings):
+                inputs = decoder_input.view(1, -1)
+                en_outputs = encoder_output[b, :, :].view(1, s_len, -1)
+                en_mask = input_mask[b, :].view(1, -1)
+                decoder_output = self.decoder(
+                    input_ids=inputs,
+                    input_mask=None,
+                    token_type_ids=None,
+                    encoder_hidden_output=en_outputs,
+                    encoder_input_mask=en_mask,
+                )
+                logits = self.lm_head(decoder_output[:, -1, :])
+                topv, topi = logits.topk(1)
+                decoded_batch[b, t] = topi.squeeze()
+                decoder_input = torch.cat(
+                    (decoder_input, topi.squeeze().view(1)), dim=0
+                )
+                if topi.squeeze() == self.decoder.config.eos_token_id:
+                    break
+
+        self.decoder.config.right_shift = True
+        return decoded_batch
 
 
 def list_parameters(model: nn.Module):
@@ -826,6 +876,7 @@ param_mapper = {
 def load_albert_encoder_decoder(mask_token_id, source_max_length, decoder_max_length):
     """Load the pretrained model into a encoder-decoder model."""
     config = AlbertConfig(
+        num_hidden_layers=6,
         go_symbol_id=mask_token_id,
         source_max_position_embeddings=source_max_length,
         decoder_max_position_embeddings=decoder_max_length,
@@ -841,6 +892,22 @@ def load_albert_encoder_decoder(mask_token_id, source_max_length, decoder_max_le
         if key in param_mapper:
             model_dict[key] = pretrained_state_dict[param_mapper[key]]
 
+    model.load_state_dict(model_dict)
+
+    return model
+
+
+def load_pretrained_race(path, mask_token_id, source_max_length, decoder_max_length):
+    """Load the pretrained model into a encoder-decoder model."""
+    config = AlbertConfig(
+        num_hidden_layers=6,
+        go_symbol_id=mask_token_id,
+        source_max_position_embeddings=source_max_length,
+        decoder_max_position_embeddings=decoder_max_length,
+    )
+    model = AlbertEncoderDecoder(config)
+
+    model_dict = torch.load(path, map_location=lambda storage, loc: storage)
     model.load_state_dict(model_dict)
 
     return model
