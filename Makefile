@@ -10,8 +10,9 @@ install:
 clean_code:
 
 	source env/bin/activate; \
-	black src/*py; \
-	isort src/*py; \
+	black src; \
+	isort src; \
 	docformatter --in-place src/*py
+	docformatter --in-place src/*/*py
 
 

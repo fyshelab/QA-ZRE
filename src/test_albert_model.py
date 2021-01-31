@@ -255,4 +255,4 @@ def test_full_model():
         target_mask=mask,
         target_ids=input_ids,
     )
-    assert output.size() == (3, 4, 32)
+    assert output["hidden_outputs"].size() == (3, 4, 32)
