@@ -775,10 +775,13 @@ class AlbertEncoderDecoder(nn.Module):
             input_ids=input_ids, input_mask=input_mask, token_type_ids=token_type_ids
         )
         b_sz, s_len, hidden_size = encoder_output.size()
-        decoded_batch = torch.zeros(
-            (b_sz, self.decoder.config.decoder_max_position_embeddings),
-            dtype=torch.long,
-            device=input_ids.device,
+        decoded_batch = (
+            torch.ones(
+                (b_sz, self.decoder.config.decoder_max_position_embeddings),
+                dtype=torch.long,
+                device=input_ids.device,
+            )
+            * self.decoder.config.word_pad_id
         )
         for b in range(b_sz):
             decoder_input = torch.tensor(
