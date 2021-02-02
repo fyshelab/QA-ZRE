@@ -1,8 +1,15 @@
 import argparse
+import csv
 import io
 import json
-from dataclasses import dataclass, field
-from typing import Optional
+import math
+import os
+import random
+import time
+from configparser import ConfigParser
+from dataclasses import dataclass, field, replace
+from pathlib import Path
+from typing import Any, Callable, Generator, List, Optional, Union
 
 import datasets
 import numpy as np
@@ -12,53 +19,162 @@ import torch.optim as optim
 from datasets import Dataset, load_dataset
 from transformers import AlbertTokenizer, Trainer, TrainingArguments
 
-from src.albert_model import load_albert_encoder_decoder, load_pretrained_race
-
-# set the tokenizer
-tokenizer = AlbertTokenizer.from_pretrained("albert-xxlarge-v2")
-tokenizer.bos_token = tokenizer.cls_token
-tokenizer.eos_token = tokenizer.sep_token
-# for race
-# source_max_length = 512
-# decoder_max_length = 128
-# batch_size = 2
-# for dreamscape
-source_max_length = 256
-decoder_max_length = 64
-batch_size = 4
+from src.albert_model import HyperParameters, Model
 
 
-def process_data_to_model_inputs(batch):
-    # tokenize the inputs and labels
-    inputs = tokenizer(
-        batch["inputs"],
-        padding="max_length",
-        truncation="only_first",
-        max_length=source_max_length,
-    )
-    outputs = tokenizer(
-        batch["outputs"],
-        padding="max_length",
-        truncation="only_first",
-        max_length=decoder_max_length,
-    )
+def run_train_epoch(
+    model,
+    batch_size: int,
+    num_steps: int,
+    train_dataset,
+) -> Generator:
+    """Train the model and return the loss for 'num_steps' given the
+    'batch_size' and the train_dataset.
 
-    batch["input_ids"] = inputs.input_ids
-    batch["input_mask"] = inputs.attention_mask
-    batch["target_ids"] = outputs.input_ids
-    batch["target_mask"] = outputs.attention_mask
-    batch["labels"] = outputs.input_ids.copy()
+    Randomly pick a batch from the train_dataset.
+    """
+    shuff_dataset = train_dataset.shuffle(seed=42)
+    for step in range(num_steps):
+        batch_start = step * batch_size
+        batch_data = shuff_dataset.select(
+            range(batch_start, batch_start + batch_size, 1)
+        )
+        batch_data = batch_data.shuffle(seed=step)
+        loss_values = batch_data.map(model.train, batched=True, batch_size=batch_size)
+        loss_values.set_format(type="numpy", columns=["loss_value"])
+        yield step, loss_values["loss_value"]
 
-    # because BERT automatically shifts the labels, the labels correspond exactly to `target_ids`.
-    # We have to make sure that the PAD token is ignored
 
-    labels = [
-        [-100 if token == tokenizer.pad_token_id else token for token in labels]
-        for labels in batch["labels"]
-    ]
-    batch["labels"] = labels
+def run_predict(
+    model, batch_size: int, data_iterator: Generator, prediction_file: str
+) -> None:
+    """Read the 'data_iterator' and predict results with the model, and save
+    the results in the prediction_file."""
 
-    return batch
+    writerparams = {"quotechar": '"', "quoting": csv.QUOTE_ALL}
+    with io.open(prediction_file, mode="w", encoding="utf-8") as out_fp:
+        writer = csv.writer(out_fp, **writerparams)
+        header_written = False
+        batch = []
+        count = 0
+        step = 0
+        for row in data_iterator:
+            batch.append(row)
+            count += 1
+            if count == batch_size:
+                for ret_row in model.predict(batch):
+                    if not header_written:
+                        headers = ret_row.keys()
+                        writer.writerow(headers)
+                        header_written = True
+                    writer.writerow(list(ret_row.values()))
+                batch = []
+                count = 0
+                step += 1
+
+        # Flush buffer
+        if count != 0:
+            for ret_row in model.predict(batch):
+                if not header_written:
+                    headers = ret_row.keys()
+                    writer.writerow(headers)
+                    header_written = True
+                writer.writerow(list(ret_row.values()))
+
+            batch = []
+            count = 0
+            step += 1
+
+
+def save_config(config: HyperParameters, path: str) -> None:
+    """Saving config dataclass."""
+
+    config_dict = vars(config)
+    parser = ConfigParser()
+    parser.add_section("train-parameters")
+    for key, value in config_dict.items():
+        parser.set("train-parameters", str(key), str(value))
+    # save to a file
+    with io.open(
+        os.path.join(path, "config.ini"), mode="w", encoding="utf-8"
+    ) as configfile:
+        parser.write(configfile)
+
+
+def run_model(
+    model,
+    config,
+    evaluator,
+    train_dataset=None,
+    dev_dataset=None,
+    test_dataset=None,
+    save_always: Optional[bool] = False,
+) -> None:
+    """Run the model on input data (for training or testing)"""
+
+    model_path = config.model_path
+    max_epochs = config.max_epochs
+    batch_size = config.batch_size
+    mode = config.mode
+    if mode == "train":
+        print("\nINFO: ML training\n")
+        # Used to save dev set predictions.
+        prediction_file = os.path.join(model_path, "temp.predicted")
+        best_val_cost = float("inf")
+        first_start = time.time()
+        epoch = 0
+        while epoch < max_epochs:
+            print("\nEpoch:{0}\n".format(epoch))
+            start = time.time()
+            total_loss = []
+            for step, loss in run_train_epoch(
+                model, config.batch_size, config.num_train_steps, train_dataset
+            ):
+                if math.isnan(loss):
+                    print("nan loss")
+
+                if loss:
+                    total_loss.append(loss)
+
+                if total_loss:
+                    mean_loss = np.mean(total_loss)
+
+                else:
+                    mean_loss = float("-inf")
+
+                print(
+                    "\rBatch:{0} | Loss:{1} | Mean Loss:{2}\n".format(
+                        step, loss, mean_loss
+                    )
+                )
+            print("\nValidation:\n")
+            predict_iterator = predict_iterator_gen(config.dev)
+            run_predict(model, config.batch_size, predict_iterator, prediction_file)
+            val_cost = evaluator(prediction_file)
+
+            print("\nValidation cost:{0}\n".format(val_cost))
+            if val_cost < best_val_cost:
+                best_val_cost = val_cost
+                model.save("best")
+            if save_always:
+                model.save(str(epoch))
+            msg = "\nEpoch training time:{} seconds\n".format(time.time() - start)
+            print(msg)
+            epoch += 1
+
+        save_config(config, model_path)
+        msg = "\nTotal training time:{} seconds\n".format(time.time() - first_start)
+        print(msg)
+        # Remove the temp output file
+        os.remove(prediction_file)
+
+    elif mode == "test":
+        print("Predicting...")
+        start = time.time()
+        predict_iterator = predict_iterator_gen(config.test)
+        run_predict(model, batch_size, predict_iterator, config.prediction_file)
+        msg = "\nTotal prediction time:{} seconds\n".format(time.time() - start)
+        print(msg)
 
 
 def glue_passage_question(bos_token, eos_token, passage, question=None):
@@ -69,8 +185,8 @@ def glue_passage_question(bos_token, eos_token, passage, question=None):
         "question": question,
     }
     if question is not None:
-        return "{passage} {sep} {question} ".format(**entries)
-    return "{passage} ".format(**entries)
+        return "{passage} {sep} {question}".format(**entries)
+    return "{passage}".format(**entries)
 
 
 def list_parameters(model):
@@ -80,34 +196,6 @@ def list_parameters(model):
             parameters[name] = param
 
     return parameters
-
-
-def process_race_row(row):
-    option_code = row["answer"]
-    if option_code == "A":
-        option_idx = 0
-    elif option_code == "B":
-        option_idx = 1
-    elif option_code == "C":
-        option_idx = 2
-    elif option_code == "D":
-        option_idx = 3
-
-    answer = row["options"][option_idx]
-    answer = " ".join(answer.split())
-
-    question = row["question"]
-    question = " ".join(question.split())
-
-    article = row["article"]
-    article = " ".join(article.split())
-
-    input_str = glue_passage_question(
-        tokenizer.bos_token, tokenizer.eos_token, article, question
-    )
-    output_str = glue_passage_question(tokenizer.bos_token, tokenizer.eos_token, answer)
-
-    return {"inputs": input_str, "outputs": output_str}
 
 
 # load rouge for validation
@@ -134,7 +222,71 @@ def compute_metrics(pred):
     }
 
 
-def create_race_dataset():
+def create_race_dataset(tokenizer, batch_size, source_max_length, decoder_max_length):
+    """Function to create the race dataset."""
+
+    def process_race_row(row):
+        """Helper function to have access to the tokenizer."""
+        option_code = row["answer"]
+        if option_code == "A":
+            option_idx = 0
+        elif option_code == "B":
+            option_idx = 1
+        elif option_code == "C":
+            option_idx = 2
+        elif option_code == "D":
+            option_idx = 3
+
+        answer = row["options"][option_idx]
+        answer = " ".join(answer.split())
+
+        question = row["question"]
+        question = " ".join(question.split())
+
+        article = row["article"]
+        article = " ".join(article.split())
+
+        input_str = glue_passage_question(
+            tokenizer.bos_token, tokenizer.eos_token, article, question
+        )
+        output_str = glue_passage_question(
+            tokenizer.bos_token, tokenizer.eos_token, answer
+        )
+
+        return {"inputs": input_str, "outputs": output_str}
+
+    def process_data_to_model_inputs(batch):
+        # tokenize the inputs and labels
+        inputs = tokenizer(
+            batch["inputs"],
+            padding="max_length",
+            truncation="only_first",
+            max_length=source_max_length,
+        )
+        outputs = tokenizer(
+            batch["outputs"],
+            padding="max_length",
+            truncation="only_first",
+            max_length=decoder_max_length,
+        )
+
+        batch["input_ids"] = inputs.input_ids
+        batch["input_mask"] = inputs.attention_mask
+        batch["target_ids"] = outputs.input_ids
+        batch["target_mask"] = outputs.attention_mask
+        batch["labels"] = outputs.input_ids.copy()
+
+        # because BERT automatically shifts the labels, the labels correspond exactly to `target_ids`.
+        # We have to make sure that the PAD token is ignored
+
+        labels = [
+            [-100 if token == tokenizer.pad_token_id else token for token in labels]
+            for labels in batch["labels"]
+        ]
+        batch["labels"] = labels
+
+        return batch
+
     train_dataset = load_dataset("race", "all", split="train")
     train_dataset = train_dataset.map(
         process_race_row,
@@ -166,7 +318,6 @@ def create_race_dataset():
         type="torch",
         columns=["input_ids", "input_mask", "target_ids", "target_mask", "labels"],
     )
-
     test_dataset = load_dataset("race", "all", split="test")
     test_dataset = test_dataset.map(
         process_race_row,
@@ -206,6 +357,7 @@ def build_dream_dataset(args):
                     tokenizer.bos_token, tokenizer.eos_token, a
                 )
                 data_rows.append({"inputs": input_str, "outputs": output_str})
+
     df = pd.DataFrame(data_rows)
     dataset = Dataset.from_pandas(df)
     dataset = dataset.map(
@@ -311,19 +463,37 @@ def main_predict(args):
     )
 
 
-def race_pretrain():
-    """main model to train."""
-    train_dataset, dev_dataset, test_dataset = create_race_dataset()
-
-    albert2albert = load_albert_encoder_decoder(
-        mask_token_id=tokenizer.mask_token_id,
-        source_max_length=source_max_length,
-        decoder_max_length=decoder_max_length,
+def race_train(args):
+    """Train albert model on race dataset."""
+    config = HyperParameters(
+        model_path=args.model_path,
+        batch_size=2,
+        source_max_length=512,
+        decoder_max_length=128,
+        gpu=args.gpu,
+        gpu_device=args.gpu_device,
+        learning_rate=args.learning_rate,
+        max_epochs=10,
+        mode="train",
+        num_train_steps=args.num_train_steps,
     )
-
-    albert2albert = albert2albert.to("cuda:0")
-
+    albert2albert = Model(config)
+    train_dataset, dev_dataset, test_dataset = create_race_dataset(
+        tokenizer=albert2albert.tokenizer,
+        batch_size=config.batch_size,
+        source_max_length=config.source_max_length,
+        decoder_max_length=config.decoder_max_length,
+    )
+    run_model(
+        albert2albert,
+        config=config,
+        evaluator=None,
+        train_dataset=train_dataset.select(range(16)),
+        dev_dataset=dev_dataset.select(range(16)),
+        test_dataset=test_dataset.select(range(16)),
+    )
     # instantiate trainer
+    """
     training_args = TrainingArguments(
         output_dir="./trained_models/",
         per_device_train_batch_size=batch_size,
@@ -350,6 +520,7 @@ def race_pretrain():
         eval_dataset=dev_dataset,
     )
     trainer.train()
+    """
 
 
 def race_predict(args):
@@ -412,8 +583,8 @@ def race_predict(args):
 
 def run_main(args):
     """Decides what to do in the code."""
-    if args.mode == "race_pretrain":
-        race_pretrain()
+    if args.mode == "race_train":
+        race_train(args)
     if args.mode == "race_predict":
         race_predict(args)
     if args.mode == "main_train":
@@ -425,12 +596,7 @@ def run_main(args):
 def argument_parser():
     """augments arguments for protein-gene model."""
     parser = argparse.ArgumentParser()
-    parser.add_argument(
-        "--mode",
-        type=str,
-        required=True,
-        help="race_pretrain | race_predict | main_train | main_predict",
-    )
+    parser.add_argument("--mode", type=str, required=True, help="race_train")
     parser.add_argument(
         "--model_path",
         type=str,
@@ -438,8 +604,57 @@ def argument_parser():
         help="Path for saving or loading models.",
     )
 
+    # Train specific
+    parser.add_argument("--train", type=str, help="file for train data.")
+
+    parser.add_argument("--dev", type=str, help="file for validation data.")
+
+    # Test specific
+    parser.add_argument("--test", type=str, help="file for test data.")
+
     parser.add_argument(
         "--prediction_file", type=str, help="file for saving predictions"
+    )
+
+    # Hyper-Parameters
+    parser.add_argument("--dim_model", type=int, default=100, help="dim of model units")
+
+    parser.add_argument(
+        "--dropout", type=float, default=0.1, help="the probability of zeroing a link"
+    )
+
+    parser.add_argument("--dim_embedding", type=int, default=100, help="embedding size")
+
+    parser.add_argument("--learning_rate", type=float, default=0.001)
+
+    parser.add_argument(
+        "--max_gradient_norm",
+        type=float,
+        default=10.0,
+        help="max norm allowed for gradients",
+    )
+
+    parser.add_argument("--batch_size", type=int, default=8, help="static batch size")
+
+    parser.add_argument(
+        "--num_train_steps", type=int, default=50000, help="number of train steps"
+    )
+
+    parser.add_argument(
+        "--max_epochs", type=int, default=25, help="max number of training iterations"
+    )
+
+    parser.add_argument("--gpu_device", type=int, default=0, help="gpu device to use")
+
+    parser.add_argument("--seed", type=int, default=len("benchsci"), help="random seed")
+
+    parser.add_argument(
+        "--config_file", type=str, default="config.ini", help="config.ini file"
+    )
+
+    # GPU or CPU
+    parser.add_argument(
+        "--gpu", type=bool, default=True, help="on gpu or not? True or False"
     )
 
     parser.add_argument(
@@ -452,3 +667,7 @@ def argument_parser():
 if __name__ == "__main__":
     args = argument_parser()
     run_main(args)
+    # build_dream_dataset(args)
+    # train_dataset, dev_dataset, test_dataset = create_race_dataset()
+    # for row in dev_dataset:
+    #    print(row)
