@@ -26,7 +26,7 @@ def filter_data(args):
     )
 
     #%% Generate clean questions.csv
-    questions_df = pd.read_csv(repo_root / "data/dreamscape/questions-jan29-2021.csv")
+    questions_df = pd.read_csv(repo_root / "data/dreamscape/questions-jan29-2021.json")
 
     questions_out_df = questions_df[questions_df["questionTypeId"] == 1]
     questions_out_df = questions_df[questions_df["Question Type"] == args.type]
