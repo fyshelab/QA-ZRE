@@ -5,11 +5,13 @@ https://github.com/jadore801120/attention-is-all-you-need-pytorch/tree/master/tr
 https://github.com/google-research/albert
 """
 import copy
+import gc
 import io
 import json
 import math
+import os
 import random
-from dataclasses import dataclass
+from dataclasses import dataclass, field, replace
 from typing import Any, List, Optional, Tuple
 
 import numpy
@@ -17,8 +19,38 @@ import numpy as np
 import six
 import torch
 import torch.nn as nn
+import torch.optim as optim
+from transformers import AlbertTokenizer
 
 from src.initialize import xavier_param_init
+
+
+@dataclass
+class HyperParameters:
+    """Model configuration."""
+
+    model_path: Optional[str] = None
+    batch_size: int = 64
+    source_max_length: int = 256
+    decoder_max_length: int = 64
+    config_file: str = "config.ini"
+    dim_embedding: int = 100
+    dim_model: int = 128
+    dropout: float = 0.5
+    gpu: bool = False
+    gpu_device: int = 0
+    gradient_clipping: bool = True
+    l2_norm_weight: float = 0.01
+    learning_rate: float = 0.0005
+    max_epochs: int = 16
+    max_gradient_norm: float = 10.0
+    mode: str = "train"
+    train: Optional[str] = None
+    num_train_steps: int = 2667
+    prediction_file: Optional[str] = None
+    seed: int = 8
+    test: Optional[str] = None
+    dev: Optional[str] = None
 
 
 def set_random_seed(seed: int) -> Any:
@@ -873,6 +905,11 @@ param_mapper = {
 }
 
 
+def save(model: torch.nn.Module, path: str) -> None:
+    """Save the model to task at the specified path."""
+    torch.save(model.state_dict(), path)
+
+
 def load_albert_encoder_decoder(mask_token_id, source_max_length, decoder_max_length):
     """Load the pretrained model into a encoder-decoder model."""
     config = AlbertConfig(
@@ -911,3 +948,141 @@ def load_pretrained_race(path, mask_token_id, source_max_length, decoder_max_len
     model.load_state_dict(model_dict)
 
     return model
+
+
+class Model(object):
+    """Wrapper class around the AlbertEncoderDecoderModel."""
+
+    def __init__(self, cfg: HyperParameters):
+        self.config = cfg
+
+        set_random_seed(cfg.seed)
+
+        # Check the gpu actually exists.
+        cfg.gpu = cfg.gpu and torch.cuda.is_available()
+
+        if cfg.gpu:
+            os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
+            os.environ["CUDA_VISIBLE_DEVICES"] = str(cfg.gpu_device)
+            torch.cuda.device(cfg.gpu_device)
+            torch.cuda.set_device(cfg.gpu_device)
+
+        tokenizer = AlbertTokenizer.from_pretrained("albert-xxlarge-v2")
+        tokenizer.bos_token = tokenizer.cls_token
+        tokenizer.eos_token = tokenizer.sep_token
+
+        # Construct model
+        model = load_albert_encoder_decoder(
+            mask_token_id=tokenizer.mask_token_id,
+            source_max_length=cfg.source_max_length,
+            decoder_max_length=cfg.decoder_max_length,
+        )
+        if cfg.gpu:
+            model.cuda(cfg.gpu_device)
+
+        if cfg.mode == "train":
+            params_to_train = list(
+                filter(lambda x: x.requires_grad, model.parameters())
+            )
+            self.optimizer = optim.Adam(
+                params_to_train, lr=cfg.learning_rate, amsgrad=True
+            )
+            if not os.path.exists(cfg.model_path):
+                os.makedirs(cfg.model_path)
+            self.model_path = os.path.join(cfg.model_path, "model")
+
+        elif cfg.mode in ["test", "inference"]:
+            self.model_path = os.path.join(cfg.model_path, "model")
+            model.load_state_dict(
+                torch.load(
+                    self.model_path + "_best_model",
+                    map_location=lambda storage, loc: storage,
+                )
+            )
+        self.model = model
+        self.tokenizer = tokenizer
+
+    def save(self, checkpoint_name: str):
+        """Save the encoder model to the specified path name."""
+        path = self.model_path + "_" + checkpoint_name
+        save(self.model, path + "_model")
+
+    def predict(self, batch):
+        # Free memory in GPU, very important!
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
+        gc.collect()
+        # disable dropout
+        self.model.eval()
+
+        input_ids = batch["input_ids"]
+        input_mask = batch["input_mask"]
+        input_ids = input_ids.to(self.config.gpu_device)
+        input_mask = input_mask.to(self.config.gpu_device)
+        predictions = self.model.greedy_decode(
+            input_ids=input_ids, input_mask=input_mask
+        )
+
+        # all special tokens including will be removed
+        predictions_str = self.tokenizer.batch_decode(
+            predictions, skip_special_tokens=True
+        )
+        input_str = self.tokenizer.batch_decode(input_ids, skip_special_tokens=False)
+        target_str = self.tokenizer.batch_decode(
+            batch["target_ids"], skip_special_tokens=True
+        )
+        for index in range(len(predictions_str)):
+            pred_str = predictions_str[index]
+            pred_str = pred_str if pred_str != "" else "<EMPTY>"
+            output_batch = {
+                "predictions_str": pred_str,
+                "input_str": input_str[index],
+                "target_str": target_str[index],
+            }
+            yield output_batch
+
+    def train(self, batch):
+        # Free memory in GPU, very important!
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
+        gc.collect()
+        # Turn on training mode which enables dropout.
+        self.model.train()
+        self.optimizer.zero_grad()
+
+        input_ids = batch["input_ids"]
+        input_mask = batch["input_mask"]
+        target_ids = batch["target_ids"]
+        target_mask = batch["target_mask"]
+        labels = batch["labels"]
+        input_ids = input_ids.to(self.config.gpu_device)
+        input_mask = input_mask.to(self.config.gpu_device)
+        target_ids = target_ids.to(self.config.gpu_device)
+        target_mask = target_mask.to(self.config.gpu_device)
+        labels = labels.to(self.config.gpu_device)
+
+        output_dict = self.model(
+            input_ids,
+            target_ids,
+            labels=labels,
+            input_mask=input_mask,
+            target_mask=target_mask,
+        )
+        loss = output_dict["loss"]
+        loss_value = loss.item()
+
+        # is loss nan? don't backpropagate!
+        if math.isnan(loss):
+            return {"loss_value": loss_value}
+
+        # BackProp
+        loss.backward()
+
+        if self.config.gradient_clipping:
+            params = self.model.parameters()
+            nn.utils.clip_grad_norm_(params, self.config.max_gradient_norm)
+
+        # Optimize
+        self.optimizer.step()
+
+        return {"loss_value": loss_value}
