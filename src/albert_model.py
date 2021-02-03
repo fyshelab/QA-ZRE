@@ -46,7 +46,6 @@ class HyperParameters:
     max_gradient_norm: float = 10.0
     mode: str = "train"
     train: Optional[str] = None
-    n_warmup_steps: int = 10000
     num_train_steps: int = 2667
     prediction_file: Optional[str] = None
     seed: int = 8
@@ -981,7 +980,7 @@ class Model(object):
         if cfg.gpu:
             model.cuda(cfg.gpu_device)
 
-        elif cfg.mode == "train":
+        if cfg.mode == "train":
             params_to_train = list(
                 filter(lambda x: x.requires_grad, model.parameters())
             )
@@ -1032,19 +1031,21 @@ class Model(object):
         target_str = self.tokenizer.batch_decode(
             batch["target_ids"], skip_special_tokens=True
         )
-        output_batch = {
-            "predictions_str": predictions_str,
-            "input_str": input_str,
-            "target_str": target_str,
-        }
-        return output_batch
+        for index in range(len(predictions_str)):
+            pred_str = predictions_str[index]
+            pred_str = pred_str if pred_str != "" else "<EMPTY>"
+            output_batch = {
+                "predictions_str": pred_str,
+                "input_str": input_str[index],
+                "target_str": target_str[index],
+            }
+            yield output_batch
 
     def train(self, batch):
         # Free memory in GPU, very important!
         if torch.cuda.is_available():
             torch.cuda.empty_cache()
         gc.collect()
-
         # Turn on training mode which enables dropout.
         self.model.train()
         self.optimizer.zero_grad()
@@ -1072,7 +1073,7 @@ class Model(object):
 
         # is loss nan? don't backpropagate!
         if math.isnan(loss):
-            return loss_value
+            return {"loss_value": loss_value}
 
         # BackProp
         loss.backward()
