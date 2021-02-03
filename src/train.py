@@ -40,50 +40,30 @@ def run_train_epoch(
             range(batch_start, batch_start + batch_size, 1)
         )
         batch_data = batch_data.shuffle(seed=step)
-        loss_values = batch_data.map(model.train, batched=True, batch_size=batch_size)
-        loss_values.set_format(type="numpy", columns=["loss_value"])
+        loss_values = model.train(batch_data)
         yield step, loss_values["loss_value"]
 
 
-def run_predict(
-    model, batch_size: int, data_iterator: Generator, prediction_file: str
-) -> None:
-    """Read the 'data_iterator' and predict results with the model, and save
-    the results in the prediction_file."""
+def run_predict(model, batch_size: int, dev_dataset, prediction_file: str) -> None:
+    """Read the 'dev_dataset' and predict results with the model, and save the
+    results in the prediction_file."""
 
+    num_steps = math.ceil(len(dev_dataset) / batch_size)
     writerparams = {"quotechar": '"', "quoting": csv.QUOTE_ALL}
     with io.open(prediction_file, mode="w", encoding="utf-8") as out_fp:
         writer = csv.writer(out_fp, **writerparams)
         header_written = False
-        batch = []
-        count = 0
-        step = 0
-        for row in data_iterator:
-            batch.append(row)
-            count += 1
-            if count == batch_size:
-                for ret_row in model.predict(batch):
-                    if not header_written:
-                        headers = ret_row.keys()
-                        writer.writerow(headers)
-                        header_written = True
-                    writer.writerow(list(ret_row.values()))
-                batch = []
-                count = 0
-                step += 1
-
-        # Flush buffer
-        if count != 0:
-            for ret_row in model.predict(batch):
+        for step in range(num_steps):
+            batch_start = step * batch_size
+            batch_data = dev_dataset.select(
+                range(batch_start, batch_start + batch_size, 1)
+            )
+            for ret_row in model.predict(batch_data):
                 if not header_written:
                     headers = ret_row.keys()
                     writer.writerow(headers)
                     header_written = True
                 writer.writerow(list(ret_row.values()))
-
-            batch = []
-            count = 0
-            step += 1
 
 
 def save_config(config: HyperParameters, path: str) -> None:
@@ -148,8 +128,7 @@ def run_model(
                     )
                 )
             print("\nValidation:\n")
-            predict_iterator = predict_iterator_gen(config.dev)
-            run_predict(model, config.batch_size, predict_iterator, prediction_file)
+            run_predict(model, config.batch_size, dev_dataset, prediction_file)
             val_cost = evaluator(prediction_file)
 
             print("\nValidation cost:{0}\n".format(val_cost))
@@ -171,8 +150,7 @@ def run_model(
     elif mode == "test":
         print("Predicting...")
         start = time.time()
-        predict_iterator = predict_iterator_gen(config.test)
-        run_predict(model, batch_size, predict_iterator, config.prediction_file)
+        run_predict(model, batch_size, test_dataset, config.prediction_file)
         msg = "\nTotal prediction time:{} seconds\n".format(time.time() - start)
         print(msg)
 
@@ -202,24 +180,20 @@ def list_parameters(model):
 rouge = datasets.load_metric("rouge")
 
 
-def compute_metrics(pred):
-    labels_ids = pred.label_ids
-    pred_ids = pred.predictions
-
-    # all unnecessary tokens are removed
-    pred_str = tokenizer.batch_decode(pred_ids, skip_special_tokens=True)
-    labels_ids[labels_ids == -100] = tokenizer.pad_token_id
-    label_str = tokenizer.batch_decode(labels_ids, skip_special_tokens=True)
-
+def compute_rouge(prediction_file):
+    df = pd.read_csv(prediction_file)
     rouge_output = rouge.compute(
-        predictions=pred_str, references=label_str, rouge_types=["rouge2"]
+        predictions=df["predictions_str"].tolist(),
+        references=df["target_str"].tolist(),
+        rouge_types=["rouge2"],
     )["rouge2"].mid
 
-    return {
+    output = {
         "rouge2_precision": round(rouge_output.precision, 4),
         "rouge2_recall": round(rouge_output.recall, 4),
         "rouge2_fmeasure": round(rouge_output.fmeasure, 4),
     }
+    return 1.0 - output["rouge2_fmeasure"]
 
 
 def create_race_dataset(tokenizer, batch_size, source_max_length, decoder_max_length):
@@ -487,40 +461,11 @@ def race_train(args):
     run_model(
         albert2albert,
         config=config,
-        evaluator=None,
-        train_dataset=train_dataset.select(range(16)),
-        dev_dataset=dev_dataset.select(range(16)),
-        test_dataset=test_dataset.select(range(16)),
-    )
-    # instantiate trainer
-    """
-    training_args = TrainingArguments(
-        output_dir="./trained_models/",
-        per_device_train_batch_size=batch_size,
-        per_device_eval_batch_size=batch_size,
-        do_train=true,
-        do_eval=true,
-        seed=10,
-        gradient_accumulation_steps=1,
-        # max_steps=500,
-        logging_steps=100,  # set to 1000 for full training
-        save_steps=100,  # set to 500 for full training
-        eval_steps=100,  # set to 8000 for full training
-        warmup_steps=1000,  # set to 2000 for full training
-        overwrite_output_dir=true,
-        save_total_limit=3,
-        num_train_epochs=3,
-    )
-
-    trainer = trainer(
-        model=albert2albert,
-        args=training_args,
-        compute_metrics=compute_metrics,
+        evaluator=compute_rouge,
         train_dataset=train_dataset,
-        eval_dataset=dev_dataset,
+        dev_dataset=dev_dataset,
+        test_dataset=test_dataset,
     )
-    trainer.train()
-    """
 
 
 def race_predict(args):
@@ -625,7 +570,7 @@ def argument_parser():
 
     parser.add_argument("--dim_embedding", type=int, default=100, help="embedding size")
 
-    parser.add_argument("--learning_rate", type=float, default=0.001)
+    parser.add_argument("--learning_rate", type=float, default=0.0005)
 
     parser.add_argument(
         "--max_gradient_norm",
