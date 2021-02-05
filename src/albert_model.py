@@ -251,9 +251,9 @@ class MultiHeadAttention(nn.Module):
 
         # denominator for normalizing attention scores
         attn = attn / np.power(self.config.dim_key, 0.5)
-        attn = attn.softmax(dim=2)
         if mask is not None:
-            attn = attn * (1.0 - mask)
+            adder = mask * -1e12
+            attn += adder
 
         if self.config.mask_future:
             _, q_length, kv_length = attn.size()
@@ -270,8 +270,26 @@ class MultiHeadAttention(nn.Module):
             )
 
             future_mask = future_mask.expand_as(attn)
-            attn = attn * (1.0 - future_mask)
+            adder = future_mask * -1e12
+            attn += adder
 
+        attn = attn.softmax(dim=2)
+        if mask is not None:
+            attn = attn * (1.0 - mask)
+
+        if self.config.mask_future:
+            attn = attn * (1.0 - future_mask)
+        """
+        if self.config.mask_future and not self.config.cross_attention:
+            print("decoder self attention")
+            print(attn[0, 10, :])
+        if not self.config.mask_future and self.config.cross_attention:
+            print("decoder cross attention")
+            print(attn[0, 10, :])
+        if not self.config.mask_future and not self.config.cross_attention:
+            print("encoder attention")
+            print(attn[0, 10, :])
+        """
         attn = self.dropout(attn)
         output = attn.bmm(value)
 
@@ -913,7 +931,7 @@ def save(model: torch.nn.Module, path: str) -> None:
 def load_albert_encoder_decoder(mask_token_id, source_max_length, decoder_max_length):
     """Load the pretrained model into a encoder-decoder model."""
     config = AlbertConfig(
-        num_hidden_layers=6,
+        num_hidden_layers=1,
         go_symbol_id=mask_token_id,
         source_max_position_embeddings=source_max_length,
         decoder_max_position_embeddings=decoder_max_length,
@@ -937,7 +955,7 @@ def load_albert_encoder_decoder(mask_token_id, source_max_length, decoder_max_le
 def load_pretrained_race(path, mask_token_id, source_max_length, decoder_max_length):
     """Load the pretrained model into a encoder-decoder model."""
     config = AlbertConfig(
-        num_hidden_layers=6,
+        num_hidden_layers=1,
         go_symbol_id=mask_token_id,
         source_max_position_embeddings=source_max_length,
         decoder_max_position_embeddings=decoder_max_length,
@@ -1015,10 +1033,12 @@ class Model(object):
         # disable dropout
         self.model.eval()
 
-        input_ids = batch["input_ids"]
-        input_mask = batch["input_mask"]
-        input_ids = input_ids.to(self.config.gpu_device)
-        input_mask = input_mask.to(self.config.gpu_device)
+        if self.config.gpu:
+            input_ids = batch["input_ids"]
+            input_mask = batch["input_mask"]
+            input_ids = input_ids.to(self.config.gpu_device)
+            input_mask = input_mask.to(self.config.gpu_device)
+
         predictions = self.model.greedy_decode(
             input_ids=input_ids, input_mask=input_mask
         )
@@ -1055,11 +1075,12 @@ class Model(object):
         target_ids = batch["target_ids"]
         target_mask = batch["target_mask"]
         labels = batch["labels"]
-        input_ids = input_ids.to(self.config.gpu_device)
-        input_mask = input_mask.to(self.config.gpu_device)
-        target_ids = target_ids.to(self.config.gpu_device)
-        target_mask = target_mask.to(self.config.gpu_device)
-        labels = labels.to(self.config.gpu_device)
+        if self.config.gpu:
+            input_ids = input_ids.to(self.config.gpu_device)
+            input_mask = input_mask.to(self.config.gpu_device)
+            target_ids = target_ids.to(self.config.gpu_device)
+            target_mask = target_mask.to(self.config.gpu_device)
+            labels = labels.to(self.config.gpu_device)
 
         output_dict = self.model(
             input_ids,
