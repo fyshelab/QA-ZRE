@@ -252,7 +252,7 @@ class MultiHeadAttention(nn.Module):
         # denominator for normalizing attention scores
         attn = attn / np.power(self.config.dim_key, 0.5)
         if mask is not None:
-            adder = mask * -1e+12
+            adder = mask * -1e12
             attn += adder
 
         if self.config.mask_future:
@@ -270,19 +270,26 @@ class MultiHeadAttention(nn.Module):
             )
 
             future_mask = future_mask.expand_as(attn)
-            adder = future_mask * -1e+12
+            adder = future_mask * -1e12
             attn += adder
 
         attn = attn.softmax(dim=2)
+        if mask is not None:
+            attn = attn * (1.0 - mask)
+
+        if self.config.mask_future:
+            attn = attn * (1.0 - future_mask)
+        """
         if self.config.mask_future and not self.config.cross_attention:
             print("decoder self attention")
-            print(attn[0, 0, :])
+            print(attn[0, 10, :])
         if not self.config.mask_future and self.config.cross_attention:
             print("decoder cross attention")
-            print(attn[0, 0, :])
+            print(attn[0, 10, :])
         if not self.config.mask_future and not self.config.cross_attention:
             print("encoder attention")
-            print(attn[0, 0, :])
+            print(attn[0, 10, :])
+        """
         attn = self.dropout(attn)
         output = attn.bmm(value)
 
@@ -1010,7 +1017,6 @@ class Model(object):
                     map_location=lambda storage, loc: storage,
                 )
             )
-            print("HEYYYYYYYYy!")
         self.model = model
         self.tokenizer = tokenizer
 
