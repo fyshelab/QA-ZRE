@@ -256,3 +256,6 @@ def test_full_model():
         target_ids=input_ids,
     )
     assert output["hidden_outputs"].size() == (3, 4, 32)
+
+
+# TODO add tests for greedy decoding and Model class.
