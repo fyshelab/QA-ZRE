@@ -441,13 +441,13 @@ def race_train(args):
     """Train albert model on race dataset."""
     config = HyperParameters(
         model_path=args.model_path,
-        batch_size=2,
+        batch_size=args.batch_size,
         source_max_length=512,
         decoder_max_length=128,
         gpu=args.gpu,
         gpu_device=args.gpu_device,
         learning_rate=args.learning_rate,
-        max_epochs=10,
+        max_epochs=args.max_epochs,
         mode="train",
         num_train_steps=args.num_train_steps,
     )
@@ -467,6 +467,37 @@ def race_train(args):
         test_dataset=test_dataset,
     )
 
+
+def race_test(args):
+    """Test albert model on race dataset."""
+    config = HyperParameters(
+        model_path=args.model_path,
+        batch_size=args.batch_size,
+        source_max_length=512,
+        decoder_max_length=128,
+        gpu=args.gpu,
+        gpu_device=args.gpu_device,
+        learning_rate=args.learning_rate,
+        max_epochs=args.max_epochs,
+        mode="test",
+        num_train_steps=args.num_train_steps,
+        prediction_file=args.prediction_file
+    )
+    albert2albert = Model(config)
+    train_dataset, dev_dataset, test_dataset = create_race_dataset(
+        tokenizer=albert2albert.tokenizer,
+        batch_size=config.batch_size,
+        source_max_length=config.source_max_length,
+        decoder_max_length=config.decoder_max_length,
+    )
+    run_model(
+        albert2albert,
+        config=config,
+        evaluator=compute_rouge,
+        train_dataset=train_dataset,
+        dev_dataset=dev_dataset,
+        test_dataset=test_dataset,
+    )
 
 def race_predict(args):
     """Main model to train."""
@@ -530,6 +561,8 @@ def run_main(args):
     """Decides what to do in the code."""
     if args.mode == "race_train":
         race_train(args)
+    if args.mode == "race_test":
+        race_test(args)
     if args.mode == "race_predict":
         race_predict(args)
     if args.mode == "main_train":
@@ -541,7 +574,7 @@ def run_main(args):
 def argument_parser():
     """augments arguments for protein-gene model."""
     parser = argparse.ArgumentParser()
-    parser.add_argument("--mode", type=str, required=True, help="race_train")
+    parser.add_argument("--mode", type=str, required=True, help="race_train | race_test")
     parser.add_argument(
         "--model_path",
         type=str,
@@ -591,7 +624,7 @@ def argument_parser():
 
     parser.add_argument("--gpu_device", type=int, default=0, help="gpu device to use")
 
-    parser.add_argument("--seed", type=int, default=len("benchsci"), help="random seed")
+    parser.add_argument("--seed", type=int, default=len("dream"), help="random seed")
 
     parser.add_argument(
         "--config_file", type=str, default="config.ini", help="config.ini file"
