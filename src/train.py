@@ -310,6 +310,136 @@ def create_race_dataset(tokenizer, batch_size, source_max_length, decoder_max_le
     return train_dataset, dev_dataset, test_dataset
 
 
+def create_squad_dataset(tokenizer, batch_size, source_max_length, decoder_max_length):
+    """Function to create the squad dataset."""
+
+    def process_squad_row(row):
+        """Helper function to have access to the tokenizer."""
+
+        try:
+            answer = row["answers"]["text"][0]
+            answer = " ".join(answer.split())
+        except:
+            answer = "<NoAnswer>"
+
+        question = row["question"]
+        question = " ".join(question.split())
+
+        article = row["context"]
+        article = " ".join(article.split())
+
+        input_str = glue_passage_question(
+            tokenizer.bos_token, tokenizer.eos_token, article, question
+        )
+
+        output_str = glue_passage_question(
+            tokenizer.bos_token, tokenizer.eos_token, answer
+        )
+
+        return {"inputs": input_str, "outputs": output_str}
+
+    def process_data_to_model_inputs(batch):
+        # tokenize the inputs and labels
+        inputs = tokenizer(
+            batch["inputs"],
+            padding="max_length",
+            truncation="only_first",
+            max_length=source_max_length,
+        )
+        outputs = tokenizer(
+            batch["outputs"],
+            padding="max_length",
+            truncation="only_first",
+            max_length=decoder_max_length,
+        )
+
+        batch["input_ids"] = inputs.input_ids
+        batch["input_mask"] = inputs.attention_mask
+        batch["target_ids"] = outputs.input_ids
+        batch["target_mask"] = outputs.attention_mask
+        batch["labels"] = outputs.input_ids.copy()
+
+        # because BERT automatically shifts the labels, the labels correspond exactly to `target_ids`.
+        # We have to make sure that the PAD token is ignored
+
+        labels = [
+            [-100 if token == tokenizer.pad_token_id else token for token in labels]
+            for labels in batch["labels"]
+        ]
+        batch["labels"] = labels
+
+        return batch
+
+    train_dataset = load_dataset("squad_v2", split="train")
+    train_dataset = train_dataset.map(
+        process_squad_row,
+        remove_columns=["id", "title", "question", "answers", "context"],
+    )
+    train_dataset = train_dataset.map(
+        process_data_to_model_inputs,
+        batched=True,
+        batch_size=batch_size,
+        remove_columns=["inputs", "outputs"],
+    )
+    train_dataset.set_format(
+        type="torch",
+        columns=["input_ids", "input_mask", "target_ids", "target_mask", "labels"],
+    )
+
+    val_dataset = load_dataset("squad_v2", split="validation")
+    val_dataset = val_dataset.map(
+        process_squad_row,
+        remove_columns=["id", "title", "question", "answers", "context"],
+    )
+    val_dataset = val_dataset.map(
+        process_data_to_model_inputs,
+        batched=True,
+        batch_size=batch_size,
+        remove_columns=["inputs", "outputs"],
+    )
+    val_dataset.set_format(
+        type="torch",
+        columns=["input_ids", "input_mask", "target_ids", "target_mask", "labels"],
+    )
+    return train_dataset, val_dataset
+
+
+def run_squad(args):
+    """Train albert model on squad dataset."""
+    if args.mode == "squad_train":
+        mode = "train"
+    elif args.mode == "squad_test":
+        mode = "test"
+    config = HyperParameters(
+        model_path=args.model_path,
+        batch_size=args.batch_size,
+        source_max_length=512,
+        decoder_max_length=128,
+        gpu=args.gpu,
+        gpu_device=args.gpu_device,
+        learning_rate=args.learning_rate,
+        max_epochs=args.max_epochs,
+        mode=mode,
+        num_train_steps=args.num_train_steps,
+        prediction_file=args.prediction_file,
+    )
+    albert2albert = Model(config)
+    train_dataset, val_dataset = create_squad_dataset(
+        tokenizer=albert2albert.tokenizer,
+        batch_size=config.batch_size,
+        source_max_length=config.source_max_length,
+        decoder_max_length=config.decoder_max_length,
+    )
+    run_model(
+        albert2albert,
+        config=config,
+        evaluator=compute_rouge,
+        train_dataset=train_dataset,
+        dev_dataset=val_dataset,
+        test_dataset=val_dataset,
+    )
+
+
 def run_race(args):
     """Train albert model on race dataset."""
     if args.mode == "race_train":
@@ -350,13 +480,18 @@ def run_main(args):
     """Decides what to do in the code."""
     if args.mode in ["race_train", "race_test"]:
         run_race(args)
+    if args.mode in ["squad_train", "squad_test"]:
+        run_squad(args)
 
 
 def argument_parser():
     """augments arguments for protein-gene model."""
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        "--mode", type=str, required=True, help="race_train | race_test"
+        "--mode",
+        type=str,
+        required=True,
+        help="race_train | race_test| squad_train | squad_test",
     )
     parser.add_argument(
         "--model_path",
