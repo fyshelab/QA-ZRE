@@ -147,13 +147,14 @@ class AlbertEmbedding(nn.Module):
 
         # Layer normalization: :cite:`https://arxiv.org/abs/1607.06450`
         # eps from huggingface transformers implementation
-        self.layer_norm = nn.LayerNorm(embedding_size, eps=1e-12)
+        self.layer_norm = nn.LayerNorm(embedding_size, eps=1e-6)
 
     def forward(self, input_ids, token_type_ids) -> torch.FloatTensor:
         """Build the embeddings."""
-        embeddings = self.word_embedder(input_ids) + self.token_type_embedder(
-            token_type_ids
-        )
+        # embeddings = self.word_embedder(input_ids) + self.token_type_embedder(
+        #    token_type_ids
+        # )
+        embeddings = self.word_embedder(input_ids)
 
         _, s_len, _ = embeddings.size()
 
@@ -232,7 +233,7 @@ class MultiHeadAttention(nn.Module):
         xavier_param_init(self)
 
         # Layer normalization: :cite:`https://arxiv.org/abs/1607.06450`
-        self.layer_norm = nn.LayerNorm(config.dim_model, eps=1e-12)
+        self.layer_norm = nn.LayerNorm(config.dim_model, eps=1e-6)
 
         self.config = config
 
@@ -395,7 +396,7 @@ class PositionwiseFeedForward(nn.Module):
 
         xavier_param_init(self)
 
-        self.layer_norm = nn.LayerNorm(dim_input, eps=1e-12)
+        self.layer_norm = nn.LayerNorm(dim_input, eps=1e-6)
 
     def forward(self, *args: List[Any]) -> torch.FloatTensor:
         """
@@ -691,7 +692,7 @@ class AlbertModel(nn.Module):
             token_type_vocab_size=config.token_type_vocab_size,
             use_position_embeddings=config.use_position_embeddings,
             max_position_embeddings=max_position,
-            dropout=config.attention_probs_dropout_prob,
+            dropout=config.hidden_dropout_prob,
         )
 
         if config.embedding_size != config.hidden_size:
@@ -932,6 +933,9 @@ def load_albert_encoder_decoder(mask_token_id, source_max_length, decoder_max_le
     """Load the pretrained model into a encoder-decoder model."""
     config = AlbertConfig(
         num_hidden_layers=1,
+        hidden_dropout_prob=0.1,
+        attention_probs_dropout_prob=0.2,
+        num_attention_heads=1,
         go_symbol_id=mask_token_id,
         source_max_position_embeddings=source_max_length,
         decoder_max_position_embeddings=decoder_max_length,

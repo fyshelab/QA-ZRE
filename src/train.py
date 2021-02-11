@@ -374,7 +374,7 @@ def create_squad_dataset(tokenizer, batch_size, source_max_length, decoder_max_l
     train_dataset = train_dataset.map(
         process_squad_row,
         remove_columns=["id", "title", "question", "answers", "context"],
-    )
+    ).filter(lambda row: "<NoAnswer>" not in row["outputs"])
     train_dataset = train_dataset.map(
         process_data_to_model_inputs,
         batched=True,
@@ -390,7 +390,7 @@ def create_squad_dataset(tokenizer, batch_size, source_max_length, decoder_max_l
     val_dataset = val_dataset.map(
         process_squad_row,
         remove_columns=["id", "title", "question", "answers", "context"],
-    )
+    ).filter(lambda row: "<NoAnswer>" not in row["outputs"])
     val_dataset = val_dataset.map(
         process_data_to_model_inputs,
         batched=True,
