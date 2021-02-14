@@ -22,7 +22,8 @@ import torch.nn as nn
 import torch.optim as optim
 from transformers import AlbertTokenizer
 
-from src.initialize import xavier_param_init
+from src.decoder import InputFeedRNNDecoder
+from src.initialize import rnn_param_init, xavier_param_init
 
 
 @dataclass
@@ -51,6 +52,7 @@ class HyperParameters:
     seed: int = 8
     test: Optional[str] = None
     dev: Optional[str] = None
+    model_type: Optional[str] = "transformer"
 
 
 def set_random_seed(seed: int) -> Any:
@@ -117,6 +119,7 @@ class AlbertEmbedding(nn.Module):
         use_position_embeddings: Optional[bool] = True,
         max_position_embeddings: Optional[int] = 512,
         dropout: Optional[float] = 0.1,
+        model_type: Optional[str] = "transformer",
     ) -> None:
 
         """The designed 3 embeddings of Albert."""
@@ -127,21 +130,23 @@ class AlbertEmbedding(nn.Module):
         )
         self.word_embedder.set_trainable(trainable=True)
 
-        # For token_type features.
-        self.token_type_embedder = AlbertTokenEmbedding(
-            pad_id=token_type_pad_id,
-            vocab_size=token_type_vocab_size,
-            dim_embeddings=embedding_size,
-        )
-        self.token_type_embedder.set_trainable(trainable=True)
-
-        if use_position_embeddings:
-            self.pos_embedder = nn.Parameter(
-                torch.Tensor(512, embedding_size),
-                requires_grad=True,
+        if model_type == "transformer":
+            # For token_type features.
+            self.token_type_embedder = AlbertTokenEmbedding(
+                pad_id=token_type_pad_id,
+                vocab_size=token_type_vocab_size,
+                dim_embeddings=embedding_size,
             )
+            self.token_type_embedder.set_trainable(trainable=True)
+
+            if use_position_embeddings:
+                self.pos_embedder = nn.Parameter(
+                    torch.Tensor(512, embedding_size),
+                    requires_grad=True,
+                )
 
         self.dropout = nn.Dropout(dropout)
+        self.model_type = model_type
 
         xavier_param_init(self)
 
@@ -158,17 +163,20 @@ class AlbertEmbedding(nn.Module):
 
         _, s_len, _ = embeddings.size()
 
-        # [0, 1, 2, ..., s_len-1]
-        length_indices = torch.tensor(
-            list(range(s_len)), dtype=torch.long, device=input_ids.device
-        )
+        if self.model_type == "transformer":
+            # [0, 1, 2, ..., s_len-1]
+            length_indices = torch.tensor(
+                list(range(s_len)), dtype=torch.long, device=input_ids.device
+            )
 
-        # size: (1, s_len, hidden_size)
-        position_embeddings = torch.index_select(
-            self.pos_embedder, 0, length_indices
-        ).unsqueeze(0)
+            # size: (1, s_len, hidden_size)
+            position_embeddings = torch.index_select(
+                self.pos_embedder, 0, length_indices
+            ).unsqueeze(0)
 
-        return self.dropout(self.layer_norm(embeddings + position_embeddings))
+            return self.dropout(self.layer_norm(embeddings + position_embeddings))
+
+        return self.dropout(self.layer_norm(embeddings))
 
 
 @dataclass
@@ -511,6 +519,95 @@ class AttentionBlock(nn.Module):
         return self.ffd_layer(output)
 
 
+class RNNModel(nn.Module):
+    """Implements a complete encoder or decoder based on RNNs."""
+
+    def __init__(
+        self,
+        hidden_size: Optional[int] = 768,
+        is_decoder: Optional[bool] = False,
+        hidden_dropout_prob: Optional[float] = 0.1,
+    ) -> None:
+
+        super(RNNModel, self).__init__()
+        # we use single block as we share weights.
+        if not is_decoder:
+            self.encoder = torch.nn.GRU(
+                input_size=hidden_size,
+                hidden_size=hidden_size,
+                num_layers=1,
+                bias=True,
+                bidirectional=True,
+            )
+            self.encoder_denser = torch.nn.Linear(
+                2 * hidden_size, hidden_size, bias=True
+            )
+
+        if is_decoder:
+            self.decoder = torch.nn.GRUCell(
+                input_size=2 * hidden_size, hidden_size=hidden_size, bias=True
+            )
+            # soft-attention
+            self.atten_W = torch.nn.Linear(hidden_size, hidden_size, bias=False)
+            self.atten_affine = torch.nn.Linear(2 * hidden_size, hidden_size, bias=True)
+
+        self.drop = nn.Dropout(hidden_dropout_prob)
+        self.is_decoder = is_decoder
+
+        xavier_param_init(self)
+
+    def forward(
+        self,
+        layer_input,
+        attention_mask,
+        encoder_input_mask=None,
+        encoder_hidden_output=None,
+    ) -> torch.FloatTensor:
+        """For both encoder and decoder RNN."""
+        if not self.is_decoder:
+            b_sz, s_len, h_units = layer_input.size()
+            mask = attention_mask.view(b_sz, s_len, 1).expand_as(layer_input)
+            layer_input = layer_input * (1.0 - mask)
+            output, _ = self.encoder(layer_input)
+            output = self.drop(output)
+            encoder_hidden_states = torch.tanh(self.encoder_denser(output))
+            return encoder_hidden_states * (1.0 - mask)
+
+        if self.is_decoder:
+            b_sz, t_len, h_units = layer_input.size()
+            mask = attention_mask.view(b_sz, t_len, 1).expand_as(layer_input)
+            layer_input = layer_input * (1.0 - mask)
+            _, s_len, _ = encoder_hidden_output.size()
+            # global general attention as https://nlp.stanford.edu/pubs/emnlp15_attn.pdf
+            states_mapped = self.atten_W(encoder_hidden_output)
+
+            Outputs = []
+            context = encoder_hidden_output[:, -1, :]
+            hidden_output = (context - context).detach()
+            for i in range(t_len):
+                input_i = layer_input[:, i, :]
+                input_feature = torch.cat((input_i, context), dim=1)
+                hidden_output = self.decoder(input_feature, hidden_output)
+                output_dr = self.drop(hidden_output)
+                atten_scores = torch.sum(
+                    states_mapped
+                    * output_dr.view(-1, 1, h_units).expand(-1, s_len, h_units),
+                    dim=2,
+                )
+                atten = nn.functional.softmax(atten_scores, dim=1)
+                context = torch.sum(
+                    atten.view(-1, s_len, 1).expand(-1, s_len, h_units)
+                    * encoder_hidden_output,
+                    dim=1,
+                )
+                output = torch.tanh(
+                    self.atten_affine(torch.cat((output_dr, context), dim=1))
+                )
+                Outputs.append(output)
+
+            return torch.stack(Outputs, dim=1)
+
+
 class TransformerModel(nn.Module):
     """Implements a complete encoder or decoder of a transformer model."""
 
@@ -586,6 +683,7 @@ class AlbertConfig(object):
         bos_token_id=2,
         eos_token_id=3,
         right_shift=True,
+        model_type="transformer",
     ):
         """Constructs AlbertConfig.
 
@@ -642,6 +740,7 @@ class AlbertConfig(object):
         self.right_shift = right_shift
         self.bos_token_id = bos_token_id
         self.eos_token_id = eos_token_id
+        self.model_type = model_type
 
     @classmethod
     def from_dict(cls, json_object):
@@ -693,6 +792,7 @@ class AlbertModel(nn.Module):
             use_position_embeddings=config.use_position_embeddings,
             max_position_embeddings=max_position,
             dropout=config.hidden_dropout_prob,
+            model_type=config.model_type,
         )
 
         if config.embedding_size != config.hidden_size:
@@ -700,15 +800,22 @@ class AlbertModel(nn.Module):
                 config.embedding_size, config.hidden_size, bias=True
             )
 
-        self.main_block = TransformerModel(
-            hidden_size=config.hidden_size,
-            is_decoder=config.is_decoder,
-            num_hidden_layers=config.num_hidden_layers,
-            num_attention_heads=config.num_attention_heads,
-            attention_probs_dropout_prob=config.attention_probs_dropout_prob,
-            intermediate_size=config.intermediate_size,
-            hidden_dropout_prob=config.hidden_dropout_prob,
-        )
+        if config.model_type == "transformer":
+            self.main_block = TransformerModel(
+                hidden_size=config.hidden_size,
+                is_decoder=config.is_decoder,
+                num_hidden_layers=config.num_hidden_layers,
+                num_attention_heads=config.num_attention_heads,
+                attention_probs_dropout_prob=config.attention_probs_dropout_prob,
+                intermediate_size=config.intermediate_size,
+                hidden_dropout_prob=config.hidden_dropout_prob,
+            )
+        if config.model_type == "rnn":
+            self.main_block = RNNModel(
+                hidden_size=config.hidden_size,
+                is_decoder=config.is_decoder,
+                hidden_dropout_prob=config.hidden_dropout_prob,
+            )
 
         self.config = config
 
