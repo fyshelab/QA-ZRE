@@ -18,6 +18,7 @@ INSTALL_REQUIRES = [
     'black',
     'pylint',
     'docformatter'
+    'openNMT-py'
 ]
 
 setup(
