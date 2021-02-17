@@ -22,7 +22,6 @@ import torch.nn as nn
 import torch.optim as optim
 from transformers import AlbertTokenizer
 
-from src.decoder import InputFeedRNNDecoder
 from src.initialize import rnn_param_init, xavier_param_init
 
 
