@@ -422,6 +422,7 @@ def run_squad(args):
         mode=mode,
         num_train_steps=args.num_train_steps,
         prediction_file=args.prediction_file,
+        model_type=args.model_type,
     )
     albert2albert = Model(config)
     train_dataset, val_dataset = create_squad_dataset(
@@ -555,6 +556,11 @@ def argument_parser():
 
     parser.add_argument(
         "--dream_path", type=str, help="path for reading dream scape data!"
+    )
+    parser.add_argument(
+        "--model_type",
+        type=str,
+        help="Type of model used for training: rnn or transformer.",
     )
     args, _ = parser.parse_known_args()
     return args
