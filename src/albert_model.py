@@ -432,6 +432,7 @@ class AttentionBlock(nn.Module):
         attention_probs_dropout_prob: Optional[float] = 0.0,
         intermediate_size: Optional[int] = 3072,
         hidden_dropout_prob: Optional[float] = 0.0,
+        lm_decoder: Optional[bool] = False,
     ) -> None:
         """Construction of the attention layer used in Albert Model.
           Args:
@@ -464,7 +465,7 @@ class AttentionBlock(nn.Module):
             self_attn_cfg, dropout=attention_probs_dropout_prob
         )
 
-        if is_decoder:
+        if is_decoder and not lm_decoder:
             cross_attn_cfg = AttentionConfig(
                 num_heads=num_attention_heads,
                 dim_model=hidden_size,
@@ -483,6 +484,7 @@ class AttentionBlock(nn.Module):
         )
 
         self.is_decoder = is_decoder
+        self.lm_decoder = lm_decoder
 
     def forward(
         self,
@@ -505,7 +507,7 @@ class AttentionBlock(nn.Module):
                 mask=attention_mask,
             )
         )
-        if self.is_decoder:
+        if self.is_decoder and not self.lm_decoder:
             output, _ = self.cross_attention(
                 AttentionData(
                     query=output,
@@ -619,6 +621,7 @@ class TransformerModel(nn.Module):
         attention_probs_dropout_prob: Optional[float] = 0.1,
         intermediate_size: Optional[int] = 3072,
         hidden_dropout_prob: Optional[float] = 0.1,
+        lm_decoder: Optional[bool] = False,
     ) -> None:
 
         super(TransformerModel, self).__init__()
@@ -630,6 +633,7 @@ class TransformerModel(nn.Module):
             attention_probs_dropout_prob=attention_probs_dropout_prob,
             intermediate_size=intermediate_size,
             hidden_dropout_prob=hidden_dropout_prob,
+            lm_decoder=lm_decoder,
         )
         self.num_layers = num_hidden_layers
 
@@ -683,6 +687,7 @@ class AlbertConfig(object):
         eos_token_id=3,
         right_shift=True,
         model_type="transformer",
+        lm_decoder=False,
     ):
         """Constructs AlbertConfig.
 
@@ -740,6 +745,7 @@ class AlbertConfig(object):
         self.bos_token_id = bos_token_id
         self.eos_token_id = eos_token_id
         self.model_type = model_type
+        self.lm_decoder = lm_decoder
 
     @classmethod
     def from_dict(cls, json_object):
@@ -874,6 +880,146 @@ class AlbertModel(nn.Module):
         )
 
 
+class LMAlbertModel(nn.Module):
+    """Complete Albert Model used for autoregressive language modelling."""
+
+    def __init__(self, config):
+        """Constructor for AlbertModel.
+
+        config: `AlbertConfig` instance.
+        """
+        super(LMAlbertModel, self).__init__()
+        config = copy.deepcopy(config)
+        max_position = config.source_max_position_embeddings
+        self.embedding = AlbertEmbedding(
+            vocab_size=config.vocab_size,
+            word_pad_id=config.word_pad_id,
+            token_type_pad_id=config.token_type_pad_id,
+            embedding_size=config.embedding_size,
+            token_type_vocab_size=config.token_type_vocab_size,
+            use_position_embeddings=config.use_position_embeddings,
+            max_position_embeddings=max_position,
+            dropout=config.hidden_dropout_prob,
+            model_type="transformer",
+        )
+
+        if config.embedding_size != config.hidden_size:
+            self.embed_to_hidden = torch.nn.Linear(
+                config.embedding_size, config.hidden_size, bias=True
+            )
+
+        self.main_block = TransformerModel(
+            hidden_size=config.hidden_size,
+            is_decoder=True,
+            num_hidden_layers=config.num_hidden_layers,
+            num_attention_heads=config.num_attention_heads,
+            attention_probs_dropout_prob=config.attention_probs_dropout_prob,
+            intermediate_size=config.intermediate_size,
+            hidden_dropout_prob=config.hidden_dropout_prob,
+            lm_decoder=True,
+        )
+        self.lm_head = nn.Linear(config.hidden_size, config.vocab_size)
+
+        self.loss_fn = nn.CrossEntropyLoss()
+
+        self.config = config
+
+    def forward(
+        self,
+        input_ids,
+        input_mask=None,
+        token_type_ids=None,
+    ) -> torch.FloatTensor:
+        """Create mask or type id if not given, also shift to right the decoder
+        inputs."""
+        batch_size, seq_length = input_ids.size()
+        if input_mask is None:
+            input_mask = torch.ones(
+                (batch_size, seq_length),
+                dtype=torch.long,
+                device=input_ids.device,
+            )
+
+        if token_type_ids is None:
+            token_type_ids = torch.ones(
+                (batch_size, seq_length),
+                dtype=torch.long,
+                device=input_ids.device,
+            )
+
+        # For the decoder, shift right the input_ids, input_mask, and token_type_ids.
+        if self.config.right_shift:
+            token_type_ids = torch.roll(token_type_ids, shifts=1, dims=1)
+            token_type_ids[:, 0:1] = torch.zeros(
+                (batch_size, 1), dtype=torch.long, device=input_ids.device
+            )
+
+            input_mask = torch.roll(input_mask, shifts=1, dims=1)
+            input_mask[:, 0:1] = torch.ones(
+                (batch_size, 1), dtype=torch.long, device=input_ids.device
+            )
+
+            input_ids = torch.roll(input_ids, shifts=1, dims=1)
+            input_ids[:, 0:1] = (
+                torch.ones((batch_size, 1), dtype=torch.long, device=input_ids.device)
+                * self.config.go_symbol_id
+            )
+
+        emb_output = self.embedding(input_ids, token_type_ids)
+
+        if self.config.embedding_size != self.config.hidden_size:
+            emb_output = self.embed_to_hidden(emb_output)
+
+        decoder_output = self.main_block(
+            layer_input=emb_output,
+            attention_mask=input_mask,
+        )
+
+        ret = {}
+        ret["hidden_outputs"] = decoder_output
+        if input_ids is not None:
+            ret["loss"] = self.cal_loss(input_ids, decoder_output)
+        return ret
+
+    def cal_loss(self, labels, decoder_output):
+        logits = self.lm_head(decoder_output)
+        logits = logits.permute(0, 2, 1)
+        return self.loss_fn(logits, labels)
+
+    def greedy_decode(self, input_ids, input_mask=None, token_type_ids=None):
+        """generate the predictions doing greedy decoding."""
+        self.config.right_shift = False
+        b_sz, _ = input_ids.size()
+        decoded_batch = (
+            torch.ones(
+                (b_sz, self.config.source_max_position_embeddings),
+                dtype=torch.long,
+                device=input_ids.device,
+            )
+            * self.config.word_pad_id
+        )
+        for b in range(b_sz):
+            infer_input = input_ids[b, :]
+            cur_len = infer_input.size()
+            decoded_batch[b, 0:cur_len] = infer_input
+            for t in range(cur_len, self.config.source_max_position_embeddings):
+                inputs = infer_input.view(1, -1)
+                infer_output = self.forward(
+                    input_ids=inputs,
+                    input_mask=None,
+                    token_type_ids=None,
+                )
+                logits = self.lm_head(infer_output[:, -1, :])
+                topv, topi = logits.topk(1)
+                decoded_batch[b, t] = topi.squeeze()
+                infer_input = torch.cat((infer_input, topi.squeeze().view(1)), dim=0)
+                if topi.squeeze() == self.config.eos_token_id:
+                    break
+
+        self.config.right_shift = True
+        return decoded_batch
+
+
 class AlbertEncoderDecoder(nn.Module):
     """Complete Albert Model used as encoder and decoder."""
 
@@ -979,6 +1125,33 @@ def list_parameters(model: nn.Module):
     return parameters
 
 
+# Map the parameters of this model from the pretrained checkpoint for LM encoder.
+lm_param_mapper = {
+    "embedding.pos_embedder": "embeddings.position_embeddings.weight",
+    "embedding.word_embedder.token_embs.weight": "embeddings.word_embeddings.weight",
+    "embedding.token_type_embedder.token_embs.weight": "embeddings.token_type_embeddings.weight",
+    "embedding.layer_norm.weight": "embeddings.LayerNorm.weight",
+    "embedding.layer_norm.bias": "embeddings.LayerNorm.bias",
+    "embed_to_hidden.weight": "encoder.embedding_hidden_mapping_in.weight",
+    "embed_to_hidden.bias": "encoder.embedding_hidden_mapping_in.bias",
+    "main_block.single_block.self_attention.w_qs.weight": "encoder.albert_layer_groups.0.albert_layers.0.attention.query.weight",
+    "main_block.single_block.self_attention.w_qs.bias": "encoder.albert_layer_groups.0.albert_layers.0.attention.query.bias",
+    "main_block.single_block.self_attention.w_ks.weight": "encoder.albert_layer_groups.0.albert_layers.0.attention.key.weight",
+    "main_block.single_block.self_attention.w_ks.bias": "encoder.albert_layer_groups.0.albert_layers.0.attention.key.bias",
+    "main_block.single_block.self_attention.w_vs.weight": "encoder.albert_layer_groups.0.albert_layers.0.attention.value.weight",
+    "main_block.single_block.self_attention.w_vs.bias": "encoder.albert_layer_groups.0.albert_layers.0.attention.value.bias",
+    "main_block.single_block.self_attention.dense_layer.weight": "encoder.albert_layer_groups.0.albert_layers.0.attention.dense.weight",
+    "main_block.single_block.self_attention.dense_layer.bias": "encoder.albert_layer_groups.0.albert_layers.0.attention.dense.bias",
+    "main_block.single_block.self_attention.layer_norm.weight": "encoder.albert_layer_groups.0.albert_layers.0.attention.LayerNorm.weight",
+    "main_block.single_block.self_attention.layer_norm.bias": "encoder.albert_layer_groups.0.albert_layers.0.attention.LayerNorm.bias",
+    "main_block.single_block.ffd_layer.layer1.weight": "encoder.albert_layer_groups.0.albert_layers.0.ffn.weight",
+    "main_block.single_block.ffd_layer.layer1.bias": "encoder.albert_layer_groups.0.albert_layers.0.ffn.bias",
+    "main_block.single_block.ffd_layer.layer2.weight": "encoder.albert_layer_groups.0.albert_layers.0.ffn_output.weight",
+    "main_block.single_block.ffd_layer.layer2.bias": "encoder.albert_layer_groups.0.albert_layers.0.ffn_output.bias",
+    "main_block.single_block.ffd_layer.layer_norm.weight": "encoder.albert_layer_groups.0.albert_layers.0.full_layer_layer_norm.weight",
+    "main_block.single_block.ffd_layer.layer_norm.bias": "encoder.albert_layer_groups.0.albert_layers.0.full_layer_layer_norm.bias",
+}
+
 # Map the parameters of this model from the pretrained checkpoint.
 param_mapper = {
     "encoder.embedding.pos_embedder": "embeddings.position_embeddings.weight",
@@ -1033,6 +1206,35 @@ param_mapper = {
 def save(model: torch.nn.Module, path: str) -> None:
     """Save the model to task at the specified path."""
     torch.save(model.state_dict(), path)
+
+
+def load_albert_lm_decoder(
+    mask_token_id,
+    source_max_length,
+):
+    """Load the pretrained model into a decoder lm model."""
+    config = AlbertConfig(
+        num_hidden_layers=1,
+        hidden_dropout_prob=0.1,
+        attention_probs_dropout_prob=0.2,
+        num_attention_heads=1,
+        go_symbol_id=mask_token_id,
+        source_max_position_embeddings=source_max_length,
+    )
+    model = LMAlbertModel(config)
+
+    pretrained_state_dict = torch.load(
+        "./albert-xxlarge-v2-pytorch.model", map_location=lambda storage, loc: storage
+    )["model_state_dict"]
+
+    model_dict = model.state_dict()
+    for key, _ in model_dict.items():
+        if key in lm_param_mapper:
+            model_dict[key] = pretrained_state_dict[lm_param_mapper[key]]
+
+    model.load_state_dict(model_dict)
+
+    return model
 
 
 def load_albert_encoder_decoder(
@@ -1103,11 +1305,15 @@ class Model(object):
         tokenizer.eos_token = tokenizer.sep_token
 
         # Construct model
-        model = load_albert_encoder_decoder(
+        # model = load_albert_encoder_decoder(
+        #    mask_token_id=tokenizer.mask_token_id,
+        #    source_max_length=cfg.source_max_length,
+        #    decoder_max_length=cfg.decoder_max_length,
+        #    model_type=cfg.model_type,
+        # )
+        model = load_albert_lm_decoder(
             mask_token_id=tokenizer.mask_token_id,
             source_max_length=cfg.source_max_length,
-            decoder_max_length=cfg.decoder_max_length,
-            model_type=cfg.model_type,
         )
         if cfg.gpu:
             model.cuda(cfg.gpu_device)
@@ -1159,11 +1365,11 @@ class Model(object):
 
         # all special tokens including will be removed
         predictions_str = self.tokenizer.batch_decode(
-            predictions, skip_special_tokens=True
+            predictions, skip_special_tokens=False
         )
         input_str = self.tokenizer.batch_decode(input_ids, skip_special_tokens=False)
         target_str = self.tokenizer.batch_decode(
-            batch["target_ids"], skip_special_tokens=True
+            batch["target_ids"], skip_special_tokens=False
         )
         for index in range(len(predictions_str)):
             pred_str = predictions_str[index]

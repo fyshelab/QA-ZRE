@@ -155,15 +155,21 @@ def run_model(
         print(msg)
 
 
-def glue_passage_question(bos_token, eos_token, passage, question=None):
+def glue_passage_question(bos_token, eos_token, passage, question=None, answer=None):
     entries = {
         "cls": bos_token,
         "sep": eos_token,
         "passage": passage,
         "question": question,
+        "answer": answer,
     }
-    if question is not None:
-        return "{passage} {sep} {question}".format(**entries)
+    if question is not None and answer is not None:
+        return "{passage} {sep} <Q> {cls} {question} {sep} <A> {cls} {answer}".format(
+            **entries
+        )
+    if question is not None and answer is None:
+        return "{passage} {sep} <Q> {cls} {question} {sep} <A>".format(**entries)
+
     return "{passage}".format(**entries)
 
 
@@ -329,11 +335,11 @@ def create_squad_dataset(tokenizer, batch_size, source_max_length, decoder_max_l
         article = " ".join(article.split())
 
         input_str = glue_passage_question(
-            tokenizer.bos_token, tokenizer.eos_token, article, question
+            tokenizer.bos_token, tokenizer.eos_token, article, question, answer
         )
 
         output_str = glue_passage_question(
-            tokenizer.bos_token, tokenizer.eos_token, answer
+            tokenizer.bos_token, tokenizer.eos_token, article, question
         )
 
         return {"inputs": input_str, "outputs": output_str}
@@ -348,9 +354,7 @@ def create_squad_dataset(tokenizer, batch_size, source_max_length, decoder_max_l
         )
         outputs = tokenizer(
             batch["outputs"],
-            padding="max_length",
-            truncation="only_first",
-            max_length=decoder_max_length,
+            padding=False,
         )
 
         batch["input_ids"] = inputs.input_ids
