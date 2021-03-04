@@ -168,7 +168,9 @@ def glue_passage_question(bos_token, eos_token, passage, question=None, answer=N
             **entries
         )
     if question is not None and answer is None:
-        return "{passage} {sep} <Q> {cls} {question} {sep} <A>".format(**entries)
+        return "{cls} {passage} {sep} <Q> {cls} {question} {sep} <A> {cls}".format(
+            **entries
+        )
 
     return "{passage}".format(**entries)
 
@@ -354,14 +356,17 @@ def create_squad_dataset(tokenizer, batch_size, source_max_length, decoder_max_l
         )
         outputs = tokenizer(
             batch["outputs"],
-            padding=False,
+            padding="max_length",
+            truncation="only_first",
+            max_length=source_max_length,
+            add_special_tokens=False,
         )
 
         batch["input_ids"] = inputs.input_ids
         batch["input_mask"] = inputs.attention_mask
         batch["target_ids"] = outputs.input_ids
         batch["target_mask"] = outputs.attention_mask
-        batch["labels"] = outputs.input_ids.copy()
+        batch["labels"] = inputs.input_ids.copy()
 
         # because BERT automatically shifts the labels, the labels correspond exactly to `target_ids`.
         # We have to make sure that the PAD token is ignored
@@ -379,12 +384,14 @@ def create_squad_dataset(tokenizer, batch_size, source_max_length, decoder_max_l
         process_squad_row,
         remove_columns=["id", "title", "question", "answers", "context"],
     ).filter(lambda row: "<NoAnswer>" not in row["outputs"])
+
     train_dataset = train_dataset.map(
         process_data_to_model_inputs,
         batched=True,
         batch_size=batch_size,
         remove_columns=["inputs", "outputs"],
     )
+
     train_dataset.set_format(
         type="torch",
         columns=["input_ids", "input_mask", "target_ids", "target_mask", "labels"],
@@ -395,12 +402,14 @@ def create_squad_dataset(tokenizer, batch_size, source_max_length, decoder_max_l
         process_squad_row,
         remove_columns=["id", "title", "question", "answers", "context"],
     ).filter(lambda row: "<NoAnswer>" not in row["outputs"])
+
     val_dataset = val_dataset.map(
         process_data_to_model_inputs,
         batched=True,
         batch_size=batch_size,
         remove_columns=["inputs", "outputs"],
     )
+
     val_dataset.set_format(
         type="torch",
         columns=["input_ids", "input_mask", "target_ids", "target_mask", "labels"],

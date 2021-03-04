@@ -929,6 +929,7 @@ class LMAlbertModel(nn.Module):
         input_ids,
         input_mask=None,
         token_type_ids=None,
+        labels=None,
     ) -> torch.FloatTensor:
         """Create mask or type id if not given, also shift to right the decoder
         inputs."""
@@ -977,8 +978,8 @@ class LMAlbertModel(nn.Module):
 
         ret = {}
         ret["hidden_outputs"] = decoder_output
-        if input_ids is not None:
-            ret["loss"] = self.cal_loss(input_ids, decoder_output)
+        if labels is not None:
+            ret["loss"] = self.cal_loss(labels, decoder_output)
         return ret
 
     def cal_loss(self, labels, decoder_output):
@@ -998,9 +999,10 @@ class LMAlbertModel(nn.Module):
             )
             * self.config.word_pad_id
         )
+        lengths = torch.sum(input_mask, dim=1).squeeze()
         for b in range(b_sz):
-            infer_input = input_ids[b, :]
-            cur_len = infer_input.size()
+            cur_len = lengths[b].item()
+            infer_input = input_ids[b, 0:cur_len]
             decoded_batch[b, 0:cur_len] = infer_input
             for t in range(cur_len, self.config.source_max_position_embeddings):
                 inputs = infer_input.view(1, -1)
@@ -1009,7 +1011,7 @@ class LMAlbertModel(nn.Module):
                     input_mask=None,
                     token_type_ids=None,
                 )
-                logits = self.lm_head(infer_output[:, -1, :])
+                logits = self.lm_head(infer_output["hidden_outputs"][:, -1, :])
                 topv, topi = logits.topk(1)
                 decoded_batch[b, t] = topi.squeeze()
                 infer_input = torch.cat((infer_input, topi.squeeze().view(1)), dim=0)
@@ -1353,24 +1355,26 @@ class Model(object):
         # disable dropout
         self.model.eval()
 
+        input_ids = batch["input_ids"]
+        input_mask = batch["input_mask"]
+        target_ids = batch["target_ids"]
+        target_mask = batch["target_mask"]
         if self.config.gpu:
-            input_ids = batch["input_ids"]
-            input_mask = batch["input_mask"]
             input_ids = input_ids.to(self.config.gpu_device)
             input_mask = input_mask.to(self.config.gpu_device)
+            target_ids = target_ids.to(self.config.gpu_device)
+            target_mask = target_mask.to(self.config.gpu_device)
 
         predictions = self.model.greedy_decode(
-            input_ids=input_ids, input_mask=input_mask
+            input_ids=target_ids, input_mask=target_mask
         )
 
         # all special tokens including will be removed
         predictions_str = self.tokenizer.batch_decode(
             predictions, skip_special_tokens=False
         )
-        input_str = self.tokenizer.batch_decode(input_ids, skip_special_tokens=False)
-        target_str = self.tokenizer.batch_decode(
-            batch["target_ids"], skip_special_tokens=False
-        )
+        input_str = self.tokenizer.batch_decode(target_ids, skip_special_tokens=False)
+        target_str = self.tokenizer.batch_decode(input_ids, skip_special_tokens=False)
         for index in range(len(predictions_str)):
             pred_str = predictions_str[index]
             pred_str = pred_str if pred_str != "" else "<EMPTY>"
@@ -1403,11 +1407,9 @@ class Model(object):
             labels = labels.to(self.config.gpu_device)
 
         output_dict = self.model(
-            input_ids,
-            target_ids,
-            labels=labels,
+            input_ids=input_ids,
             input_mask=input_mask,
-            target_mask=target_mask,
+            labels=labels,
         )
         loss = output_dict["loss"]
         loss_value = loss.item()
@@ -1419,9 +1421,9 @@ class Model(object):
         # BackProp
         loss.backward()
 
-        if self.config.gradient_clipping:
-            params = self.model.parameters()
-            nn.utils.clip_grad_norm_(params, self.config.max_gradient_norm)
+        # if self.config.gradient_clipping:
+        #    params = self.model.parameters()
+        #    nn.utils.clip_grad_norm_(params, self.config.max_gradient_norm)
 
         # Optimize
         self.optimizer.step()
