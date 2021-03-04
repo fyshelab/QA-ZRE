@@ -1216,10 +1216,10 @@ def load_albert_lm_decoder(
 ):
     """Load the pretrained model into a decoder lm model."""
     config = AlbertConfig(
-        num_hidden_layers=1,
+        num_hidden_layers=12,
         hidden_dropout_prob=0.1,
         attention_probs_dropout_prob=0.2,
-        num_attention_heads=1,
+        num_attention_heads=64,
         go_symbol_id=mask_token_id,
         source_max_position_embeddings=source_max_length,
     )

@@ -414,6 +414,7 @@ def create_squad_dataset(tokenizer, batch_size, source_max_length, decoder_max_l
         type="torch",
         columns=["input_ids", "input_mask", "target_ids", "target_mask", "labels"],
     )
+    print(len(train_dataset))
     return train_dataset, val_dataset
 
 
