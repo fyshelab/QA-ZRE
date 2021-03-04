@@ -6,7 +6,7 @@ from src.albert_model import (AlbertConfig, AlbertEmbedding,
                               AlbertTokenEmbedding, AttentionBlock,
                               AttentionConfig, AttentionData,
                               MultiHeadAttention, PositionwiseFeedForward,
-                              TransformerModel, list_parameters,
+                              RNNModel, TransformerModel, list_parameters,
                               set_random_seed)
 
 set_random_seed(len("dreamscape-qa"))
@@ -164,16 +164,17 @@ def test_attention_block():
     assert output.size() == (3, 4, 2)
 
 
-def test_transformer_models():
+def test_rnn_models():
     """Test the full block."""
-    model = TransformerModel(
+    model = RNNModel(
+        hidden_size=2,
+        is_decoder=False,
+        hidden_dropout_prob=0.2,
+    )
+    dec_model = RNNModel(
         hidden_size=2,
         is_decoder=True,
-        num_attention_heads=1,
-        attention_probs_dropout_prob=0.1,
-        intermediate_size=4,
         hidden_dropout_prob=0.2,
-        num_hidden_layers=12,
     )
     matrix = [
         [[0.5, 0.5], [0.5, 0.5], [0.0, 0.0], [0.0, 0.0]],
@@ -184,6 +185,14 @@ def test_transformer_models():
     mask = [[0, 0, 0, 1], [0, 0, 1, 1], [0, 0, 0, 0]]
     mask = torch.ByteTensor(mask)
     output = model(
+        layer_input=matrix,
+        attention_mask=mask,
+        encoder_hidden_output=matrix,
+        encoder_input_mask=mask,
+    )
+    assert output.size() == (3, 4, 2)
+
+    output = dec_model(
         layer_input=matrix,
         attention_mask=mask,
         encoder_hidden_output=matrix,
@@ -203,6 +212,7 @@ def test_full_model():
         num_hidden_layers=4,
         num_attention_heads=2,
         intermediate_size=64,
+        model_type="transformer",
     )
     model = AlbertModel(config)
 
@@ -224,6 +234,7 @@ def test_full_model():
         num_hidden_layers=4,
         num_attention_heads=2,
         intermediate_size=64,
+        model_type="transformer",
     )
 
     decoder_model = AlbertModel(decoder_config)
