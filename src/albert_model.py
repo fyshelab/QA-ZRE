@@ -11,7 +11,7 @@ import json
 import math
 import os
 import random
-from dataclasses import dataclass, field, replace
+from dataclasses import dataclass
 from typing import Any, List, Optional, Tuple
 
 import numpy
@@ -22,7 +22,7 @@ import torch.nn as nn
 import torch.optim as optim
 from transformers import AlbertTokenizer
 
-from src.initialize import rnn_param_init, xavier_param_init
+from src.initialize import xavier_param_init
 
 
 @dataclass
@@ -155,10 +155,9 @@ class AlbertEmbedding(nn.Module):
 
     def forward(self, input_ids, token_type_ids) -> torch.FloatTensor:
         """Build the embeddings."""
-        # embeddings = self.word_embedder(input_ids) + self.token_type_embedder(
-        #    token_type_ids
-        # )
-        embeddings = self.word_embedder(input_ids)
+        embeddings = self.word_embedder(input_ids) + self.token_type_embedder(
+            token_type_ids
+        )
 
         _, s_len, _ = embeddings.size()
 
@@ -852,9 +851,6 @@ class AlbertModel(nn.Module):
         # For the decoder, shift right the input_ids, input_mask, and token_type_ids.
         if self.config.is_decoder and self.config.right_shift:
             token_type_ids = torch.roll(token_type_ids, shifts=1, dims=1)
-            token_type_ids[:, 0:1] = torch.zeros(
-                (batch_size, 1), dtype=torch.long, device=input_ids.device
-            )
 
             input_mask = torch.roll(input_mask, shifts=1, dims=1)
             input_mask[:, 0:1] = torch.ones(
@@ -1158,50 +1154,50 @@ lm_param_mapper = {
 param_mapper = {
     "encoder.embedding.pos_embedder": "embeddings.position_embeddings.weight",
     "encoder.embedding.word_embedder.token_embs.weight": "embeddings.word_embeddings.weight",
-    # "encoder.embedding.token_type_embedder.token_embs.weight": "embeddings.token_type_embeddings.weight",
-    # "encoder.embedding.layer_norm.weight": "embeddings.LayerNorm.weight",
-    # "encoder.embedding.layer_norm.bias": "embeddings.LayerNorm.bias",
-    # "encoder.embed_to_hidden.weight": "encoder.embedding_hidden_mapping_in.weight",
-    # "encoder.embed_to_hidden.bias": "encoder.embedding_hidden_mapping_in.bias",
-    # "encoder.main_block.single_block.self_attention.w_qs.weight": "encoder.albert_layer_groups.0.albert_layers.0.attention.query.weight",
-    # "encoder.main_block.single_block.self_attention.w_qs.bias": "encoder.albert_layer_groups.0.albert_layers.0.attention.query.bias",
-    # "encoder.main_block.single_block.self_attention.w_ks.weight": "encoder.albert_layer_groups.0.albert_layers.0.attention.key.weight",
-    # "encoder.main_block.single_block.self_attention.w_ks.bias": "encoder.albert_layer_groups.0.albert_layers.0.attention.key.bias",
-    # "encoder.main_block.single_block.self_attention.w_vs.weight": "encoder.albert_layer_groups.0.albert_layers.0.attention.value.weight",
-    # "encoder.main_block.single_block.self_attention.w_vs.bias": "encoder.albert_layer_groups.0.albert_layers.0.attention.value.bias",
-    # "encoder.main_block.single_block.self_attention.dense_layer.weight": "encoder.albert_layer_groups.0.albert_layers.0.attention.dense.weight",
-    # "encoder.main_block.single_block.self_attention.dense_layer.bias": "encoder.albert_layer_groups.0.albert_layers.0.attention.dense.bias",
-    # "encoder.main_block.single_block.self_attention.layer_norm.weight": "encoder.albert_layer_groups.0.albert_layers.0.attention.LayerNorm.weight",
-    # "encoder.main_block.single_block.self_attention.layer_norm.bias": "encoder.albert_layer_groups.0.albert_layers.0.attention.LayerNorm.bias",
-    # "encoder.main_block.single_block.ffd_layer.layer1.weight": "encoder.albert_layer_groups.0.albert_layers.0.ffn.weight",
-    # "encoder.main_block.single_block.ffd_layer.layer1.bias": "encoder.albert_layer_groups.0.albert_layers.0.ffn.bias",
-    # "encoder.main_block.single_block.ffd_layer.layer2.weight": "encoder.albert_layer_groups.0.albert_layers.0.ffn_output.weight",
-    # "encoder.main_block.single_block.ffd_layer.layer2.bias": "encoder.albert_layer_groups.0.albert_layers.0.ffn_output.bias",
-    # "encoder.main_block.single_block.ffd_layer.layer_norm.weight": "encoder.albert_layer_groups.0.albert_layers.0.full_layer_layer_norm.weight",
-    # "encoder.main_block.single_block.ffd_layer.layer_norm.bias": "encoder.albert_layer_groups.0.albert_layers.0.full_layer_layer_norm.bias",
+    "encoder.embedding.token_type_embedder.token_embs.weight": "embeddings.token_type_embeddings.weight",
+    "encoder.embedding.layer_norm.weight": "embeddings.LayerNorm.weight",
+    "encoder.embedding.layer_norm.bias": "embeddings.LayerNorm.bias",
+    "encoder.embed_to_hidden.weight": "encoder.embedding_hidden_mapping_in.weight",
+    "encoder.embed_to_hidden.bias": "encoder.embedding_hidden_mapping_in.bias",
+    "encoder.main_block.single_block.self_attention.w_qs.weight": "encoder.albert_layer_groups.0.albert_layers.0.attention.query.weight",
+    "encoder.main_block.single_block.self_attention.w_qs.bias": "encoder.albert_layer_groups.0.albert_layers.0.attention.query.bias",
+    "encoder.main_block.single_block.self_attention.w_ks.weight": "encoder.albert_layer_groups.0.albert_layers.0.attention.key.weight",
+    "encoder.main_block.single_block.self_attention.w_ks.bias": "encoder.albert_layer_groups.0.albert_layers.0.attention.key.bias",
+    "encoder.main_block.single_block.self_attention.w_vs.weight": "encoder.albert_layer_groups.0.albert_layers.0.attention.value.weight",
+    "encoder.main_block.single_block.self_attention.w_vs.bias": "encoder.albert_layer_groups.0.albert_layers.0.attention.value.bias",
+    "encoder.main_block.single_block.self_attention.dense_layer.weight": "encoder.albert_layer_groups.0.albert_layers.0.attention.dense.weight",
+    "encoder.main_block.single_block.self_attention.dense_layer.bias": "encoder.albert_layer_groups.0.albert_layers.0.attention.dense.bias",
+    "encoder.main_block.single_block.self_attention.layer_norm.weight": "encoder.albert_layer_groups.0.albert_layers.0.attention.LayerNorm.weight",
+    "encoder.main_block.single_block.self_attention.layer_norm.bias": "encoder.albert_layer_groups.0.albert_layers.0.attention.LayerNorm.bias",
+    "encoder.main_block.single_block.ffd_layer.layer1.weight": "encoder.albert_layer_groups.0.albert_layers.0.ffn.weight",
+    "encoder.main_block.single_block.ffd_layer.layer1.bias": "encoder.albert_layer_groups.0.albert_layers.0.ffn.bias",
+    "encoder.main_block.single_block.ffd_layer.layer2.weight": "encoder.albert_layer_groups.0.albert_layers.0.ffn_output.weight",
+    "encoder.main_block.single_block.ffd_layer.layer2.bias": "encoder.albert_layer_groups.0.albert_layers.0.ffn_output.bias",
+    "encoder.main_block.single_block.ffd_layer.layer_norm.weight": "encoder.albert_layer_groups.0.albert_layers.0.full_layer_layer_norm.weight",
+    "encoder.main_block.single_block.ffd_layer.layer_norm.bias": "encoder.albert_layer_groups.0.albert_layers.0.full_layer_layer_norm.bias",
     "decoder.embedding.pos_embedder": "embeddings.position_embeddings.weight",
     "decoder.embedding.word_embedder.token_embs.weight": "embeddings.word_embeddings.weight",
-    # "decoder.embedding.token_type_embedder.token_embs.weight": "embeddings.token_type_embeddings.weight",
-    # "decoder.embedding.layer_norm.weight": "embeddings.LayerNorm.weight",
-    # "decoder.embedding.layer_norm.bias": "embeddings.LayerNorm.bias",
-    # "decoder.embed_to_hidden.weight": "encoder.embedding_hidden_mapping_in.weight",
-    # "decoder.embed_to_hidden.bias": "encoder.embedding_hidden_mapping_in.bias",
-    # "decoder.main_block.single_block.self_attention.w_qs.weight": "encoder.albert_layer_groups.0.albert_layers.0.attention.query.weight",
-    # "decoder.main_block.single_block.self_attention.w_qs.bias": "encoder.albert_layer_groups.0.albert_layers.0.attention.query.bias",
-    # "decoder.main_block.single_block.self_attention.w_ks.weight": "encoder.albert_layer_groups.0.albert_layers.0.attention.key.weight",
-    # "decoder.main_block.single_block.self_attention.w_ks.bias": "encoder.albert_layer_groups.0.albert_layers.0.attention.key.bias",
-    # "decoder.main_block.single_block.self_attention.w_vs.weight": "encoder.albert_layer_groups.0.albert_layers.0.attention.value.weight",
-    # "decoder.main_block.single_block.self_attention.w_vs.bias": "encoder.albert_layer_groups.0.albert_layers.0.attention.value.bias",
-    # "decoder.main_block.single_block.self_attention.dense_layer.weight": "encoder.albert_layer_groups.0.albert_layers.0.attention.dense.weight",
-    # "decoder.main_block.single_block.self_attention.dense_layer.bias": "encoder.albert_layer_groups.0.albert_layers.0.attention.dense.bias",
-    # "decoder.main_block.single_block.self_attention.layer_norm.weight": "encoder.albert_layer_groups.0.albert_layers.0.attention.LayerNorm.weight",
-    # "decoder.main_block.single_block.self_attention.layer_norm.bias": "encoder.albert_layer_groups.0.albert_layers.0.attention.LayerNorm.bias",
-    # "decoder.main_block.single_block.ffd_layer.layer1.weight": "encoder.albert_layer_groups.0.albert_layers.0.ffn.weight",
-    # "decoder.main_block.single_block.ffd_layer.layer1.bias": "encoder.albert_layer_groups.0.albert_layers.0.ffn.bias",
-    # "decoder.main_block.single_block.ffd_layer.layer2.weight": "encoder.albert_layer_groups.0.albert_layers.0.ffn_output.weight",
-    # "decoder.main_block.single_block.ffd_layer.layer2.bias": "encoder.albert_layer_groups.0.albert_layers.0.ffn_output.bias",
-    # "decoder.main_block.single_block.ffd_layer.layer_norm.weight": "encoder.albert_layer_groups.0.albert_layers.0.full_layer_layer_norm.weight",
-    # "decoder.main_block.single_block.ffd_layer.layer_norm.bias": "encoder.albert_layer_groups.0.albert_layers.0.full_layer_layer_norm.bias",
+    "decoder.embedding.token_type_embedder.token_embs.weight": "embeddings.token_type_embeddings.weight",
+    "decoder.embedding.layer_norm.weight": "embeddings.LayerNorm.weight",
+    "decoder.embedding.layer_norm.bias": "embeddings.LayerNorm.bias",
+    "decoder.embed_to_hidden.weight": "encoder.embedding_hidden_mapping_in.weight",
+    "decoder.embed_to_hidden.bias": "encoder.embedding_hidden_mapping_in.bias",
+    "decoder.main_block.single_block.self_attention.w_qs.weight": "encoder.albert_layer_groups.0.albert_layers.0.attention.query.weight",
+    "decoder.main_block.single_block.self_attention.w_qs.bias": "encoder.albert_layer_groups.0.albert_layers.0.attention.query.bias",
+    "decoder.main_block.single_block.self_attention.w_ks.weight": "encoder.albert_layer_groups.0.albert_layers.0.attention.key.weight",
+    "decoder.main_block.single_block.self_attention.w_ks.bias": "encoder.albert_layer_groups.0.albert_layers.0.attention.key.bias",
+    "decoder.main_block.single_block.self_attention.w_vs.weight": "encoder.albert_layer_groups.0.albert_layers.0.attention.value.weight",
+    "decoder.main_block.single_block.self_attention.w_vs.bias": "encoder.albert_layer_groups.0.albert_layers.0.attention.value.bias",
+    "decoder.main_block.single_block.self_attention.dense_layer.weight": "encoder.albert_layer_groups.0.albert_layers.0.attention.dense.weight",
+    "decoder.main_block.single_block.self_attention.dense_layer.bias": "encoder.albert_layer_groups.0.albert_layers.0.attention.dense.bias",
+    "decoder.main_block.single_block.self_attention.layer_norm.weight": "encoder.albert_layer_groups.0.albert_layers.0.attention.LayerNorm.weight",
+    "decoder.main_block.single_block.self_attention.layer_norm.bias": "encoder.albert_layer_groups.0.albert_layers.0.attention.LayerNorm.bias",
+    "decoder.main_block.single_block.ffd_layer.layer1.weight": "encoder.albert_layer_groups.0.albert_layers.0.ffn.weight",
+    "decoder.main_block.single_block.ffd_layer.layer1.bias": "encoder.albert_layer_groups.0.albert_layers.0.ffn.bias",
+    "decoder.main_block.single_block.ffd_layer.layer2.weight": "encoder.albert_layer_groups.0.albert_layers.0.ffn_output.weight",
+    "decoder.main_block.single_block.ffd_layer.layer2.bias": "encoder.albert_layer_groups.0.albert_layers.0.ffn_output.bias",
+    "decoder.main_block.single_block.ffd_layer.layer_norm.weight": "encoder.albert_layer_groups.0.albert_layers.0.full_layer_layer_norm.weight",
+    "decoder.main_block.single_block.ffd_layer.layer_norm.bias": "encoder.albert_layer_groups.0.albert_layers.0.full_layer_layer_norm.bias",
 }
 
 
@@ -1244,10 +1240,10 @@ def load_albert_encoder_decoder(
 ):
     """Load the pretrained model into a encoder-decoder model."""
     config = AlbertConfig(
-        num_hidden_layers=1,
+        num_hidden_layers=6,
         hidden_dropout_prob=0.1,
         attention_probs_dropout_prob=0.2,
-        num_attention_heads=1,
+        num_attention_heads=64,
         go_symbol_id=mask_token_id,
         source_max_position_embeddings=source_max_length,
         decoder_max_position_embeddings=decoder_max_length,
@@ -1307,16 +1303,16 @@ class Model(object):
         tokenizer.eos_token = tokenizer.sep_token
 
         # Construct model
-        # model = load_albert_encoder_decoder(
-        #    mask_token_id=tokenizer.mask_token_id,
-        #    source_max_length=cfg.source_max_length,
-        #    decoder_max_length=cfg.decoder_max_length,
-        #    model_type=cfg.model_type,
-        # )
-        model = load_albert_lm_decoder(
+        model = load_albert_encoder_decoder(
             mask_token_id=tokenizer.mask_token_id,
             source_max_length=cfg.source_max_length,
+            decoder_max_length=cfg.decoder_max_length,
+            model_type=cfg.model_type,
         )
+        # model = load_albert_lm_decoder(
+        #    mask_token_id=tokenizer.mask_token_id,
+        #    source_max_length=cfg.source_max_length,
+        # )
         if cfg.gpu:
             model.cuda(cfg.gpu_device)
 
@@ -1357,24 +1353,26 @@ class Model(object):
 
         input_ids = batch["input_ids"]
         input_mask = batch["input_mask"]
+        input_token_type_ids = batch["input_token_type_ids"]
         target_ids = batch["target_ids"]
-        target_mask = batch["target_mask"]
         if self.config.gpu:
             input_ids = input_ids.to(self.config.gpu_device)
             input_mask = input_mask.to(self.config.gpu_device)
+            input_token_type_ids = input_token_type_ids.to(self.config.gpu_device)
             target_ids = target_ids.to(self.config.gpu_device)
-            target_mask = target_mask.to(self.config.gpu_device)
 
         predictions = self.model.greedy_decode(
-            input_ids=target_ids, input_mask=target_mask
+            input_ids=input_ids,
+            input_mask=input_mask,
+            token_type_ids=input_token_type_ids,
         )
 
         # all special tokens including will be removed
         predictions_str = self.tokenizer.batch_decode(
             predictions, skip_special_tokens=False
         )
-        input_str = self.tokenizer.batch_decode(target_ids, skip_special_tokens=False)
-        target_str = self.tokenizer.batch_decode(input_ids, skip_special_tokens=False)
+        input_str = self.tokenizer.batch_decode(input_ids, skip_special_tokens=False)
+        target_str = self.tokenizer.batch_decode(target_ids, skip_special_tokens=False)
         for index in range(len(predictions_str)):
             pred_str = predictions_str[index]
             pred_str = pred_str if pred_str != "" else "<EMPTY>"
@@ -1396,12 +1394,14 @@ class Model(object):
 
         input_ids = batch["input_ids"]
         input_mask = batch["input_mask"]
+        input_token_type_ids = batch["input_token_type_ids"]
         target_ids = batch["target_ids"]
         target_mask = batch["target_mask"]
         labels = batch["labels"]
         if self.config.gpu:
             input_ids = input_ids.to(self.config.gpu_device)
             input_mask = input_mask.to(self.config.gpu_device)
+            input_token_type_ids = input_token_type_ids.to(self.config.gpu_device)
             target_ids = target_ids.to(self.config.gpu_device)
             target_mask = target_mask.to(self.config.gpu_device)
             labels = labels.to(self.config.gpu_device)
@@ -1410,6 +1410,9 @@ class Model(object):
             input_ids=input_ids,
             input_mask=input_mask,
             labels=labels,
+            target_ids=target_ids,
+            target_mask=target_mask,
+            token_type_ids=input_token_type_ids,
         )
         loss = output_dict["loss"]
         loss_value = loss.item()

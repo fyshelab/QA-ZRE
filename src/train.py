@@ -1,23 +1,16 @@
 import argparse
 import csv
 import io
-import json
 import math
 import os
-import random
 import time
 from configparser import ConfigParser
-from dataclasses import dataclass, field, replace
-from pathlib import Path
-from typing import Any, Callable, Generator, List, Optional, Union
+from typing import Generator, Optional
 
 import datasets
 import numpy as np
 import pandas as pd
-import torch
-import torch.optim as optim
-from datasets import Dataset, load_dataset
-from transformers import AlbertTokenizer, Trainer, TrainingArguments
+from datasets import load_dataset
 
 from src.albert_model import HyperParameters, Model
 
@@ -155,26 +148,6 @@ def run_model(
         print(msg)
 
 
-def glue_passage_question(bos_token, eos_token, passage, question=None, answer=None):
-    entries = {
-        "cls": bos_token,
-        "sep": eos_token,
-        "passage": passage,
-        "question": question,
-        "answer": answer,
-    }
-    if question is not None and answer is not None:
-        return "{passage} {sep} <Q> {cls} {question} {sep} <A> {cls} {answer}".format(
-            **entries
-        )
-    if question is not None and answer is None:
-        return "{cls} {passage} {sep} <Q> {cls} {question} {sep} <A> {cls}".format(
-            **entries
-        )
-
-    return "{passage}".format(**entries)
-
-
 def list_parameters(model):
     parameters = {}
     for name, param in model.named_parameters():
@@ -204,120 +177,6 @@ def compute_rouge(prediction_file):
     return 1.0 - output["rouge2_fmeasure"]
 
 
-def create_race_dataset(tokenizer, batch_size, source_max_length, decoder_max_length):
-    """Function to create the race dataset."""
-
-    def process_race_row(row):
-        """Helper function to have access to the tokenizer."""
-        option_code = row["answer"]
-        if option_code == "A":
-            option_idx = 0
-        elif option_code == "B":
-            option_idx = 1
-        elif option_code == "C":
-            option_idx = 2
-        elif option_code == "D":
-            option_idx = 3
-
-        answer = row["options"][option_idx]
-        answer = " ".join(answer.split())
-
-        question = row["question"]
-        question = " ".join(question.split())
-
-        article = row["article"]
-        article = " ".join(article.split())
-
-        input_str = glue_passage_question(
-            tokenizer.bos_token, tokenizer.eos_token, article, question
-        )
-        output_str = glue_passage_question(
-            tokenizer.bos_token, tokenizer.eos_token, answer
-        )
-
-        return {"inputs": input_str, "outputs": output_str}
-
-    def process_data_to_model_inputs(batch):
-        # tokenize the inputs and labels
-        inputs = tokenizer(
-            batch["inputs"],
-            padding="max_length",
-            truncation="only_first",
-            max_length=source_max_length,
-        )
-        outputs = tokenizer(
-            batch["outputs"],
-            padding="max_length",
-            truncation="only_first",
-            max_length=decoder_max_length,
-        )
-
-        batch["input_ids"] = inputs.input_ids
-        batch["input_mask"] = inputs.attention_mask
-        batch["target_ids"] = outputs.input_ids
-        batch["target_mask"] = outputs.attention_mask
-        batch["labels"] = outputs.input_ids.copy()
-
-        # because BERT automatically shifts the labels, the labels correspond exactly to `target_ids`.
-        # We have to make sure that the PAD token is ignored
-
-        labels = [
-            [-100 if token == tokenizer.pad_token_id else token for token in labels]
-            for labels in batch["labels"]
-        ]
-        batch["labels"] = labels
-
-        return batch
-
-    train_dataset = load_dataset("race", "all", split="train")
-    train_dataset = train_dataset.map(
-        process_race_row,
-        remove_columns=["article", "options", "question", "answer", "example_id"],
-    )
-    train_dataset = train_dataset.map(
-        process_data_to_model_inputs,
-        batched=True,
-        batch_size=batch_size,
-        remove_columns=["inputs", "outputs"],
-    )
-    train_dataset.set_format(
-        type="torch",
-        columns=["input_ids", "input_mask", "target_ids", "target_mask", "labels"],
-    )
-
-    dev_dataset = load_dataset("race", "all", split="validation")
-    dev_dataset = dev_dataset.map(
-        process_race_row,
-        remove_columns=["article", "options", "question", "answer", "example_id"],
-    )
-    dev_dataset = dev_dataset.map(
-        process_data_to_model_inputs,
-        batched=True,
-        batch_size=batch_size,
-        remove_columns=["inputs", "outputs"],
-    )
-    dev_dataset.set_format(
-        type="torch",
-        columns=["input_ids", "input_mask", "target_ids", "target_mask", "labels"],
-    )
-    test_dataset = load_dataset("race", "all", split="test")
-    test_dataset = test_dataset.map(
-        process_race_row,
-        remove_columns=["article", "options", "question", "answer", "example_id"],
-    )
-    test_dataset = test_dataset.map(
-        process_data_to_model_inputs,
-        batched=True,
-        batch_size=batch_size,
-        remove_columns=["inputs", "outputs"],
-    )
-    test_dataset.set_format(
-        type="torch",
-        columns=["input_ids", "input_mask", "target_ids", "target_mask", "labels"],
-    )
-    return train_dataset, dev_dataset, test_dataset
-
-
 def create_squad_dataset(tokenizer, batch_size, source_max_length, decoder_max_length):
     """Function to create the squad dataset."""
 
@@ -336,15 +195,16 @@ def create_squad_dataset(tokenizer, batch_size, source_max_length, decoder_max_l
         article = row["context"]
         article = " ".join(article.split())
 
-        input_str = glue_passage_question(
-            tokenizer.bos_token, tokenizer.eos_token, article, question, answer
-        )
-
-        output_str = glue_passage_question(
-            tokenizer.bos_token, tokenizer.eos_token, article, question
-        )
-
-        return {"inputs": input_str, "outputs": output_str}
+        entries = {
+            "cls": tokenizer.bos_token,
+            "sep": tokenizer.eos_token,
+            "passage": article,
+            "question": question,
+        }
+        return {
+            "inputs": "{passage} {sep} {question}".format(**entries),
+            "outputs": answer,
+        }
 
     def process_data_to_model_inputs(batch):
         # tokenize the inputs and labels
@@ -353,20 +213,32 @@ def create_squad_dataset(tokenizer, batch_size, source_max_length, decoder_max_l
             padding="max_length",
             truncation="only_first",
             max_length=source_max_length,
+            add_special_tokens=True,
         )
         outputs = tokenizer(
             batch["outputs"],
             padding="max_length",
             truncation="only_first",
-            max_length=source_max_length,
-            add_special_tokens=False,
+            max_length=decoder_max_length,
+            add_special_tokens=True,
         )
 
         batch["input_ids"] = inputs.input_ids
+        batch["input_token_type_ids"] = []
+        for input_id in inputs.input_ids:
+            sep_index = input_id.index(
+                tokenizer._convert_token_to_id(tokenizer.eos_token)
+            )
+            article_type = [0] * (sep_index + 1)
+            question_type = [1] * (source_max_length - (sep_index + 1))
+
+            token_type_mask = article_type + question_type
+            batch["input_token_type_ids"].append(token_type_mask)
+
         batch["input_mask"] = inputs.attention_mask
         batch["target_ids"] = outputs.input_ids
         batch["target_mask"] = outputs.attention_mask
-        batch["labels"] = inputs.input_ids.copy()
+        batch["labels"] = outputs.input_ids.copy()
 
         # because BERT automatically shifts the labels, the labels correspond exactly to `target_ids`.
         # We have to make sure that the PAD token is ignored
@@ -376,7 +248,6 @@ def create_squad_dataset(tokenizer, batch_size, source_max_length, decoder_max_l
             for labels in batch["labels"]
         ]
         batch["labels"] = labels
-
         return batch
 
     train_dataset = load_dataset("squad_v2", split="train")
@@ -449,52 +320,14 @@ def run_squad(args):
         albert2albert,
         config=config,
         evaluator=compute_rouge,
-        train_dataset=train_dataset,
+        train_dataset=val_dataset,
         dev_dataset=val_dataset,
         test_dataset=val_dataset,
     )
 
 
-def run_race(args):
-    """Train albert model on race dataset."""
-    if args.mode == "race_train":
-        mode = "train"
-    elif args.mode == "race_test":
-        mode = "test"
-    config = HyperParameters(
-        model_path=args.model_path,
-        batch_size=args.batch_size,
-        source_max_length=512,
-        decoder_max_length=128,
-        gpu=args.gpu,
-        gpu_device=args.gpu_device,
-        learning_rate=args.learning_rate,
-        max_epochs=args.max_epochs,
-        mode=mode,
-        num_train_steps=args.num_train_steps,
-        prediction_file=args.prediction_file,
-    )
-    albert2albert = Model(config)
-    train_dataset, dev_dataset, test_dataset = create_race_dataset(
-        tokenizer=albert2albert.tokenizer,
-        batch_size=config.batch_size,
-        source_max_length=config.source_max_length,
-        decoder_max_length=config.decoder_max_length,
-    )
-    run_model(
-        albert2albert,
-        config=config,
-        evaluator=compute_rouge,
-        train_dataset=train_dataset,
-        dev_dataset=dev_dataset,
-        test_dataset=test_dataset,
-    )
-
-
 def run_main(args):
     """Decides what to do in the code."""
-    if args.mode in ["race_train", "race_test"]:
-        run_race(args)
     if args.mode in ["squad_train", "squad_test"]:
         run_squad(args)
 
@@ -506,7 +339,7 @@ def argument_parser():
         "--mode",
         type=str,
         required=True,
-        help="race_train | race_test| squad_train | squad_test",
+        help="squad_train | squad_test",
     )
     parser.add_argument(
         "--model_path",
