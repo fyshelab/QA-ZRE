@@ -577,7 +577,6 @@ class AlbertConfig(object):
         eos_token_id=3,
         use_position_embeddings=True,
         is_decoder=False,
-        right_shift=True,
     ):
         """Constructs AlbertConfig.
 
@@ -646,7 +645,6 @@ class AlbertConfig(object):
         self.layer_norm_eps = layer_norm_eps
         self.classifier_dropout_prob = classifier_dropout_prob
         self.word_pad_id = word_pad_id
-        self.right_shift = right_shift
         self.bos_token_id = bos_token_id  # usually [CLS]
         self.eos_token_id = eos_token_id  # usually [SEP]
 
@@ -729,7 +727,8 @@ class AlbertModel(nn.Module):
         inputs."""
         batch_size, seq_length = input_ids.size()
         if input_mask is None:
-            input_mask = torch.ones(
+            # every token is normal.
+            input_mask = torch.zeros(
                 (batch_size, seq_length),
                 dtype=torch.long,
                 device=input_ids.device,
@@ -810,7 +809,6 @@ class AlbertEncoderDecoder(nn.Module):
 
     def greedy_decode(self, input_ids, input_mask=None, token_type_ids=None):
         """generate the predictions doing greedy decoding."""
-        self.decoder.config.right_shift = False
         encoder_output = self.encoder(
             input_ids=input_ids, input_mask=input_mask, token_type_ids=token_type_ids
         )
@@ -849,7 +847,6 @@ class AlbertEncoderDecoder(nn.Module):
                 if topi.squeeze() == self.decoder.config.eos_token_id:
                     break
 
-        self.decoder.config.right_shift = True
         return decoded_batch
 
 
