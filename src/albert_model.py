@@ -742,21 +742,6 @@ class AlbertModel(nn.Module):
                 device=input_ids.device,
             )
 
-        # For the decoder, shift right the input_ids, input_mask, and token_type_ids.
-        if self.config.is_decoder and self.config.right_shift:
-            token_type_ids = torch.roll(token_type_ids, shifts=1, dims=1)
-
-            input_mask = torch.roll(input_mask, shifts=1, dims=1)
-            input_mask[:, 0:1] = torch.ones(
-                (batch_size, 1), dtype=torch.long, device=input_ids.device
-            )
-
-            input_ids = torch.roll(input_ids, shifts=1, dims=1)
-            input_ids[:, 0:1] = (
-                torch.ones((batch_size, 1), dtype=torch.long, device=input_ids.device)
-                * self.config.bos_token_id
-            )
-
         emb_output = self.embedding(input_ids, token_type_ids)
 
         if self.config.embedding_size != self.config.hidden_size:
@@ -819,7 +804,9 @@ class AlbertEncoderDecoder(nn.Module):
     def cal_loss(self, labels, decoder_output):
         logits = self.lm_head(decoder_output)
         logits = logits.permute(0, 2, 1)
-        return self.loss_fn(logits, labels)
+        shifted_labels = torch.roll(labels, shifts=-1, dims=1)
+        shifted_labels[:, -1] = -100
+        return self.loss_fn(logits, shifted_labels)
 
     def greedy_decode(self, input_ids, input_mask=None, token_type_ids=None):
         """generate the predictions doing greedy decoding."""
@@ -934,6 +921,7 @@ def save(model: torch.nn.Module, path: str) -> None:
 def load_albert_encoder_decoder(source_max_length, decoder_max_length):
     """Load the pretrained model into a encoder-decoder model."""
     config = AlbertConfig(
+        num_hidden_layers=3,
         source_max_position_embeddings=source_max_length,
         decoder_max_position_embeddings=decoder_max_length,
     )
