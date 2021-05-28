@@ -200,10 +200,11 @@ def create_squad_dataset(tokenizer, batch_size, source_max_length, decoder_max_l
             "sep": tokenizer.eos_token,
             "passage": article,
             "question": question,
+            "answer": answer,
         }
         return {
-            "inputs": "{passage} {sep} {question}".format(**entries),
-            "outputs": answer,
+            "inputs": " {passage} {sep} {question} ".format(**entries),
+            "outputs": " {answer} ".format(**entries),
         }
 
     def process_data_to_model_inputs(batch):
