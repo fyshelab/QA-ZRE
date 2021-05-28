@@ -22,6 +22,7 @@ import torch.nn as nn
 import torch.optim as optim
 from transformers import AlbertTokenizer
 
+from optimization import BERTAdam
 from src.initialize import init_weights
 
 
@@ -769,7 +770,7 @@ class AlbertEncoderDecoder(nn.Module):
         config.is_decoder = True
         self.decoder = AlbertModel(config)
 
-        self.lm_head = nn.Linear(config.hidden_size, config.vocab_size)
+        self.lm_head = nn.Linear(config.hidden_size, config.vocab_size, bias=False)
 
         self.loss_fn = nn.CrossEntropyLoss()
 
@@ -935,6 +936,9 @@ def load_albert_encoder_decoder(source_max_length, decoder_max_length):
 
     model.load_state_dict(model_dict)
 
+    model.lm_head.weight.data = model.encoder.embed_to_hidden(
+        model.encoder.embedding.word_embedder.token_embs.weight
+    )
     return model
 
 
@@ -969,12 +973,23 @@ class Model(object):
             model.cuda(cfg.gpu_device)
 
         if cfg.mode == "train":
-            params_to_train = list(
-                filter(lambda x: x.requires_grad, model.parameters())
+            no_decay = ["bias", "gamma", "beta"]
+            optimizer_parameters = [
+                {
+                    "params": [
+                        p for n, p in model.named_parameters() if n not in no_decay
+                    ],
+                    "weight_decay_rate": 0.01,
+                },
+                {
+                    "params": [p for n, p in model.named_parameters() if n in no_decay],
+                    "weight_decay_rate": 0.0,
+                },
+            ]
+            self.optimizer = BERTAdam(
+                optimizer_parameters, lr=cfg.learning_rate, warmup=-1, t_total=-1
             )
-            self.optimizer = optim.Adam(
-                params_to_train, lr=cfg.learning_rate, amsgrad=True
-            )
+
             if not os.path.exists(cfg.model_path):
                 os.makedirs(cfg.model_path)
             self.model_path = os.path.join(cfg.model_path, "model")
