@@ -286,7 +286,6 @@ def create_squad_dataset(tokenizer, batch_size, source_max_length, decoder_max_l
         type="torch",
         columns=["input_ids", "input_mask", "target_ids", "target_mask", "labels"],
     )
-    print(len(train_dataset))
     return train_dataset, val_dataset
 
 
@@ -320,7 +319,7 @@ def run_squad(args):
         albert2albert,
         config=config,
         evaluator=compute_rouge,
-        train_dataset=val_dataset,
+        train_dataset=train_dataset,
         dev_dataset=val_dataset,
         test_dataset=val_dataset,
     )
