@@ -109,21 +109,6 @@ class AlbertTokenEmbedding(nn.Module):
         return self.token_embs(token_indices)
 
 
-class BERTLayerNorm(nn.Module):
-    def __init__(self, hidden_size, variance_epsilon=1e-12):
-        """Construct a layernorm module in the TF style (epsilon inside the
-        square root)."""
-        super(BERTLayerNorm, self).__init__()
-        self.gamma = nn.Parameter(torch.ones(hidden_size))
-        self.beta = nn.Parameter(torch.zeros(hidden_size))
-        self.variance_epsilon = variance_epsilon
-
-    def forward(self, x):
-        u = x.mean(-1, keepdim=True)
-        s = (x - u).pow(2).mean(-1, keepdim=True)
-        x = (x - u) / torch.sqrt(s + self.variance_epsilon)
-        return self.gamma * x + self.beta
-
 
 class AlbertEmbedding(nn.Module):
     """AlbertEmbedding: word embeddings, token_type embeddings, position embeddings."""
@@ -167,7 +152,7 @@ class AlbertEmbedding(nn.Module):
         self.dropout = nn.Dropout(dropout)
 
         # Layer normalization: :cite:`https://arxiv.org/abs/1607.06450`
-        self.layer_norm = BERTLayerNorm(embedding_size, variance_epsilon=1e-12)
+        self.layer_norm = nn.LayerNorm(embedding_size, 1e-12)
 
         init_weights(self)
 
@@ -260,7 +245,7 @@ class MultiHeadAttention(nn.Module):
         init_weights(self)
 
         # Layer normalization: :cite:`https://arxiv.org/abs/1607.06450`
-        self.layer_norm = BERTLayerNorm(config.dim_model)
+        self.layer_norm = nn.LayerNorm(config.dim_model, eps=1e-12)
 
         self.config = config
 
@@ -414,7 +399,7 @@ class PositionwiseFeedForward(nn.Module):
         self.layer2 = nn.Linear(dim_ff, dim_input)
         self.dropout = nn.Dropout(dropout)
 
-        self.layer_norm = BERTLayerNorm(dim_input)
+        self.layer_norm = nn.LayerNorm(dim_input, eps=1e-12)
 
         init_weights(self)
 
@@ -801,7 +786,7 @@ class AlbertEncoderDecoder(nn.Module):
         config.is_decoder = True
         self.decoder = AlbertModel(config)
 
-        self.lm_head = nn.Linear(config.hidden_size, config.vocab_size, bias=True)
+        self.lm_head = nn.Linear(config.hidden_size, config.vocab_size, bias=False)
 
         self.loss_fn = nn.CrossEntropyLoss(ignore_index=config.word_pad_id)
         self.config = config
@@ -949,7 +934,7 @@ def save(model: torch.nn.Module, path: str) -> None:
 def load_albert(source_max_length, decoder_max_length):
     """Load the pretrained model into a encoder-decoder model."""
     config = AlbertConfig(
-        num_hidden_layers=12,
+        num_hidden_layers=4,
         source_max_position_embeddings=source_max_length,
         decoder_max_position_embeddings=decoder_max_length,
     )
@@ -1019,7 +1004,6 @@ class Model(object):
             self.optimizer = BERTAdam(
                 optimizer_parameters, lr=cfg.learning_rate, warmup=-1, t_total=-1
             )
-
             if not os.path.exists(cfg.model_path):
                 os.makedirs(cfg.model_path)
             self.model_path = os.path.join(cfg.model_path, "model")
