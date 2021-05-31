@@ -10,10 +10,10 @@ from pathlib import Path
 from typing import Generator, Optional
 
 import datasets
-from datasets import load_dataset
 import numpy as np
 import pandas as pd
 import torch
+from datasets import load_dataset
 from torch.utils.data import DataLoader
 
 from src.albert_model import HyperParameters, Model
@@ -38,6 +38,136 @@ def read_squad(path):
                     answers.append(answer["text"])
 
     return contexts, questions, answers
+
+
+def create_narrative_dataset(
+    tokenizer, batch_size, source_max_length, decoder_max_length
+):
+    """Function to create the narrative dataset."""
+
+    def process_race_row(row):
+        """Helper function."""
+        max_answer_length = 0
+        answer = None
+        for asw in row["answers"]:
+            answer_len = len(asw["text"].split())
+            if answer_len > max_answer_length:
+                answer = asw["text"]
+                max_answer_length = answer_len
+
+        answer = " ".join(answer.split())
+
+        question = row["question"]["text"]
+        question = " ".join(question.split())
+
+        article = row["document"]["summary"]["text"]
+        article = " ".join(article.split())
+
+        return {"article": article, "question": question, "answer": answer}
+
+    def process_data_to_model_inputs(batch):
+        # tokenize the inputs and labels
+        inputs = tokenizer(
+            batch["question"],
+            batch["article"],
+            truncation=True,
+            padding="max_length",
+            max_length=source_max_length,
+            add_special_tokens=True,
+        )
+        outputs = tokenizer(
+            batch["answer"],
+            truncation=True,
+            padding="max_length",
+            max_length=decoder_max_length,
+            add_special_tokens=True,
+        )
+
+        batch["input_ids"] = inputs.input_ids
+        batch["attention_mask"] = inputs.attention_mask
+        batch["token_type_ids"] = inputs.token_type_ids
+
+        batch["target_ids"] = outputs.input_ids
+        batch["target_attention_mask"] = outputs.attention_mask
+        batch["target_token_type_ids"] = outputs.token_type_ids
+
+        return batch
+
+    train_dataset = load_dataset("narrativeqa", "all", split="train")
+    dev_dataset = load_dataset("narrativeqa", "all", split="validation")
+    test_dataset = load_dataset("narrativeqa", "all", split="test")
+
+    train_dataset = train_dataset.map(
+        process_race_row,
+        remove_columns=["document", "answers"],
+    )
+    train_dataset = train_dataset.map(
+        process_data_to_model_inputs,
+        batched=True,
+        batch_size=batch_size,
+        remove_columns=["question", "answer", "article"],
+    )
+    train_dataset.set_format(
+        type="torch",
+        columns=[
+            "input_ids",
+            "attention_mask",
+            "target_ids",
+            "target_attention_mask",
+            "token_type_ids",
+            "target_token_type_ids",
+        ],
+    )
+
+    dev_dataset = dev_dataset.map(
+        process_race_row,
+        remove_columns=["document", "answers"],
+    )
+    dev_dataset = dev_dataset.map(
+        process_data_to_model_inputs,
+        batched=True,
+        batch_size=batch_size,
+        remove_columns=["question", "answer", "article"],
+    )
+    dev_dataset.set_format(
+        type="torch",
+        columns=[
+            "input_ids",
+            "attention_mask",
+            "target_ids",
+            "target_attention_mask",
+            "token_type_ids",
+            "target_token_type_ids",
+        ],
+    )
+    test_dataset = test_dataset.map(
+        process_race_row,
+        remove_columns=["document", "answers"],
+    )
+    test_dataset = test_dataset.map(
+        process_data_to_model_inputs,
+        batched=True,
+        batch_size=batch_size,
+        remove_columns=["question", "answer", "article"],
+    )
+    test_dataset.set_format(
+        type="torch",
+        columns=[
+            "input_ids",
+            "attention_mask",
+            "target_ids",
+            "target_attention_mask",
+            "token_type_ids",
+            "target_token_type_ids",
+        ],
+    )
+
+    train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
+    val_loader = DataLoader(dev_dataset, batch_size=batch_size, shuffle=True)
+    test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=True)
+
+    return train_loader, val_loader, test_loader
+
 
 def create_race_dataset(tokenizer, batch_size, source_max_length, decoder_max_length):
     """Function to create the race dataset."""
@@ -106,7 +236,14 @@ def create_race_dataset(tokenizer, batch_size, source_max_length, decoder_max_le
     )
     train_dataset.set_format(
         type="torch",
-        columns=["input_ids", "attention_mask", "target_ids", "target_attention_mask", "token_type_ids", "target_token_type_ids"],
+        columns=[
+            "input_ids",
+            "attention_mask",
+            "target_ids",
+            "target_attention_mask",
+            "token_type_ids",
+            "target_token_type_ids",
+        ],
     )
 
     dev_dataset = load_dataset("race", "all", split="validation")
@@ -122,7 +259,14 @@ def create_race_dataset(tokenizer, batch_size, source_max_length, decoder_max_le
     )
     dev_dataset.set_format(
         type="torch",
-        columns=["input_ids", "attention_mask", "target_ids", "target_attention_mask", "token_type_ids", "target_token_type_ids"],
+        columns=[
+            "input_ids",
+            "attention_mask",
+            "target_ids",
+            "target_attention_mask",
+            "token_type_ids",
+            "target_token_type_ids",
+        ],
     )
     test_dataset = load_dataset("race", "all", split="test")
     test_dataset = test_dataset.map(
@@ -137,7 +281,14 @@ def create_race_dataset(tokenizer, batch_size, source_max_length, decoder_max_le
     )
     test_dataset.set_format(
         type="torch",
-        columns=["input_ids", "attention_mask", "target_ids", "target_attention_mask", "token_type_ids", "target_token_type_ids"],
+        columns=[
+            "input_ids",
+            "attention_mask",
+            "target_ids",
+            "target_attention_mask",
+            "token_type_ids",
+            "target_token_type_ids",
+        ],
     )
 
     train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
@@ -145,6 +296,7 @@ def create_race_dataset(tokenizer, batch_size, source_max_length, decoder_max_le
     test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=True)
 
     return train_loader, val_loader, test_loader
+
 
 def run_train_epoch(
     model,
@@ -395,6 +547,7 @@ def run_squad(args):
         test_dataloader=val_loader,
     )
 
+
 def run_race(args):
     """Train albert model on race dataset."""
     if args.mode == "race_train":
@@ -431,12 +584,52 @@ def run_race(args):
         test_dataloader=test_loader,
     )
 
+
+def run_narrative(args):
+    """Train albert model on narrative dataset."""
+    if args.mode == "narrative_train":
+        mode = "train"
+    elif args.mode == "narrative_test":
+        mode = "test"
+    config = HyperParameters(
+        model_path=args.model_path,
+        batch_size=args.batch_size,
+        source_max_length=1024,
+        decoder_max_length=128,
+        gpu=args.gpu,
+        gpu_device=args.gpu_device,
+        learning_rate=args.learning_rate,
+        max_epochs=args.max_epochs,
+        mode=mode,
+        num_train_steps=args.num_train_steps,
+        prediction_file=args.prediction_file,
+    )
+    albert2albert = Model(config)
+
+    train_loader, val_loader, test_loader = create_narrative_dataset(
+        tokenizer=albert2albert.tokenizer,
+        batch_size=config.batch_size,
+        source_max_length=config.source_max_length,
+        decoder_max_length=config.decoder_max_length,
+    )
+    run_model(
+        albert2albert,
+        config=config,
+        evaluator=compute_rouge,
+        train_dataloader=train_loader,
+        dev_dataloader=val_loader,
+        test_dataloader=test_loader,
+    )
+
+
 def run_main(args):
     """Decides what to do in the code."""
     if args.mode in ["squad_train", "squad_test"]:
         run_squad(args)
     if args.mode in ["race_train", "race_test"]:
         run_race(args)
+    if args.mode in ["narrative_train", "narrative_test"]:
+        run_narrative(args)
 
 
 def argument_parser():
@@ -446,7 +639,7 @@ def argument_parser():
         "--mode",
         type=str,
         required=True,
-        help="squad_train | squad_test | race_train | race_test",
+        help="squad_train | squad_test | race_train | race_test | narrative_train | narrative_test",
     )
     parser.add_argument(
         "--model_path",

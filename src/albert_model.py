@@ -109,7 +109,6 @@ class AlbertTokenEmbedding(nn.Module):
         return self.token_embs(token_indices)
 
 
-
 class AlbertEmbedding(nn.Module):
     """AlbertEmbedding: word embeddings, token_type embeddings, position embeddings."""
 
