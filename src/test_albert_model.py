@@ -14,26 +14,30 @@ set_random_seed(len("dreamscape-qa"))
 
 def test_embeddings():
     """Testing the TokenEmbedding class."""
-    embedder = AlbertTokenEmbedding(vocab_size=4, dim_embeddings=2)
+    embedder = AlbertTokenEmbedding(pad_id=3, vocab_size=4, dim_embeddings=2)
     tokens = torch.LongTensor([[0, 1, 2, 3]])
 
     assert embedder.token_embs.weight.size() == (4, 2)
-    # assert embedder.token_embs.weight.tolist()[3] == [0.0, 0.0]
+    assert embedder.token_embs.weight.tolist()[3] == [0.0, 0.0]
 
     output_vectors = embedder(tokens)
     assert output_vectors.size() == (1, 4, 2)
 
     # pads must get zero vector.
-    # assert output_vectors.tolist()[0][3] == [0.0, 0.0]
+    assert output_vectors.tolist()[0][3] == [0.0, 0.0]
 
     albert_emb = AlbertEmbedding(
+        word_pad_id=0,
         vocab_size=4,
         embedding_size=2,
         token_type_vocab_size=10,
     )
 
+    input_mask = torch.Tensor([[0, 1, 1, 1]])
     token_types = torch.LongTensor([[4, 5, 9, 9]])
-    final_embeddings = albert_emb(input_ids=tokens, token_type_ids=token_types)
+    final_embeddings = albert_emb(
+        input_ids=tokens, token_type_ids=token_types, input_mask=input_mask
+    )
 
     assert final_embeddings.size() == (1, 4, 2)
 

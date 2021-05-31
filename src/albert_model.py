@@ -22,8 +22,8 @@ import torch.nn as nn
 import torch.optim as optim
 from transformers import AlbertTokenizer
 
-from optimization import BERTAdam
 from src.initialize import init_weights
+from src.optimization import BERTAdam
 
 
 @dataclass
@@ -32,8 +32,8 @@ class HyperParameters:
 
     model_path: Optional[str] = None
     batch_size: int = 64
-    source_max_length: int = 256
-    decoder_max_length: int = 64
+    source_max_length: int = 512
+    decoder_max_length: int = 128
     config_file: str = "config.ini"
     dim_embedding: int = 100
     dim_model: int = 128
@@ -52,7 +52,6 @@ class HyperParameters:
     seed: int = 8
     test: Optional[str] = None
     dev: Optional[str] = None
-    model_type: Optional[str] = "transformer"
 
 
 def set_random_seed(seed: int) -> Any:
@@ -76,7 +75,7 @@ class AlbertTokenEmbedding(nn.Module):
 
     def __init__(
         self,
-        # pad_id: int,
+        pad_id: Optional[int] = -1,
         vocab_size: Optional[int] = 1,
         dim_embeddings: Optional[int] = 1,
         lookup_table: Optional[numpy.ndarray] = None,
@@ -85,14 +84,17 @@ class AlbertTokenEmbedding(nn.Module):
         features."""
         super(AlbertTokenEmbedding, self).__init__()
 
-        # self.pad_id = pad_id
+        self.pad_id = pad_id
         if lookup_table is not None:
             lookup_t = torch.FloatTensor(lookup_table)
             self.token_embs = nn.Embedding.from_pretrained(lookup_t)
         else:
             self.token_embs = nn.Embedding(vocab_size, dim_embeddings)
 
-        # self.token_embs.weight.data[self.pad_id].fill_(0.0)
+        init_weights(self)
+
+        if self.pad_id != -1:
+            self.token_embs.weight.data[self.pad_id].fill_(0.0)
 
     def set_trainable(self, trainable: Optional[bool] = True) -> None:
         """Set the freeze embeddings during training or not."""
@@ -102,8 +104,25 @@ class AlbertTokenEmbedding(nn.Module):
         """Zero the vector for the pad tokens, and then retreive the vector of
         each token."""
         token_indices = args[0]
-        # self.token_embs.weight.data[self.pad_id].fill_(0.0)
+        if self.pad_id != -1:
+            self.token_embs.weight.data[self.pad_id].fill_(0.0)
         return self.token_embs(token_indices)
+
+
+class BERTLayerNorm(nn.Module):
+    def __init__(self, hidden_size, variance_epsilon=1e-12):
+        """Construct a layernorm module in the TF style (epsilon inside the
+        square root)."""
+        super(BERTLayerNorm, self).__init__()
+        self.gamma = nn.Parameter(torch.ones(hidden_size))
+        self.beta = nn.Parameter(torch.zeros(hidden_size))
+        self.variance_epsilon = variance_epsilon
+
+    def forward(self, x):
+        u = x.mean(-1, keepdim=True)
+        s = (x - u).pow(2).mean(-1, keepdim=True)
+        x = (x - u) / torch.sqrt(s + self.variance_epsilon)
+        return self.gamma * x + self.beta
 
 
 class AlbertEmbedding(nn.Module):
@@ -112,8 +131,10 @@ class AlbertEmbedding(nn.Module):
     def __init__(
         self,
         vocab_size: int,
+        word_pad_id: Optional[int] = 0,
+        token_pad_id: Optional[int] = -1,
         embedding_size: Optional[int] = 128,
-        token_type_vocab_size: Optional[int] = 16,
+        token_type_vocab_size: Optional[int] = 2,
         use_position_embeddings: Optional[bool] = True,
         max_position_embeddings: Optional[int] = 512,
         dropout: Optional[float] = 0.1,
@@ -123,12 +144,15 @@ class AlbertEmbedding(nn.Module):
         super(AlbertEmbedding, self).__init__()
 
         self.word_embedder = AlbertTokenEmbedding(
-            vocab_size=vocab_size, dim_embeddings=embedding_size
+            pad_id=word_pad_id,
+            vocab_size=vocab_size,
+            dim_embeddings=embedding_size,
         )
         self.word_embedder.set_trainable(trainable=True)
 
         # For token_type features.
         self.token_type_embedder = AlbertTokenEmbedding(
+            pad_id=token_pad_id,
             vocab_size=token_type_vocab_size,
             dim_embeddings=embedding_size,
         )
@@ -142,13 +166,12 @@ class AlbertEmbedding(nn.Module):
 
         self.dropout = nn.Dropout(dropout)
 
+        # Layer normalization: :cite:`https://arxiv.org/abs/1607.06450`
+        self.layer_norm = BERTLayerNorm(embedding_size, variance_epsilon=1e-12)
+
         init_weights(self)
 
-        # Layer normalization: :cite:`https://arxiv.org/abs/1607.06450`
-        # eps from huggingface transformers implementation
-        self.layer_norm = nn.LayerNorm(embedding_size, eps=1e-12)
-
-    def forward(self, input_ids, token_type_ids) -> torch.FloatTensor:
+    def forward(self, input_ids, token_type_ids, input_mask) -> torch.FloatTensor:
         """Build the embeddings."""
         embeddings = self.word_embedder(input_ids) + self.token_type_embedder(
             token_type_ids
@@ -160,13 +183,16 @@ class AlbertEmbedding(nn.Module):
         length_indices = torch.tensor(
             list(range(s_len)), dtype=torch.long, device=input_ids.device
         )
-
         # size: (1, s_len, hidden_size)
         position_embeddings = torch.index_select(
             self.pos_embedder, 0, length_indices
         ).unsqueeze(0)
 
-        return self.dropout(self.layer_norm(embeddings + position_embeddings))
+        final_embeddings = self.dropout(
+            self.layer_norm(embeddings + position_embeddings)
+        )
+        final_embeddings = final_embeddings * (1.0 - input_mask.unsqueeze(dim=2))
+        return final_embeddings
 
 
 @dataclass
@@ -234,7 +260,7 @@ class MultiHeadAttention(nn.Module):
         init_weights(self)
 
         # Layer normalization: :cite:`https://arxiv.org/abs/1607.06450`
-        self.layer_norm = nn.LayerNorm(config.dim_model, eps=1e-12)
+        self.layer_norm = BERTLayerNorm(config.dim_model)
 
         self.config = config
 
@@ -276,6 +302,7 @@ class MultiHeadAttention(nn.Module):
             attn += adder
 
         attn = attn.softmax(dim=2)
+
         if mask is not None:
             attn = attn * (1.0 - mask)
 
@@ -387,9 +414,9 @@ class PositionwiseFeedForward(nn.Module):
         self.layer2 = nn.Linear(dim_ff, dim_input)
         self.dropout = nn.Dropout(dropout)
 
-        init_weights(self)
+        self.layer_norm = BERTLayerNorm(dim_input)
 
-        self.layer_norm = nn.LayerNorm(dim_input, eps=1e-12)
+        init_weights(self)
 
     def forward(self, *args: List[Any]) -> torch.FloatTensor:
         """
@@ -574,6 +601,7 @@ class AlbertConfig(object):
         layer_norm_eps=1e-12,
         classifier_dropout_prob=0.1,
         word_pad_id=0,
+        token_pad_id=-1,  # no removal of pad.
         bos_token_id=2,
         eos_token_id=3,
         use_position_embeddings=True,
@@ -648,6 +676,7 @@ class AlbertConfig(object):
         self.word_pad_id = word_pad_id
         self.bos_token_id = bos_token_id  # usually [CLS]
         self.eos_token_id = eos_token_id  # usually [SEP]
+        self.token_pad_id = token_pad_id
 
     @classmethod
     def from_dict(cls, json_object):
@@ -691,6 +720,8 @@ class AlbertModel(nn.Module):
             else config.source_max_position_embeddings
         )
         self.embedding = AlbertEmbedding(
+            word_pad_id=config.word_pad_id,
+            token_pad_id=config.token_pad_id,
             vocab_size=config.vocab_size,
             embedding_size=config.embedding_size,
             token_type_vocab_size=config.token_type_vocab_size,
@@ -736,13 +767,13 @@ class AlbertModel(nn.Module):
             )
 
         if token_type_ids is None:
-            token_type_ids = torch.ones(
+            token_type_ids = torch.zeros(
                 (batch_size, seq_length),
                 dtype=torch.long,
                 device=input_ids.device,
             )
 
-        emb_output = self.embedding(input_ids, token_type_ids)
+        emb_output = self.embedding(input_ids, token_type_ids, input_mask)
 
         if self.config.embedding_size != self.config.hidden_size:
             emb_output = self.embed_to_hidden(emb_output)
@@ -770,21 +801,21 @@ class AlbertEncoderDecoder(nn.Module):
         config.is_decoder = True
         self.decoder = AlbertModel(config)
 
-        self.lm_head = nn.Linear(config.hidden_size, config.vocab_size, bias=False)
+        self.lm_head = nn.Linear(config.hidden_size, config.vocab_size, bias=True)
 
-        self.loss_fn = nn.CrossEntropyLoss()
+        self.loss_fn = nn.CrossEntropyLoss(ignore_index=config.word_pad_id)
+        self.config = config
 
     def forward(
         self,
         input_ids,
         target_ids,
-        labels=None,
         input_mask=None,
         target_mask=None,
         token_type_ids=None,
         target_token_type_ids=None,
     ) -> torch.FloatTensor:
-        """Overall computation in the encoder decoder model."""
+        """Overall computation in the encoder-decoder model."""
         encoder_output = self.encoder(
             input_ids=input_ids, input_mask=input_mask, token_type_ids=token_type_ids
         )
@@ -797,15 +828,14 @@ class AlbertEncoderDecoder(nn.Module):
         )
         ret = {}
         ret["hidden_outputs"] = decoder_output
-        if labels is not None:
-            ret["loss"] = self.cal_loss(labels, decoder_output)
+        ret["loss"] = self.cal_loss(target_ids, decoder_output)
         return ret
 
-    def cal_loss(self, labels, decoder_output):
+    def cal_loss(self, target_ids, decoder_output):
         logits = self.lm_head(decoder_output)
         logits = logits.permute(0, 2, 1)
-        shifted_labels = torch.roll(labels, shifts=-1, dims=1)
-        shifted_labels[:, -1] = -100
+        shifted_labels = torch.roll(target_ids, shifts=-1, dims=1)
+        shifted_labels[:, -1] = self.config.word_pad_id
         return self.loss_fn(logits, shifted_labels)
 
     def greedy_decode(self, input_ids, input_mask=None, token_type_ids=None):
@@ -916,7 +946,7 @@ def save(model: torch.nn.Module, path: str) -> None:
     torch.save(model.state_dict(), path)
 
 
-def load_albert_encoder_decoder(source_max_length, decoder_max_length):
+def load_albert(source_max_length, decoder_max_length):
     """Load the pretrained model into a encoder-decoder model."""
     config = AlbertConfig(
         num_hidden_layers=12,
@@ -959,12 +989,12 @@ class Model(object):
             torch.cuda.device(cfg.gpu_device)
             torch.cuda.set_device(cfg.gpu_device)
 
-        tokenizer = AlbertTokenizer.from_pretrained("albert-xxlarge-v2")
+        tokenizer = AlbertTokenizer.from_pretrained("albert-base-v2")
         tokenizer.bos_token = tokenizer.cls_token
         tokenizer.eos_token = tokenizer.sep_token
 
         # Construct model
-        model = load_albert_encoder_decoder(
+        model = load_albert(
             source_max_length=cfg.source_max_length,
             decoder_max_length=cfg.decoder_max_length,
         )
@@ -1019,8 +1049,8 @@ class Model(object):
         self.model.eval()
 
         input_ids = batch["input_ids"]
-        input_mask = 1 - batch["input_mask"]  # our mask is 1, 0 for normal
-        input_token_type_ids = batch["input_token_type_ids"]
+        input_mask = 1 - batch["attention_mask"]  # our mask is 1, 0 for normal
+        input_token_type_ids = batch["token_type_ids"]
         target_ids = batch["target_ids"]
         if self.config.gpu:
             input_ids = input_ids.to(self.config.gpu_device)
@@ -1060,23 +1090,20 @@ class Model(object):
         self.optimizer.zero_grad()
 
         input_ids = batch["input_ids"]
-        input_mask = 1 - batch["input_mask"]  # our mask is 1, 0 for normal
-        input_token_type_ids = batch["input_token_type_ids"]
+        input_mask = 1 - batch["attention_mask"]  # our mask is 1, 0 for normal
+        input_token_type_ids = batch["token_type_ids"]
         target_ids = batch["target_ids"]
-        target_mask = 1 - batch["target_mask"]  # our mask is 1, 0 for normal
-        labels = batch["labels"]
+        target_mask = 1 - batch["target_attention_mask"]  # our mask is 1, 0 for normal
         if self.config.gpu:
             input_ids = input_ids.to(self.config.gpu_device)
             input_mask = input_mask.to(self.config.gpu_device)
             input_token_type_ids = input_token_type_ids.to(self.config.gpu_device)
             target_ids = target_ids.to(self.config.gpu_device)
             target_mask = target_mask.to(self.config.gpu_device)
-            labels = labels.to(self.config.gpu_device)
 
         output_dict = self.model(
             input_ids=input_ids,
             input_mask=input_mask,
-            labels=labels,
             target_ids=target_ids,
             target_mask=target_mask,
             token_type_ids=input_token_type_ids,

@@ -1,57 +1,69 @@
 import argparse
 import csv
 import io
+import json
 import math
 import os
 import time
 from configparser import ConfigParser
+from pathlib import Path
 from typing import Generator, Optional
 
 import datasets
 import numpy as np
 import pandas as pd
-from datasets import load_dataset
+import torch
+from torch.utils.data import DataLoader
 
 from src.albert_model import HyperParameters, Model
 
 
+def read_squad(path):
+    path = Path(path)
+    with open(path, "rb") as f:
+        squad_dict = json.load(f)
+
+    contexts = []
+    questions = []
+    answers = []
+    for group in squad_dict["data"]:
+        for passage in group["paragraphs"]:
+            context = passage["context"]
+            for qa in passage["qas"]:
+                question = qa["question"]
+                for answer in qa["answers"]:
+                    contexts.append(context)
+                    questions.append(question)
+                    answers.append(answer["text"])
+
+    return contexts, questions, answers
+
+
 def run_train_epoch(
     model,
-    batch_size: int,
-    num_steps: int,
-    train_dataset,
+    train_dataloader,
 ) -> Generator:
     """Train the model and return the loss for 'num_steps' given the
     'batch_size' and the train_dataset.
 
     Randomly pick a batch from the train_dataset.
     """
-    shuff_dataset = train_dataset.shuffle(seed=42)
-    for step in range(num_steps):
-        batch_start = step * batch_size
-        batch_data = shuff_dataset.select(
-            range(batch_start, batch_start + batch_size, 1)
-        )
-        batch_data = batch_data.shuffle(seed=step)
-        loss_values = model.train(batch_data)
+    step = 0
+    for batch in train_dataloader:
+        loss_values = model.train(batch)
+        step += 1
         yield step, loss_values["loss_value"]
 
 
-def run_predict(model, batch_size: int, dev_dataset, prediction_file: str) -> None:
+def run_predict(model, dev_dataloader, prediction_file: str) -> None:
     """Read the 'dev_dataset' and predict results with the model, and save the
     results in the prediction_file."""
-
-    num_steps = math.ceil(len(dev_dataset) / batch_size)
     writerparams = {"quotechar": '"', "quoting": csv.QUOTE_ALL}
     with io.open(prediction_file, mode="w", encoding="utf-8") as out_fp:
         writer = csv.writer(out_fp, **writerparams)
         header_written = False
-        for step in range(num_steps):
-            batch_start = step * batch_size
-            batch_data = dev_dataset.select(
-                range(batch_start, batch_start + batch_size, 1)
-            )
-            for ret_row in model.predict(batch_data):
+        for batch in dev_dataloader:
+            for ret_row in model.predict(batch):
                 if not header_written:
                     headers = ret_row.keys()
                     writer.writerow(headers)
@@ -78,9 +90,9 @@ def run_model(
     model,
     config,
     evaluator,
-    train_dataset=None,
-    dev_dataset=None,
-    test_dataset=None,
+    train_dataloader=None,
+    dev_dataloader=None,
+    test_dataloader=None,
     save_always: Optional[bool] = False,
 ) -> None:
     """Run the model on input data (for training or testing)"""
@@ -100,9 +112,7 @@ def run_model(
             print("\nEpoch:{0}\n".format(epoch))
             start = time.time()
             total_loss = []
-            for step, loss in run_train_epoch(
-                model, config.batch_size, config.num_train_steps, train_dataset
-            ):
+            for step, loss in run_train_epoch(model, train_dataloader):
                 if math.isnan(loss):
                     print("nan loss")
 
@@ -121,7 +131,7 @@ def run_model(
                     )
                 )
             print("\nValidation:\n")
-            run_predict(model, config.batch_size, dev_dataset, prediction_file)
+            run_predict(model, dev_dataloader, prediction_file)
             val_cost = evaluator(prediction_file)
 
             print("\nValidation cost:{0}\n".format(val_cost))
@@ -143,7 +153,7 @@ def run_model(
     elif mode == "test":
         print("Predicting...")
         start = time.time()
-        run_predict(model, batch_size, test_dataset, config.prediction_file)
+        run_predict(model, test_dataloader, config.prediction_file)
         msg = "\nTotal prediction time:{} seconds\n".format(time.time() - start)
         print(msg)
 
@@ -179,114 +189,67 @@ def compute_rouge(prediction_file):
 
 def create_squad_dataset(tokenizer, batch_size, source_max_length, decoder_max_length):
     """Function to create the squad dataset."""
+    train_contexts, train_questions, train_answers = read_squad(
+        "./squad/train-v2.0.json"
+    )
+    val_contexts, val_questions, val_answers = read_squad("./squad/dev-v2.0.json")
 
-    def process_squad_row(row):
-        """Helper function to have access to the tokenizer."""
-
-        try:
-            answer = row["answers"]["text"][0]
-            answer = " ".join(answer.split())
-        except:
-            answer = "<NoAnswer>"
-
-        question = row["question"]
-        question = " ".join(question.split())
-
-        article = row["context"]
-        article = " ".join(article.split())
-
-        entries = {
-            "cls": tokenizer.bos_token,
-            "sep": tokenizer.eos_token,
-            "passage": article,
-            "question": question,
-            "answer": answer,
-        }
-        return {
-            "inputs": " {passage} {sep} {question} ".format(**entries),
-            "outputs": " {answer} ".format(**entries),
-        }
-
-    def process_data_to_model_inputs(batch):
-        # tokenize the inputs and labels
-        inputs = tokenizer(
-            batch["inputs"],
-            padding="max_length",
-            truncation="only_first",
-            max_length=source_max_length,
-            add_special_tokens=True,
-        )
-        outputs = tokenizer(
-            batch["outputs"],
-            padding="max_length",
-            truncation="only_first",
-            max_length=decoder_max_length,
-            add_special_tokens=True,
-        )
-
-        batch["input_ids"] = inputs.input_ids
-        batch["input_token_type_ids"] = []
-        for input_id in inputs.input_ids:
-            sep_index = input_id.index(
-                tokenizer._convert_token_to_id(tokenizer.eos_token)
-            )
-            article_type = [0] * (sep_index + 1)
-            question_type = [1] * (source_max_length - (sep_index + 1))
-
-            token_type_mask = article_type + question_type
-            batch["input_token_type_ids"].append(token_type_mask)
-
-        batch["input_mask"] = inputs.attention_mask
-        batch["target_ids"] = outputs.input_ids
-        batch["target_mask"] = outputs.attention_mask
-        batch["labels"] = outputs.input_ids.copy()
-
-        # because BERT automatically shifts the labels, the labels correspond exactly to `target_ids`.
-        # We have to make sure that the PAD token is ignored
-
-        labels = [
-            [-100 if token == tokenizer.pad_token_id else token for token in labels]
-            for labels in batch["labels"]
-        ]
-        batch["labels"] = labels
-        return batch
-
-    train_dataset = load_dataset("squad_v2", split="train")
-    train_dataset = train_dataset.map(
-        process_squad_row,
-        remove_columns=["id", "title", "question", "answers", "context"],
-    ).filter(lambda row: "<NoAnswer>" not in row["outputs"])
-
-    train_dataset = train_dataset.map(
-        process_data_to_model_inputs,
-        batched=True,
-        batch_size=batch_size,
-        remove_columns=["inputs", "outputs"],
+    val_encodings = tokenizer(
+        val_contexts,
+        val_questions,
+        truncation=True,
+        padding="max_length",
+        max_length=source_max_length,
+        add_special_tokens=True,
+    )
+    val_answer_encodings = tokenizer(
+        val_answers,
+        truncation=True,
+        padding="max_length",
+        max_length=decoder_max_length,
+        add_special_tokens=True,
     )
 
-    train_dataset.set_format(
-        type="torch",
-        columns=["input_ids", "input_mask", "target_ids", "target_mask", "labels"],
+    train_encodings = tokenizer(
+        train_contexts,
+        train_questions,
+        truncation=True,
+        padding="max_length",
+        max_length=source_max_length,
+        add_special_tokens=True,
+    )
+    train_answer_encodings = tokenizer(
+        train_answers,
+        truncation=True,
+        padding="max_length",
+        max_length=decoder_max_length,
+        add_special_tokens=True,
     )
 
-    val_dataset = load_dataset("squad_v2", split="validation")
-    val_dataset = val_dataset.map(
-        process_squad_row,
-        remove_columns=["id", "title", "question", "answers", "context"],
-    ).filter(lambda row: "<NoAnswer>" not in row["outputs"])
+    train_encodings["target_ids"] = train_answer_encodings.input_ids
+    train_encodings["target_attention_mask"] = train_answer_encodings.attention_mask
+    train_encodings["target_token_type_ids"] = train_answer_encodings.token_type_ids
 
-    val_dataset = val_dataset.map(
-        process_data_to_model_inputs,
-        batched=True,
-        batch_size=batch_size,
-        remove_columns=["inputs", "outputs"],
-    )
+    val_encodings["target_ids"] = val_answer_encodings.input_ids
+    val_encodings["target_attention_mask"] = val_answer_encodings.attention_mask
+    val_encodings["target_token_type_ids"] = val_answer_encodings.token_type_ids
 
-    val_dataset.set_format(
-        type="torch",
-        columns=["input_ids", "input_mask", "target_ids", "target_mask", "labels"],
-    )
-    return train_dataset, val_dataset
+    class SquadDataset(torch.utils.data.Dataset):
+        def __init__(self, encodings):
+            self.encodings = encodings
+
+        def __getitem__(self, idx):
+            return {key: torch.tensor(val[idx]) for key, val in self.encodings.items()}
+
+        def __len__(self):
+            return len(self.encodings.input_ids)
+
+    train_dataset = SquadDataset(train_encodings)
+    val_dataset = SquadDataset(val_encodings)
+
+    train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
+    val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=True)
+    return train_loader, val_loader
 
 
 def run_squad(args):
@@ -299,7 +262,7 @@ def run_squad(args):
         model_path=args.model_path,
         batch_size=args.batch_size,
         source_max_length=512,
-        decoder_max_length=128,
+        decoder_max_length=64,
         gpu=args.gpu,
         gpu_device=args.gpu_device,
         learning_rate=args.learning_rate,
@@ -309,7 +272,8 @@ def run_squad(args):
         prediction_file=args.prediction_file,
     )
     albert2albert = Model(config)
-    train_dataset, val_dataset = create_squad_dataset(
+
+    train_loader, val_loader = create_squad_dataset(
         tokenizer=albert2albert.tokenizer,
         batch_size=config.batch_size,
         source_max_length=config.source_max_length,
@@ -319,9 +283,9 @@ def run_squad(args):
         albert2albert,
         config=config,
         evaluator=compute_rouge,
-        train_dataset=train_dataset,
-        dev_dataset=val_dataset,
-        test_dataset=val_dataset,
+        train_dataloader=train_loader,
+        dev_dataloader=val_loader,
+        test_dataloader=val_loader,
     )
 
 
