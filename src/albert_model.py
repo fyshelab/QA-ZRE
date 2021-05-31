@@ -146,7 +146,7 @@ class AlbertEmbedding(nn.Module):
 
         if use_position_embeddings:
             self.pos_embedder = nn.Parameter(
-                torch.Tensor(512, embedding_size),
+                torch.Tensor(1024, embedding_size),
                 requires_grad=True,
             )
 
@@ -156,6 +156,7 @@ class AlbertEmbedding(nn.Module):
         self.layer_norm = nn.LayerNorm(embedding_size, 1e-12)
 
         init_weights(self)
+        nn.init.xavier_uniform_(self.pos_embedder)
 
     def forward(self, input_ids, token_type_ids, input_mask) -> torch.FloatTensor:
         """Build the embeddings."""
@@ -878,7 +879,7 @@ def list_parameters(model: nn.Module):
 
 # Map the parameters of this model from the pretrained checkpoint.
 param_mapper = {
-    "encoder.embedding.pos_embedder": "albert.embeddings.position_embeddings.weight",
+    # "encoder.embedding.pos_embedder": "albert.embeddings.position_embeddings.weight",
     "encoder.embedding.word_embedder.token_embs.weight": "albert.embeddings.word_embeddings.weight",
     "encoder.embedding.token_type_embedder.token_embs.weight": "albert.embeddings.token_type_embeddings.weight",
     "encoder.embedding.layer_norm.weight": "albert.embeddings.LayerNorm.weight",
@@ -901,7 +902,7 @@ param_mapper = {
     "encoder.main_block.single_block.ffd_layer.layer2.bias": "albert.encoder.albert_layer_groups.0.albert_layers.0.ffn_output.bias",
     "encoder.main_block.single_block.ffd_layer.layer_norm.weight": "albert.encoder.albert_layer_groups.0.albert_layers.0.full_layer_layer_norm.weight",
     "encoder.main_block.single_block.ffd_layer.layer_norm.bias": "albert.encoder.albert_layer_groups.0.albert_layers.0.full_layer_layer_norm.bias",
-    "decoder.embedding.pos_embedder": "albert.embeddings.position_embeddings.weight",
+    # "decoder.embedding.pos_embedder": "albert.embeddings.position_embeddings.weight",
     "decoder.embedding.word_embedder.token_embs.weight": "albert.embeddings.word_embeddings.weight",
     "decoder.embedding.token_type_embedder.token_embs.weight": "albert.embeddings.token_type_embeddings.weight",
     "decoder.embedding.layer_norm.weight": "albert.embeddings.LayerNorm.weight",
@@ -935,7 +936,7 @@ def save(model: torch.nn.Module, path: str) -> None:
 def load_albert(source_max_length, decoder_max_length):
     """Load the pretrained model into a encoder-decoder model."""
     config = AlbertConfig(
-        num_hidden_layers=4,
+        num_hidden_layers=2,
         source_max_position_embeddings=source_max_length,
         decoder_max_position_embeddings=decoder_max_length,
     )
@@ -1002,8 +1003,14 @@ class Model(object):
                     "weight_decay_rate": 0.0,
                 },
             ]
-            self.optimizer = BERTAdam(
-                optimizer_parameters, lr=cfg.learning_rate, warmup=-1, t_total=-1
+            # self.optimizer = BERTAdam(
+            #    optimizer_parameters, lr=cfg.learning_rate, warmup=-1, t_total=-1
+            # )
+            self.optimizer = torch.optim.Adam(
+                optimizer_parameters,
+                lr=cfg.learning_rate,
+                betas=(0.9, 0.999),
+                amsgrad=True,
             )
             if not os.path.exists(cfg.model_path):
                 os.makedirs(cfg.model_path)
