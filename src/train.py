@@ -16,7 +16,7 @@ import torch
 from datasets import load_dataset
 from torch.utils.data import DataLoader
 
-from src.albert_model import HyperParameters, Model
+from src.albert_model import BertGenerationModel, HyperParameters, Model
 
 
 def read_squad(path):
@@ -91,6 +91,17 @@ def create_narrative_dataset(
         batch["target_attention_mask"] = outputs.attention_mask
         batch["target_token_type_ids"] = outputs.token_type_ids
 
+        batch["labels"] = outputs.input_ids.copy()
+
+        # because BERT automatically shifts the labels, the labels correspond exactly to `target_ids`.
+        # We have to make sure that the PAD token is ignored
+
+        labels = [
+            [-100 if token == tokenizer.pad_token_id else token for token in labels]
+            for labels in batch["labels"]
+        ]
+        batch["labels"] = labels
+
         return batch
 
     train_dataset = load_dataset("narrativeqa", "all", split="train")
@@ -116,6 +127,7 @@ def create_narrative_dataset(
             "target_attention_mask",
             "token_type_ids",
             "target_token_type_ids",
+            "labels",
         ],
     )
 
@@ -138,6 +150,7 @@ def create_narrative_dataset(
             "target_attention_mask",
             "token_type_ids",
             "target_token_type_ids",
+            "labels",
         ],
     )
     test_dataset = test_dataset.map(
@@ -159,6 +172,7 @@ def create_narrative_dataset(
             "target_attention_mask",
             "token_type_ids",
             "target_token_type_ids",
+            "labels",
         ],
     )
 
@@ -604,16 +618,16 @@ def run_narrative(args):
         num_train_steps=args.num_train_steps,
         prediction_file=args.prediction_file,
     )
-    albert2albert = Model(config)
+    bertgeneration = BertGenerationModel(config)
 
     train_loader, val_loader, test_loader = create_narrative_dataset(
-        tokenizer=albert2albert.tokenizer,
+        tokenizer=bertgeneration.tokenizer,
         batch_size=config.batch_size,
         source_max_length=config.source_max_length,
         decoder_max_length=config.decoder_max_length,
     )
     run_model(
-        albert2albert,
+        bertgeneration,
         config=config,
         evaluator=compute_rouge,
         train_dataloader=train_loader,
