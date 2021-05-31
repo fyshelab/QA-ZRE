@@ -102,7 +102,7 @@ def create_race_dataset(tokenizer, batch_size, source_max_length, decoder_max_le
         process_data_to_model_inputs,
         batched=True,
         batch_size=batch_size,
-        remove_columns=["inputs", "outputs"],
+        remove_columns=["question", "answer", "article"],
     )
     train_dataset.set_format(
         type="torch",
@@ -118,7 +118,7 @@ def create_race_dataset(tokenizer, batch_size, source_max_length, decoder_max_le
         process_data_to_model_inputs,
         batched=True,
         batch_size=batch_size,
-        remove_columns=["inputs", "outputs"],
+        remove_columns=["question", "answer", "article"],
     )
     dev_dataset.set_format(
         type="torch",
@@ -133,7 +133,7 @@ def create_race_dataset(tokenizer, batch_size, source_max_length, decoder_max_le
         process_data_to_model_inputs,
         batched=True,
         batch_size=batch_size,
-        remove_columns=["inputs", "outputs"],
+        remove_columns=["question", "answer", "article"],
     )
     test_dataset.set_format(
         type="torch",
