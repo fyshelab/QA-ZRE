@@ -63,7 +63,11 @@ def create_narrative_dataset(
         article = row["document"]["summary"]["text"]
         article = " ".join(article.split())
 
-        return {"article": article, "question": question, "answer": answer}
+        return {
+            "article": article,
+            "question": question,
+            "answer": question + " " + answer,
+        }
 
     def process_data_to_model_inputs(batch):
         # tokenize the inputs and labels
@@ -609,7 +613,7 @@ def run_narrative(args):
         model_path=args.model_path,
         batch_size=args.batch_size,
         source_max_length=1024,
-        decoder_max_length=128,
+        decoder_max_length=180,
         gpu=args.gpu,
         gpu_device=args.gpu_device,
         learning_rate=args.learning_rate,
@@ -618,16 +622,16 @@ def run_narrative(args):
         num_train_steps=args.num_train_steps,
         prediction_file=args.prediction_file,
     )
-    bertgeneration = BertGenerationModel(config)
+    model = Model(config)
 
     train_loader, val_loader, test_loader = create_narrative_dataset(
-        tokenizer=bertgeneration.tokenizer,
+        tokenizer=model.tokenizer,
         batch_size=config.batch_size,
         source_max_length=config.source_max_length,
         decoder_max_length=config.decoder_max_length,
     )
     run_model(
-        bertgeneration,
+        model,
         config=config,
         evaluator=compute_rouge,
         train_dataloader=train_loader,
