@@ -302,8 +302,8 @@ def create_squad_dataset(tokenizer, batch_size, source_max_length, decoder_max_l
     val_contexts, val_questions, val_answers = read_squad("./squad/dev-v2.0.json")
 
     val_encodings = tokenizer(
-        val_contexts,
         val_questions,
+        val_contexts,
         truncation=True,
         padding="max_length",
         max_length=source_max_length,
@@ -318,8 +318,8 @@ def create_squad_dataset(tokenizer, batch_size, source_max_length, decoder_max_l
     )
 
     train_encodings = tokenizer(
-        train_contexts,
         train_questions,
+        train_contexts,
         truncation=True,
         padding="max_length",
         max_length=source_max_length,
