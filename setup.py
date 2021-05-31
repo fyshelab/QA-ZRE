@@ -17,8 +17,9 @@ INSTALL_REQUIRES = [
     'mock',
     'black',
     'pylint',
-    'docformatter'
-    'openNMT-py'
+    'docformatter',
+    'tensorflow',
+    'tensorflow_datasets'
 ]
 
 setup(
