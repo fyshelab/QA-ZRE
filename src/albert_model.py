@@ -19,11 +19,10 @@ import numpy as np
 import six
 import torch
 import torch.nn as nn
-import torch.optim as optim
 from transformers import (AlbertTokenizer, BertGenerationDecoder,
                           BertGenerationEncoder, BertTokenizer,
                           EncoderDecoderModel, T5ForConditionalGeneration,
-                          T5Model, T5Tokenizer)
+                          T5Tokenizer)
 
 from src.initialize import init_weights
 from src.optimization import BERTAdam
@@ -1372,10 +1371,10 @@ class T5QA(object):
 
         # all special tokens including will be removed
         predictions_str = self.tokenizer.batch_decode(
-            predictions[0], skip_special_tokens=False
+            predictions[0], skip_special_tokens=True
         )
-        input_str = self.tokenizer.batch_decode(input_ids, skip_special_tokens=False)
-        target_str = self.tokenizer.batch_decode(target_ids, skip_special_tokens=False)
+        input_str = self.tokenizer.batch_decode(input_ids, skip_special_tokens=True)
+        target_str = self.tokenizer.batch_decode(target_ids, skip_special_tokens=True)
         for index in range(len(predictions_str)):
             pred_str = predictions_str[index]
             pred_str = pred_str if pred_str != "" else "<EMPTY>"
