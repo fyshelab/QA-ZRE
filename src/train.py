@@ -16,7 +16,7 @@ import torch
 from datasets import load_dataset
 from torch.utils.data import DataLoader
 
-from src.albert_model import BertGenerationModel, HyperParameters, Model
+from src.albert_model import T5QA, BertGenerationModel, HyperParameters, Model
 
 
 def read_squad(path):
@@ -64,15 +64,13 @@ def create_narrative_dataset(
         article = " ".join(article.split())
 
         return {
-            "article": article,
-            "question": question,
-            "answer": question + " " + answer,
+            "article": "question: " + question + " context: " + article,
+            "answer": answer,
         }
 
     def process_data_to_model_inputs(batch):
         # tokenize the inputs and labels
         inputs = tokenizer(
-            batch["question"],
             batch["article"],
             truncation=True,
             padding="max_length",
@@ -120,7 +118,7 @@ def create_narrative_dataset(
         process_data_to_model_inputs,
         batched=True,
         batch_size=batch_size,
-        remove_columns=["question", "answer", "article"],
+        remove_columns=["answer", "article"],
     )
     train_dataset.set_format(
         type="torch",
@@ -143,7 +141,7 @@ def create_narrative_dataset(
         process_data_to_model_inputs,
         batched=True,
         batch_size=batch_size,
-        remove_columns=["question", "answer", "article"],
+        remove_columns=["answer", "article"],
     )
     dev_dataset.set_format(
         type="torch",
@@ -165,7 +163,7 @@ def create_narrative_dataset(
         process_data_to_model_inputs,
         batched=True,
         batch_size=batch_size,
-        remove_columns=["question", "answer", "article"],
+        remove_columns=["answer", "article"],
     )
     test_dataset.set_format(
         type="torch",
@@ -613,7 +611,7 @@ def run_narrative(args):
         model_path=args.model_path,
         batch_size=args.batch_size,
         source_max_length=1024,
-        decoder_max_length=180,
+        decoder_max_length=256,
         gpu=args.gpu,
         gpu_device=args.gpu_device,
         learning_rate=args.learning_rate,
@@ -622,7 +620,7 @@ def run_narrative(args):
         num_train_steps=args.num_train_steps,
         prediction_file=args.prediction_file,
     )
-    model = Model(config)
+    model = T5QA(config)
 
     train_loader, val_loader, test_loader = create_narrative_dataset(
         tokenizer=model.tokenizer,
