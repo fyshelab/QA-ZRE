@@ -441,7 +441,7 @@ rouge = datasets.load_metric("rouge")
 
 
 def compute_rouge(prediction_file):
-    df = pd.read_csv(prediction_file)
+    df = pd.read_csv(prediction_file).astype(str)
     rouge_output = rouge.compute(
         predictions=df["predictions_str"].tolist(),
         references=df["target_str"].tolist(),
