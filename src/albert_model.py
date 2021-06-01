@@ -22,7 +22,8 @@ import torch.nn as nn
 import torch.optim as optim
 from transformers import (AlbertTokenizer, BertGenerationDecoder,
                           BertGenerationEncoder, BertTokenizer,
-                          EncoderDecoderModel)
+                          EncoderDecoderModel, T5ForConditionalGeneration,
+                          T5Model, T5Tokenizer)
 
 from src.initialize import init_weights
 from src.optimization import BERTAdam
@@ -1173,6 +1174,155 @@ class BertGenerationModel(object):
             ]
             self.optimizer = BERTAdam(
                 optimizer_parameters, lr=cfg.learning_rate, warmup=-1, t_total=-1
+            )
+            if not os.path.exists(cfg.model_path):
+                os.makedirs(cfg.model_path)
+            self.model_path = os.path.join(cfg.model_path, "model")
+
+        elif cfg.mode in ["test", "inference"]:
+            self.model_path = os.path.join(cfg.model_path, "model")
+            model.load_state_dict(
+                torch.load(
+                    self.model_path + "_best_model",
+                    map_location=lambda storage, loc: storage,
+                )
+            )
+        self.model = model
+        self.tokenizer = tokenizer
+
+    def save(self, checkpoint_name: str):
+        """Save the encoder model to the specified path name."""
+        path = self.model_path + "_" + checkpoint_name
+        save(self.model, path + "_model")
+
+    def predict(self, batch):
+        # Free memory in GPU, very important!
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
+        gc.collect()
+        # disable dropout
+        self.model.eval()
+
+        input_ids = batch["input_ids"]
+        input_mask = batch["attention_mask"]
+        target_ids = batch["target_ids"]
+        if self.config.gpu:
+            input_ids = input_ids.to(self.config.gpu_device)
+            input_mask = input_mask.to(self.config.gpu_device)
+            target_ids = target_ids.to(self.config.gpu_device)
+
+        predictions = self.model.generate(
+            input_ids=input_ids,
+            attention_mask=input_mask,
+            decoder_start_token_id=self.tokenizer.pad_token_id,
+            beam=5,
+            early_stopping=True,
+            no_repeat_ngram_size=2,
+            max_length=self.config.decoder_max_length,
+        )
+
+        # all special tokens including will be removed
+        predictions_str = self.tokenizer.batch_decode(
+            predictions[0], skip_special_tokens=False
+        )
+        input_str = self.tokenizer.batch_decode(input_ids, skip_special_tokens=False)
+        target_str = self.tokenizer.batch_decode(target_ids, skip_special_tokens=False)
+        for index in range(len(predictions_str)):
+            pred_str = predictions_str[index]
+            pred_str = pred_str if pred_str != "" else "<EMPTY>"
+            output_batch = {
+                "predictions_str": pred_str,
+                "input_str": input_str[index],
+                "target_str": target_str[index],
+            }
+            yield output_batch
+
+    def train(self, batch):
+        # Free memory in GPU, very important!
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
+        gc.collect()
+        # Turn on training mode which enables dropout.
+        self.model.train()
+        self.optimizer.zero_grad()
+
+        input_ids = batch["input_ids"]
+        input_mask = batch["attention_mask"]
+        labels = batch["labels"]
+        target_ids = batch["target_ids"]
+        target_mask = batch["target_attention_mask"]
+        if self.config.gpu:
+            input_ids = input_ids.to(self.config.gpu_device)
+            input_mask = input_mask.to(self.config.gpu_device)
+            labels = labels.to(self.config.gpu_device)
+            target_ids = target_ids.to(self.config.gpu_device)
+            target_mask = target_mask.to(self.config.gpu_device)
+
+        output = self.model(
+            input_ids=input_ids,
+            attention_mask=input_mask,
+            decoder_input_ids=target_ids,
+            decoder_attention_mask=target_mask,
+            labels=labels,
+        )
+        loss = output.loss
+        loss_value = loss.item()
+
+        # is loss nan? don't backpropagate!
+        if math.isnan(loss):
+            return {"loss_value": loss_value}
+
+        # BackProp
+        loss.backward()
+
+        # if self.config.gradient_clipping:
+        #    params = self.model.parameters()
+        #    nn.utils.clip_grad_norm_(params, self.config.max_gradient_norm)
+
+        # Optimize
+        self.optimizer.step()
+
+        return {"loss_value": loss_value}
+
+
+class T5QA(object):
+    """Wrapper class around the T5 Model."""
+
+    def __init__(self, cfg: HyperParameters):
+        self.config = cfg
+
+        set_random_seed(cfg.seed)
+
+        # Check the gpu actually exists.
+        cfg.gpu = cfg.gpu and torch.cuda.is_available()
+
+        if cfg.gpu:
+            os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
+            os.environ["CUDA_VISIBLE_DEVICES"] = str(cfg.gpu_device)
+            torch.cuda.device(cfg.gpu_device)
+            torch.cuda.set_device(cfg.gpu_device)
+
+        tokenizer = T5Tokenizer.from_pretrained("t5-base")
+
+        # Construct model
+        model = T5ForConditionalGeneration.from_pretrained(
+            "t5-base",
+            bos_token_id=tokenizer.bos_token_id,
+            eos_token_id=tokenizer.eos_token_id,
+        )
+        if cfg.gpu:
+            model.cuda(cfg.gpu_device)
+
+        if cfg.mode == "train":
+            params_to_train = list(
+                filter(lambda x: x.requires_grad, model.parameters())
+            )
+            self.optimizer = torch.optim.Adam(
+                params_to_train,
+                lr=cfg.learning_rate,
+                betas=(0.9, 0.999),
+                amsgrad=True,
+                weight_decay=0.01,
             )
             if not os.path.exists(cfg.model_path):
                 os.makedirs(cfg.model_path)
