@@ -1293,24 +1293,27 @@ class T5QA(object):
         set_random_seed(cfg.seed)
 
         # Check the gpu actually exists.
-        cfg.gpu = cfg.gpu and torch.cuda.is_available()
 
-        if cfg.gpu:
-            os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
-            os.environ["CUDA_VISIBLE_DEVICES"] = str(cfg.gpu_device)
-            torch.cuda.device(cfg.gpu_device)
-            torch.cuda.set_device(cfg.gpu_device)
+        cfg.gpu = cfg.gpu and torch.cuda.is_available()
+        self.device = torch.device("cuda" if cfg.gpu else "cpu")
+
+        # if cfg.gpu:
+        #    os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
+        #    os.environ["CUDA_VISIBLE_DEVICES"] = str(cfg.gpu_device)
+        #    torch.cuda.device(cfg.gpu_device)
+        #    torch.cuda.set_device(cfg.gpu_device)
 
         tokenizer = T5Tokenizer.from_pretrained("t5-base")
 
         # Construct model
-        model = T5ForConditionalGeneration.from_pretrained(
-            "t5-base",
-            bos_token_id=tokenizer.bos_token_id,
-            eos_token_id=tokenizer.eos_token_id,
+        model = nn.DataParallel(
+            T5ForConditionalGeneration.from_pretrained(
+                "t5-base",
+                bos_token_id=tokenizer.bos_token_id,
+                eos_token_id=tokenizer.eos_token_id,
+            )
         )
-        if cfg.gpu:
-            model.cuda(cfg.gpu_device)
+        model.to(self.device)
 
         if cfg.mode == "train":
             params_to_train = list(
@@ -1355,17 +1358,17 @@ class T5QA(object):
         input_mask = batch["attention_mask"]
         target_ids = batch["target_ids"]
         if self.config.gpu:
-            input_ids = input_ids.to(self.config.gpu_device)
-            input_mask = input_mask.to(self.config.gpu_device)
-            target_ids = target_ids.to(self.config.gpu_device)
+            input_ids = input_ids.to(self.device)
+            input_mask = input_mask.to(self.device)
+            target_ids = target_ids.to(self.device)
 
         predictions = self.model.generate(
             input_ids=input_ids,
             attention_mask=input_mask,
             decoder_start_token_id=self.tokenizer.pad_token_id,
-            num_beams=5,
-            early_stopping=True,
-            no_repeat_ngram_size=2,
+            # num_beams=5,
+            # early_stopping=True,
+            # no_repeat_ngram_size=2,
             max_length=self.config.decoder_max_length,
         )
 
@@ -1400,11 +1403,11 @@ class T5QA(object):
         target_ids = batch["target_ids"]
         target_mask = batch["target_attention_mask"]
         if self.config.gpu:
-            input_ids = input_ids.to(self.config.gpu_device)
-            input_mask = input_mask.to(self.config.gpu_device)
-            labels = labels.to(self.config.gpu_device)
-            target_ids = target_ids.to(self.config.gpu_device)
-            target_mask = target_mask.to(self.config.gpu_device)
+            input_ids = input_ids.to(self.device)
+            input_mask = input_mask.to(self.device)
+            labels = labels.to(self.device)
+            target_ids = target_ids.to(self.device)
+            target_mask = target_mask.to(self.device)
 
         output = self.model(
             input_ids=input_ids,
