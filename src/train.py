@@ -590,7 +590,7 @@ def run_narrative(args):
     config = HyperParameters(
         model_path=args.model_path,
         batch_size=args.batch_size,
-        source_max_length=512,
+        source_max_length=1024,
         decoder_max_length=256,
         gpu=args.gpu,
         gpu_device=args.gpu_device,
@@ -600,7 +600,7 @@ def run_narrative(args):
         num_train_steps=args.num_train_steps,
         prediction_file=args.prediction_file,
     )
-    model = BertGenerationModel(config)
+    model = T5QA(config)
 
     train_loader, val_loader, test_loader = create_narrative_dataset(
         tokenizer=model.tokenizer,
