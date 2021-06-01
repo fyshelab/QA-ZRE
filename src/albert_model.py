@@ -1416,7 +1416,7 @@ class T5QA(object):
             decoder_attention_mask=target_mask,
             labels=labels,
         )
-        loss = output.loss
+        loss = output.loss.mean()
         loss_value = loss.item()
 
         # is loss nan? don't backpropagate!
