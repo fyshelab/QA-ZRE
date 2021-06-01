@@ -18,8 +18,8 @@ INSTALL_REQUIRES = [
     'black',
     'pylint',
     'docformatter',
-    'tensorflow',
-    'tensorflow_datasets'
+    'transformers',
+    'datasets'
 ]
 
 setup(
