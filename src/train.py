@@ -85,11 +85,9 @@ def create_narrative_dataset(
 
         batch["input_ids"] = inputs.input_ids
         batch["attention_mask"] = inputs.attention_mask
-        batch["token_type_ids"] = inputs.token_type_ids
 
         batch["target_ids"] = outputs.input_ids
         batch["target_attention_mask"] = outputs.attention_mask
-        batch["target_token_type_ids"] = outputs.token_type_ids
 
         batch["labels"] = outputs.input_ids.copy()
 
@@ -125,8 +123,6 @@ def create_narrative_dataset(
             "attention_mask",
             "target_ids",
             "target_attention_mask",
-            "token_type_ids",
-            "target_token_type_ids",
             "labels",
         ],
     )
@@ -148,8 +144,6 @@ def create_narrative_dataset(
             "attention_mask",
             "target_ids",
             "target_attention_mask",
-            "token_type_ids",
-            "target_token_type_ids",
             "labels",
         ],
     )
@@ -170,8 +164,6 @@ def create_narrative_dataset(
             "attention_mask",
             "target_ids",
             "target_attention_mask",
-            "token_type_ids",
-            "target_token_type_ids",
             "labels",
         ],
     )
@@ -234,6 +226,16 @@ def create_race_dataset(tokenizer, batch_size, source_max_length, decoder_max_le
 
         batch["target_ids"] = outputs.input_ids
         batch["target_attention_mask"] = outputs.attention_mask
+        batch["labels"] = outputs.input_ids.copy()
+
+        # because BERT automatically shifts the labels, the labels correspond exactly to `target_ids`.
+        # We have to make sure that the PAD token is ignored
+
+        labels = [
+            [-100 if token == tokenizer.pad_token_id else token for token in labels]
+            for labels in batch["labels"]
+        ]
+        batch["labels"] = labels
 
         return batch
 
@@ -456,10 +458,8 @@ def compute_rouge(prediction_file):
 
 def create_squad_dataset(tokenizer, batch_size, source_max_length, decoder_max_length):
     """Function to create the squad dataset."""
-    train_contexts, train_questions, train_answers = read_squad(
-        "./squad/train-v2.0.json"
-    )
-    val_contexts, val_questions, val_answers = read_squad("./squad/dev-v2.0.json")
+    train_contexts, train_answers = read_squad("./squad/train-v2.0.json")
+    val_contexts, val_answers = read_squad("./squad/dev-v2.0.json")
 
     val_encodings = tokenizer(
         val_contexts,
@@ -493,9 +493,29 @@ def create_squad_dataset(tokenizer, batch_size, source_max_length, decoder_max_l
 
     train_encodings["target_ids"] = train_answer_encodings.input_ids
     train_encodings["target_attention_mask"] = train_answer_encodings.attention_mask
+    train_encodings["labels"] = train_answer_encodings.input_ids.copy()
+
+    # because BERT automatically shifts the labels, the labels correspond exactly to `target_ids`.
+    # We have to make sure that the PAD token is ignored
+
+    labels = [
+        [-100 if token == tokenizer.pad_token_id else token for token in labels]
+        for labels in train_encodings["labels"]
+    ]
+    train_encodings["labels"] = labels
 
     val_encodings["target_ids"] = val_answer_encodings.input_ids
     val_encodings["target_attention_mask"] = val_answer_encodings.attention_mask
+    val_encodings["labels"] = val_answer_encodings.input_ids.copy()
+
+    # because BERT automatically shifts the labels, the labels correspond exactly to `target_ids`.
+    # We have to make sure that the PAD token is ignored
+
+    labels = [
+        [-100 if token == tokenizer.pad_token_id else token for token in labels]
+        for labels in val_encodings["labels"]
+    ]
+    val_encodings["labels"] = labels
 
     class SquadDataset(torch.utils.data.Dataset):
         def __init__(self, encodings):

@@ -1363,7 +1363,7 @@ class T5QA(object):
             input_ids=input_ids,
             attention_mask=input_mask,
             decoder_start_token_id=self.tokenizer.pad_token_id,
-            beam=5,
+            num_beams=5,
             early_stopping=True,
             no_repeat_ngram_size=2,
             max_length=self.config.decoder_max_length,
@@ -1371,7 +1371,7 @@ class T5QA(object):
 
         # all special tokens including will be removed
         predictions_str = self.tokenizer.batch_decode(
-            predictions[0], skip_special_tokens=True
+            predictions, skip_special_tokens=True
         )
         input_str = self.tokenizer.batch_decode(input_ids, skip_special_tokens=True)
         target_str = self.tokenizer.batch_decode(target_ids, skip_special_tokens=True)
