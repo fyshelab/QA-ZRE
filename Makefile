@@ -13,6 +13,5 @@ clean_code:
 	black src; \
 	isort src; \
 	docformatter --in-place src/*py
-	docformatter --in-place src/*/*py
 
 
