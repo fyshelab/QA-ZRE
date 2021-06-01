@@ -11,7 +11,7 @@ import json
 import math
 import os
 import random
-from dataclasses import dataclass, field, replace
+from dataclasses import dataclass
 from typing import Any, List, Optional, Tuple
 
 import numpy
@@ -19,10 +19,13 @@ import numpy as np
 import six
 import torch
 import torch.nn as nn
-import torch.optim as optim
-from transformers import AlbertTokenizer
+from transformers import (AlbertTokenizer, BertGenerationDecoder,
+                          BertGenerationEncoder, BertTokenizer,
+                          EncoderDecoderModel, T5ForConditionalGeneration,
+                          T5Tokenizer)
 
-from src.initialize import rnn_param_init, xavier_param_init
+from src.initialize import init_weights
+from src.optimization import BERTAdam
 
 
 @dataclass
@@ -31,8 +34,8 @@ class HyperParameters:
 
     model_path: Optional[str] = None
     batch_size: int = 64
-    source_max_length: int = 256
-    decoder_max_length: int = 64
+    source_max_length: int = 512
+    decoder_max_length: int = 128
     config_file: str = "config.ini"
     dim_embedding: int = 100
     dim_model: int = 128
@@ -51,7 +54,6 @@ class HyperParameters:
     seed: int = 8
     test: Optional[str] = None
     dev: Optional[str] = None
-    model_type: Optional[str] = "transformer"
 
 
 def set_random_seed(seed: int) -> Any:
@@ -75,7 +77,7 @@ class AlbertTokenEmbedding(nn.Module):
 
     def __init__(
         self,
-        pad_id: int,
+        pad_id: Optional[int] = -1,
         vocab_size: Optional[int] = 1,
         dim_embeddings: Optional[int] = 1,
         lookup_table: Optional[numpy.ndarray] = None,
@@ -91,7 +93,10 @@ class AlbertTokenEmbedding(nn.Module):
         else:
             self.token_embs = nn.Embedding(vocab_size, dim_embeddings)
 
-        self.token_embs.weight.data[self.pad_id].fill_(0.0)
+        init_weights(self)
+
+        if self.pad_id != -1:
+            self.token_embs.weight.data[self.pad_id].fill_(0.0)
 
     def set_trainable(self, trainable: Optional[bool] = True) -> None:
         """Set the freeze embeddings during training or not."""
@@ -101,7 +106,8 @@ class AlbertTokenEmbedding(nn.Module):
         """Zero the vector for the pad tokens, and then retreive the vector of
         each token."""
         token_indices = args[0]
-        self.token_embs.weight.data[self.pad_id].fill_(0.0)
+        if self.pad_id != -1:
+            self.token_embs.weight.data[self.pad_id].fill_(0.0)
         return self.token_embs(token_indices)
 
 
@@ -111,71 +117,69 @@ class AlbertEmbedding(nn.Module):
     def __init__(
         self,
         vocab_size: int,
-        word_pad_id: int,
-        token_type_pad_id: int,
+        word_pad_id: Optional[int] = 0,
+        token_pad_id: Optional[int] = -1,
         embedding_size: Optional[int] = 128,
-        token_type_vocab_size: Optional[int] = 16,
+        token_type_vocab_size: Optional[int] = 2,
         use_position_embeddings: Optional[bool] = True,
         max_position_embeddings: Optional[int] = 512,
         dropout: Optional[float] = 0.1,
-        model_type: Optional[str] = "transformer",
     ) -> None:
 
         """The designed 3 embeddings of Albert."""
         super(AlbertEmbedding, self).__init__()
 
         self.word_embedder = AlbertTokenEmbedding(
-            pad_id=word_pad_id, vocab_size=vocab_size, dim_embeddings=embedding_size
+            pad_id=word_pad_id,
+            vocab_size=vocab_size,
+            dim_embeddings=embedding_size,
         )
         self.word_embedder.set_trainable(trainable=True)
 
-        if model_type == "transformer":
-            # For token_type features.
-            self.token_type_embedder = AlbertTokenEmbedding(
-                pad_id=token_type_pad_id,
-                vocab_size=token_type_vocab_size,
-                dim_embeddings=embedding_size,
-            )
-            self.token_type_embedder.set_trainable(trainable=True)
+        # For token_type features.
+        self.token_type_embedder = AlbertTokenEmbedding(
+            pad_id=token_pad_id,
+            vocab_size=token_type_vocab_size,
+            dim_embeddings=embedding_size,
+        )
+        self.token_type_embedder.set_trainable(trainable=True)
 
-            if use_position_embeddings:
-                self.pos_embedder = nn.Parameter(
-                    torch.Tensor(512, embedding_size),
-                    requires_grad=True,
-                )
+        if use_position_embeddings:
+            self.pos_embedder = nn.Parameter(
+                torch.Tensor(1024, embedding_size),
+                requires_grad=True,
+            )
 
         self.dropout = nn.Dropout(dropout)
-        self.model_type = model_type
-
-        xavier_param_init(self)
 
         # Layer normalization: :cite:`https://arxiv.org/abs/1607.06450`
-        # eps from huggingface transformers implementation
-        self.layer_norm = nn.LayerNorm(embedding_size, eps=1e-6)
+        self.layer_norm = nn.LayerNorm(embedding_size, 1e-12)
 
-    def forward(self, input_ids, token_type_ids) -> torch.FloatTensor:
+        init_weights(self)
+        nn.init.xavier_uniform_(self.pos_embedder)
+
+    def forward(self, input_ids, token_type_ids, input_mask) -> torch.FloatTensor:
         """Build the embeddings."""
-        # embeddings = self.word_embedder(input_ids) + self.token_type_embedder(
-        #    token_type_ids
-        # )
-        embeddings = self.word_embedder(input_ids)
+        embeddings = self.word_embedder(input_ids) + self.token_type_embedder(
+            token_type_ids
+        )
 
         _, s_len, _ = embeddings.size()
 
-        if self.model_type == "transformer":
-            # [0, 1, 2, ..., s_len-1]
-            length_indices = torch.tensor(
-                list(range(s_len)), dtype=torch.long, device=input_ids.device
-            )
+        # [0, 1, 2, ..., s_len-1]
+        length_indices = torch.tensor(
+            list(range(s_len)), dtype=torch.long, device=input_ids.device
+        )
+        # size: (1, s_len, hidden_size)
+        position_embeddings = torch.index_select(
+            self.pos_embedder, 0, length_indices
+        ).unsqueeze(0)
 
-            # size: (1, s_len, hidden_size)
-            position_embeddings = torch.index_select(
-                self.pos_embedder, 0, length_indices
-            ).unsqueeze(0)
-
-            return self.dropout(self.layer_norm(embeddings + position_embeddings))
-
-        return self.dropout(self.layer_norm(embeddings))
+        final_embeddings = self.dropout(
+            self.layer_norm(embeddings + position_embeddings)
+        )
+        final_embeddings = final_embeddings * (1.0 - input_mask.unsqueeze(dim=2))
+        return final_embeddings
 
 
 @dataclass
@@ -203,11 +207,14 @@ class AttentionConfig:
 class AttentionData:
     """Data for the MultiHeadAttention Module.
 
-    Dimension Notes: query (FloatTensor): ``(batch_size,
-    sequence_length, hidden_units)`` key (FloatTensor): ``(batch_size,
-    sequence_length, hidden_units)`` value (FloatTensor): ``(batch_size,
-    sequence_length, hidden_units)`` mask (ByteTensor): ``(batch_size,
-    sequence_length)``
+    Dimension Notes: query (FloatTensor):
+    (batch_size, sequence_length, hidden_units)
+
+    key (FloatTensor): (batch_size, sequence_length, hidden_units)
+
+    value (FloatTensor): (batch_size, sequence_length, hidden_units)
+
+    mask (ByteTensor): (batch_size, sequence_length)
     """
 
     query: torch.FloatTensor
@@ -237,10 +244,10 @@ class MultiHeadAttention(nn.Module):
         )
         self.dropout = nn.Dropout(dropout)
 
-        xavier_param_init(self)
+        init_weights(self)
 
         # Layer normalization: :cite:`https://arxiv.org/abs/1607.06450`
-        self.layer_norm = nn.LayerNorm(config.dim_model, eps=1e-6)
+        self.layer_norm = nn.LayerNorm(config.dim_model, eps=1e-12)
 
         self.config = config
 
@@ -282,22 +289,13 @@ class MultiHeadAttention(nn.Module):
             attn += adder
 
         attn = attn.softmax(dim=2)
+
         if mask is not None:
             attn = attn * (1.0 - mask)
 
         if self.config.mask_future:
             attn = attn * (1.0 - future_mask)
-        """
-        if self.config.mask_future and not self.config.cross_attention:
-            print("decoder self attention")
-            print(attn[0, 10, :])
-        if not self.config.mask_future and self.config.cross_attention:
-            print("decoder cross attention")
-            print(attn[0, 10, :])
-        if not self.config.mask_future and not self.config.cross_attention:
-            print("encoder attention")
-            print(attn[0, 10, :])
-        """
+
         attn = self.dropout(attn)
         output = attn.bmm(value)
 
@@ -305,6 +303,8 @@ class MultiHeadAttention(nn.Module):
 
     def forward(self, *args) -> Tuple[torch.FloatTensor, torch.FloatTensor]:
         """Compute the multi-head attention.
+
+        1 for masked tokens, 0 for normal tokens.
         Returns:
             (FloatTensor, FloatTensor):
                 * output ``(batch_size, sequence_length, hidden_units)``
@@ -401,9 +401,9 @@ class PositionwiseFeedForward(nn.Module):
         self.layer2 = nn.Linear(dim_ff, dim_input)
         self.dropout = nn.Dropout(dropout)
 
-        xavier_param_init(self)
+        self.layer_norm = nn.LayerNorm(dim_input, eps=1e-12)
 
-        self.layer_norm = nn.LayerNorm(dim_input, eps=1e-6)
+        init_weights(self)
 
     def forward(self, *args: List[Any]) -> torch.FloatTensor:
         """
@@ -432,7 +432,6 @@ class AttentionBlock(nn.Module):
         attention_probs_dropout_prob: Optional[float] = 0.0,
         intermediate_size: Optional[int] = 3072,
         hidden_dropout_prob: Optional[float] = 0.0,
-        lm_decoder: Optional[bool] = False,
     ) -> None:
         """Construction of the attention layer used in Albert Model.
           Args:
@@ -465,7 +464,7 @@ class AttentionBlock(nn.Module):
             self_attn_cfg, dropout=attention_probs_dropout_prob
         )
 
-        if is_decoder and not lm_decoder:
+        if is_decoder:
             cross_attn_cfg = AttentionConfig(
                 num_heads=num_attention_heads,
                 dim_model=hidden_size,
@@ -484,7 +483,6 @@ class AttentionBlock(nn.Module):
         )
 
         self.is_decoder = is_decoder
-        self.lm_decoder = lm_decoder
 
     def forward(
         self,
@@ -507,7 +505,7 @@ class AttentionBlock(nn.Module):
                 mask=attention_mask,
             )
         )
-        if self.is_decoder and not self.lm_decoder:
+        if self.is_decoder:
             output, _ = self.cross_attention(
                 AttentionData(
                     query=output,
@@ -518,95 +516,6 @@ class AttentionBlock(nn.Module):
             )
 
         return self.ffd_layer(output)
-
-
-class RNNModel(nn.Module):
-    """Implements a complete encoder or decoder based on RNNs."""
-
-    def __init__(
-        self,
-        hidden_size: Optional[int] = 768,
-        is_decoder: Optional[bool] = False,
-        hidden_dropout_prob: Optional[float] = 0.1,
-    ) -> None:
-
-        super(RNNModel, self).__init__()
-        # we use single block as we share weights.
-        if not is_decoder:
-            self.encoder = torch.nn.GRU(
-                input_size=hidden_size,
-                hidden_size=hidden_size,
-                num_layers=1,
-                bias=True,
-                bidirectional=True,
-            )
-            self.encoder_denser = torch.nn.Linear(
-                2 * hidden_size, hidden_size, bias=True
-            )
-
-        if is_decoder:
-            self.decoder = torch.nn.GRUCell(
-                input_size=2 * hidden_size, hidden_size=hidden_size, bias=True
-            )
-            # soft-attention
-            self.atten_W = torch.nn.Linear(hidden_size, hidden_size, bias=False)
-            self.atten_affine = torch.nn.Linear(2 * hidden_size, hidden_size, bias=True)
-
-        self.drop = nn.Dropout(hidden_dropout_prob)
-        self.is_decoder = is_decoder
-
-        xavier_param_init(self)
-
-    def forward(
-        self,
-        layer_input,
-        attention_mask,
-        encoder_input_mask=None,
-        encoder_hidden_output=None,
-    ) -> torch.FloatTensor:
-        """For both encoder and decoder RNN."""
-        if not self.is_decoder:
-            b_sz, s_len, h_units = layer_input.size()
-            mask = attention_mask.view(b_sz, s_len, 1).expand_as(layer_input)
-            layer_input = layer_input * (1.0 - mask)
-            output, _ = self.encoder(layer_input)
-            output = self.drop(output)
-            encoder_hidden_states = torch.tanh(self.encoder_denser(output))
-            return encoder_hidden_states * (1.0 - mask)
-
-        if self.is_decoder:
-            b_sz, t_len, h_units = layer_input.size()
-            mask = attention_mask.view(b_sz, t_len, 1).expand_as(layer_input)
-            layer_input = layer_input * (1.0 - mask)
-            _, s_len, _ = encoder_hidden_output.size()
-            # global general attention as https://nlp.stanford.edu/pubs/emnlp15_attn.pdf
-            states_mapped = self.atten_W(encoder_hidden_output)
-
-            Outputs = []
-            context = encoder_hidden_output[:, -1, :]
-            hidden_output = (context - context).detach()
-            for i in range(t_len):
-                input_i = layer_input[:, i, :]
-                input_feature = torch.cat((input_i, context), dim=1)
-                hidden_output = self.decoder(input_feature, hidden_output)
-                output_dr = self.drop(hidden_output)
-                atten_scores = torch.sum(
-                    states_mapped
-                    * output_dr.view(-1, 1, h_units).expand(-1, s_len, h_units),
-                    dim=2,
-                )
-                atten = nn.functional.softmax(atten_scores, dim=1)
-                context = torch.sum(
-                    atten.view(-1, s_len, 1).expand(-1, s_len, h_units)
-                    * encoder_hidden_output,
-                    dim=1,
-                )
-                output = torch.tanh(
-                    self.atten_affine(torch.cat((output_dr, context), dim=1))
-                )
-                Outputs.append(output)
-
-            return torch.stack(Outputs, dim=1)
 
 
 class TransformerModel(nn.Module):
@@ -621,7 +530,6 @@ class TransformerModel(nn.Module):
         attention_probs_dropout_prob: Optional[float] = 0.1,
         intermediate_size: Optional[int] = 3072,
         hidden_dropout_prob: Optional[float] = 0.1,
-        lm_decoder: Optional[bool] = False,
     ) -> None:
 
         super(TransformerModel, self).__init__()
@@ -633,7 +541,6 @@ class TransformerModel(nn.Module):
             attention_probs_dropout_prob=attention_probs_dropout_prob,
             intermediate_size=intermediate_size,
             hidden_dropout_prob=hidden_dropout_prob,
-            lm_decoder=lm_decoder,
         )
         self.num_layers = num_hidden_layers
 
@@ -657,37 +564,35 @@ class AlbertConfig(object):
     """Configuration for `AlbertModel`.
 
     The default settings match the configuration of model
-    `albert_xxlarge`.
+    https://huggingface.co/albert-xxlarge-v2/resolve/main/config.json
     """
 
     def __init__(
         self,
         vocab_size=30000,
         embedding_size=128,
-        hidden_size=4096,
+        hidden_size=768,
         num_hidden_layers=12,
         num_hidden_groups=1,
-        num_attention_heads=64,
-        intermediate_size=16384,
+        num_attention_heads=12,
+        intermediate_size=3072,
         inner_group_num=1,
         down_scale_factor=1,
-        hidden_act="gelu",
+        hidden_act="gelu_new",
         hidden_dropout_prob=0,
         attention_probs_dropout_prob=0,
         source_max_position_embeddings=512,
         decoder_max_position_embeddings=512,
         type_vocab_size=2,
         initializer_range=0.02,
-        go_symbol_id=2,
-        is_decoder=False,
+        layer_norm_eps=1e-12,
+        classifier_dropout_prob=0.1,
         word_pad_id=0,
-        token_type_pad_id=0,
-        use_position_embeddings=True,
+        token_pad_id=-1,  # no removal of pad.
         bos_token_id=2,
         eos_token_id=3,
-        right_shift=True,
-        model_type="transformer",
-        lm_decoder=False,
+        use_position_embeddings=True,
+        is_decoder=False,
     ):
         """Constructs AlbertConfig.
 
@@ -710,15 +615,30 @@ class AlbertConfig(object):
             layers in the embeddings, encoder, and pooler.
           attention_probs_dropout_prob: The dropout ratio for the attention
             probabilities.
-          max_position_embeddings: The maximum sequence length that this model might
+          source_max_position_embeddings: The maximum source sequence length that this model might
+            ever be used with. Typically set this to something large just in case
+            (e.g., 512 or 1024 or 2048).
+          decoder_max_position_embeddings: The maximum decoder sequence length that this model might
             ever be used with. Typically set this to something large just in case
             (e.g., 512 or 1024 or 2048).
           type_vocab_size: The vocabulary size of the `token_type_ids` passed into
             `AlbertModel`.
           initializer_range: The stdev of the truncated_normal_initializer for
             initializing all weight matrices.
+
+          layer_norm_eps (:obj:`float`, `optional`, defaults to 1e-12):
+            The epsilon used by the layer normalization layers.
+
+          classifier_dropout_prob (:obj:`float`, `optional`, defaults to 0.1):
+            The dropout ratio for attached classifiers.
+
+          word_pad_id: token index in the vocabulary for the pad token.
+
+          bos_token_id: begining of the sentence token id
+          eos_token_id: end of sentence token id.
+          use_position_embeddings: True, learn a positional embeddings for the input and output.
+          right_shift: shift the decoder input to the right or not.
           is_decoder: will this model used as decoder or encoder. The default is False (encoder).
-          go_symbol_id: the id for the go symbol token used as the first input to decoder transformer.
         """
         self.vocab_size = vocab_size
         self.embedding_size = embedding_size
@@ -738,20 +658,18 @@ class AlbertConfig(object):
         self.token_type_vocab_size = type_vocab_size
         self.initializer_range = initializer_range
         self.is_decoder = is_decoder
-        self.go_symbol_id = go_symbol_id
+        self.layer_norm_eps = layer_norm_eps
+        self.classifier_dropout_prob = classifier_dropout_prob
         self.word_pad_id = word_pad_id
-        self.token_type_pad_id = token_type_pad_id
-        self.right_shift = right_shift
-        self.bos_token_id = bos_token_id
-        self.eos_token_id = eos_token_id
-        self.model_type = model_type
-        self.lm_decoder = lm_decoder
+        self.bos_token_id = bos_token_id  # usually [CLS]
+        self.eos_token_id = eos_token_id  # usually [SEP]
+        self.token_pad_id = token_pad_id
 
     @classmethod
     def from_dict(cls, json_object):
         """Constructs a `AlbertConfig` from a Python dictionary of
         parameters."""
-        config = AlbertConfig(vocab_size=None)
+        config = AlbertConfig()
         for (key, value) in six.iteritems(json_object):
             config.__dict__[key] = value
         return config
@@ -789,15 +707,14 @@ class AlbertModel(nn.Module):
             else config.source_max_position_embeddings
         )
         self.embedding = AlbertEmbedding(
-            vocab_size=config.vocab_size,
             word_pad_id=config.word_pad_id,
-            token_type_pad_id=config.token_type_pad_id,
+            token_pad_id=config.token_pad_id,
+            vocab_size=config.vocab_size,
             embedding_size=config.embedding_size,
             token_type_vocab_size=config.token_type_vocab_size,
             use_position_embeddings=config.use_position_embeddings,
             max_position_embeddings=max_position,
             dropout=config.hidden_dropout_prob,
-            model_type=config.model_type,
         )
 
         if config.embedding_size != config.hidden_size:
@@ -805,22 +722,15 @@ class AlbertModel(nn.Module):
                 config.embedding_size, config.hidden_size, bias=True
             )
 
-        if config.model_type == "transformer":
-            self.main_block = TransformerModel(
-                hidden_size=config.hidden_size,
-                is_decoder=config.is_decoder,
-                num_hidden_layers=config.num_hidden_layers,
-                num_attention_heads=config.num_attention_heads,
-                attention_probs_dropout_prob=config.attention_probs_dropout_prob,
-                intermediate_size=config.intermediate_size,
-                hidden_dropout_prob=config.hidden_dropout_prob,
-            )
-        if config.model_type == "rnn":
-            self.main_block = RNNModel(
-                hidden_size=config.hidden_size,
-                is_decoder=config.is_decoder,
-                hidden_dropout_prob=config.hidden_dropout_prob,
-            )
+        self.main_block = TransformerModel(
+            hidden_size=config.hidden_size,
+            is_decoder=config.is_decoder,
+            num_hidden_layers=config.num_hidden_layers,
+            num_attention_heads=config.num_attention_heads,
+            attention_probs_dropout_prob=config.attention_probs_dropout_prob,
+            intermediate_size=config.intermediate_size,
+            hidden_dropout_prob=config.hidden_dropout_prob,
+        )
 
         self.config = config
 
@@ -836,38 +746,21 @@ class AlbertModel(nn.Module):
         inputs."""
         batch_size, seq_length = input_ids.size()
         if input_mask is None:
-            input_mask = torch.ones(
+            # every token is normal.
+            input_mask = torch.zeros(
                 (batch_size, seq_length),
                 dtype=torch.long,
                 device=input_ids.device,
             )
 
         if token_type_ids is None:
-            token_type_ids = torch.ones(
+            token_type_ids = torch.zeros(
                 (batch_size, seq_length),
                 dtype=torch.long,
                 device=input_ids.device,
             )
 
-        # For the decoder, shift right the input_ids, input_mask, and token_type_ids.
-        if self.config.is_decoder and self.config.right_shift:
-            token_type_ids = torch.roll(token_type_ids, shifts=1, dims=1)
-            token_type_ids[:, 0:1] = torch.zeros(
-                (batch_size, 1), dtype=torch.long, device=input_ids.device
-            )
-
-            input_mask = torch.roll(input_mask, shifts=1, dims=1)
-            input_mask[:, 0:1] = torch.ones(
-                (batch_size, 1), dtype=torch.long, device=input_ids.device
-            )
-
-            input_ids = torch.roll(input_ids, shifts=1, dims=1)
-            input_ids[:, 0:1] = (
-                torch.ones((batch_size, 1), dtype=torch.long, device=input_ids.device)
-                * self.config.go_symbol_id
-            )
-
-        emb_output = self.embedding(input_ids, token_type_ids)
+        emb_output = self.embedding(input_ids, token_type_ids, input_mask)
 
         if self.config.embedding_size != self.config.hidden_size:
             emb_output = self.embed_to_hidden(emb_output)
@@ -878,148 +771,6 @@ class AlbertModel(nn.Module):
             encoder_hidden_output=encoder_hidden_output,
             encoder_input_mask=encoder_input_mask,
         )
-
-
-class LMAlbertModel(nn.Module):
-    """Complete Albert Model used for autoregressive language modelling."""
-
-    def __init__(self, config):
-        """Constructor for AlbertModel.
-
-        config: `AlbertConfig` instance.
-        """
-        super(LMAlbertModel, self).__init__()
-        config = copy.deepcopy(config)
-        max_position = config.source_max_position_embeddings
-        self.embedding = AlbertEmbedding(
-            vocab_size=config.vocab_size,
-            word_pad_id=config.word_pad_id,
-            token_type_pad_id=config.token_type_pad_id,
-            embedding_size=config.embedding_size,
-            token_type_vocab_size=config.token_type_vocab_size,
-            use_position_embeddings=config.use_position_embeddings,
-            max_position_embeddings=max_position,
-            dropout=config.hidden_dropout_prob,
-            model_type="transformer",
-        )
-
-        if config.embedding_size != config.hidden_size:
-            self.embed_to_hidden = torch.nn.Linear(
-                config.embedding_size, config.hidden_size, bias=True
-            )
-
-        self.main_block = TransformerModel(
-            hidden_size=config.hidden_size,
-            is_decoder=True,
-            num_hidden_layers=config.num_hidden_layers,
-            num_attention_heads=config.num_attention_heads,
-            attention_probs_dropout_prob=config.attention_probs_dropout_prob,
-            intermediate_size=config.intermediate_size,
-            hidden_dropout_prob=config.hidden_dropout_prob,
-            lm_decoder=True,
-        )
-        self.lm_head = nn.Linear(config.hidden_size, config.vocab_size)
-
-        self.loss_fn = nn.CrossEntropyLoss()
-
-        self.config = config
-
-    def forward(
-        self,
-        input_ids,
-        input_mask=None,
-        token_type_ids=None,
-        labels=None,
-    ) -> torch.FloatTensor:
-        """Create mask or type id if not given, also shift to right the decoder
-        inputs."""
-        batch_size, seq_length = input_ids.size()
-        if input_mask is None:
-            input_mask = torch.ones(
-                (batch_size, seq_length),
-                dtype=torch.long,
-                device=input_ids.device,
-            )
-
-        if token_type_ids is None:
-            token_type_ids = torch.ones(
-                (batch_size, seq_length),
-                dtype=torch.long,
-                device=input_ids.device,
-            )
-
-        # For the decoder, shift right the input_ids, input_mask, and token_type_ids.
-        if self.config.right_shift:
-            token_type_ids = torch.roll(token_type_ids, shifts=1, dims=1)
-            token_type_ids[:, 0:1] = torch.zeros(
-                (batch_size, 1), dtype=torch.long, device=input_ids.device
-            )
-
-            input_mask = torch.roll(input_mask, shifts=1, dims=1)
-            input_mask[:, 0:1] = torch.ones(
-                (batch_size, 1), dtype=torch.long, device=input_ids.device
-            )
-
-            input_ids = torch.roll(input_ids, shifts=1, dims=1)
-            input_ids[:, 0:1] = (
-                torch.ones((batch_size, 1), dtype=torch.long, device=input_ids.device)
-                * self.config.go_symbol_id
-            )
-
-        emb_output = self.embedding(input_ids, token_type_ids)
-
-        if self.config.embedding_size != self.config.hidden_size:
-            emb_output = self.embed_to_hidden(emb_output)
-
-        decoder_output = self.main_block(
-            layer_input=emb_output,
-            attention_mask=input_mask,
-        )
-
-        ret = {}
-        ret["hidden_outputs"] = decoder_output
-        if labels is not None:
-            ret["loss"] = self.cal_loss(labels, decoder_output)
-        return ret
-
-    def cal_loss(self, labels, decoder_output):
-        logits = self.lm_head(decoder_output)
-        logits = logits.permute(0, 2, 1)
-        return self.loss_fn(logits, labels)
-
-    def greedy_decode(self, input_ids, input_mask=None, token_type_ids=None):
-        """generate the predictions doing greedy decoding."""
-        self.config.right_shift = False
-        b_sz, _ = input_ids.size()
-        decoded_batch = (
-            torch.ones(
-                (b_sz, self.config.source_max_position_embeddings),
-                dtype=torch.long,
-                device=input_ids.device,
-            )
-            * self.config.word_pad_id
-        )
-        lengths = torch.sum(input_mask, dim=1).squeeze()
-        for b in range(b_sz):
-            cur_len = lengths[b].item()
-            infer_input = input_ids[b, 0:cur_len]
-            decoded_batch[b, 0:cur_len] = infer_input
-            for t in range(cur_len, self.config.source_max_position_embeddings):
-                inputs = infer_input.view(1, -1)
-                infer_output = self.forward(
-                    input_ids=inputs,
-                    input_mask=None,
-                    token_type_ids=None,
-                )
-                logits = self.lm_head(infer_output["hidden_outputs"][:, -1, :])
-                topv, topi = logits.topk(1)
-                decoded_batch[b, t] = topi.squeeze()
-                infer_input = torch.cat((infer_input, topi.squeeze().view(1)), dim=0)
-                if topi.squeeze() == self.config.eos_token_id:
-                    break
-
-        self.config.right_shift = True
-        return decoded_batch
 
 
 class AlbertEncoderDecoder(nn.Module):
@@ -1037,21 +788,21 @@ class AlbertEncoderDecoder(nn.Module):
         config.is_decoder = True
         self.decoder = AlbertModel(config)
 
-        self.lm_head = nn.Linear(config.hidden_size, config.vocab_size)
+        self.lm_head = nn.Linear(config.hidden_size, config.vocab_size, bias=False)
 
-        self.loss_fn = nn.CrossEntropyLoss()
+        self.loss_fn = nn.CrossEntropyLoss(ignore_index=config.word_pad_id)
+        self.config = config
 
     def forward(
         self,
         input_ids,
         target_ids,
-        labels=None,
         input_mask=None,
         target_mask=None,
         token_type_ids=None,
         target_token_type_ids=None,
     ) -> torch.FloatTensor:
-        """Overall computation in the encoder decoder model."""
+        """Overall computation in the encoder-decoder model."""
         encoder_output = self.encoder(
             input_ids=input_ids, input_mask=input_mask, token_type_ids=token_type_ids
         )
@@ -1064,18 +815,18 @@ class AlbertEncoderDecoder(nn.Module):
         )
         ret = {}
         ret["hidden_outputs"] = decoder_output
-        if labels is not None:
-            ret["loss"] = self.cal_loss(labels, decoder_output)
+        ret["loss"] = self.cal_loss(target_ids, decoder_output)
         return ret
 
-    def cal_loss(self, labels, decoder_output):
+    def cal_loss(self, target_ids, decoder_output):
         logits = self.lm_head(decoder_output)
         logits = logits.permute(0, 2, 1)
-        return self.loss_fn(logits, labels)
+        shifted_labels = torch.roll(target_ids, shifts=-1, dims=1)
+        shifted_labels[:, -1] = self.config.word_pad_id
+        return self.loss_fn(logits, shifted_labels)
 
     def greedy_decode(self, input_ids, input_mask=None, token_type_ids=None):
         """generate the predictions doing greedy decoding."""
-        self.decoder.config.right_shift = False
         encoder_output = self.encoder(
             input_ids=input_ids, input_mask=input_mask, token_type_ids=token_type_ids
         )
@@ -1090,7 +841,7 @@ class AlbertEncoderDecoder(nn.Module):
         )
         for b in range(b_sz):
             decoder_input = torch.tensor(
-                [self.decoder.config.go_symbol_id],
+                [self.decoder.config.bos_token_id],
                 device=input_ids.device,
                 dtype=torch.long,
             )
@@ -1114,7 +865,6 @@ class AlbertEncoderDecoder(nn.Module):
                 if topi.squeeze() == self.decoder.config.eos_token_id:
                     break
 
-        self.decoder.config.right_shift = True
         return decoded_batch
 
 
@@ -1127,81 +877,54 @@ def list_parameters(model: nn.Module):
     return parameters
 
 
-# Map the parameters of this model from the pretrained checkpoint for LM encoder.
-lm_param_mapper = {
-    "embedding.pos_embedder": "embeddings.position_embeddings.weight",
-    "embedding.word_embedder.token_embs.weight": "embeddings.word_embeddings.weight",
-    "embedding.token_type_embedder.token_embs.weight": "embeddings.token_type_embeddings.weight",
-    "embedding.layer_norm.weight": "embeddings.LayerNorm.weight",
-    "embedding.layer_norm.bias": "embeddings.LayerNorm.bias",
-    "embed_to_hidden.weight": "encoder.embedding_hidden_mapping_in.weight",
-    "embed_to_hidden.bias": "encoder.embedding_hidden_mapping_in.bias",
-    "main_block.single_block.self_attention.w_qs.weight": "encoder.albert_layer_groups.0.albert_layers.0.attention.query.weight",
-    "main_block.single_block.self_attention.w_qs.bias": "encoder.albert_layer_groups.0.albert_layers.0.attention.query.bias",
-    "main_block.single_block.self_attention.w_ks.weight": "encoder.albert_layer_groups.0.albert_layers.0.attention.key.weight",
-    "main_block.single_block.self_attention.w_ks.bias": "encoder.albert_layer_groups.0.albert_layers.0.attention.key.bias",
-    "main_block.single_block.self_attention.w_vs.weight": "encoder.albert_layer_groups.0.albert_layers.0.attention.value.weight",
-    "main_block.single_block.self_attention.w_vs.bias": "encoder.albert_layer_groups.0.albert_layers.0.attention.value.bias",
-    "main_block.single_block.self_attention.dense_layer.weight": "encoder.albert_layer_groups.0.albert_layers.0.attention.dense.weight",
-    "main_block.single_block.self_attention.dense_layer.bias": "encoder.albert_layer_groups.0.albert_layers.0.attention.dense.bias",
-    "main_block.single_block.self_attention.layer_norm.weight": "encoder.albert_layer_groups.0.albert_layers.0.attention.LayerNorm.weight",
-    "main_block.single_block.self_attention.layer_norm.bias": "encoder.albert_layer_groups.0.albert_layers.0.attention.LayerNorm.bias",
-    "main_block.single_block.ffd_layer.layer1.weight": "encoder.albert_layer_groups.0.albert_layers.0.ffn.weight",
-    "main_block.single_block.ffd_layer.layer1.bias": "encoder.albert_layer_groups.0.albert_layers.0.ffn.bias",
-    "main_block.single_block.ffd_layer.layer2.weight": "encoder.albert_layer_groups.0.albert_layers.0.ffn_output.weight",
-    "main_block.single_block.ffd_layer.layer2.bias": "encoder.albert_layer_groups.0.albert_layers.0.ffn_output.bias",
-    "main_block.single_block.ffd_layer.layer_norm.weight": "encoder.albert_layer_groups.0.albert_layers.0.full_layer_layer_norm.weight",
-    "main_block.single_block.ffd_layer.layer_norm.bias": "encoder.albert_layer_groups.0.albert_layers.0.full_layer_layer_norm.bias",
-}
-
 # Map the parameters of this model from the pretrained checkpoint.
 param_mapper = {
-    "encoder.embedding.pos_embedder": "embeddings.position_embeddings.weight",
-    "encoder.embedding.word_embedder.token_embs.weight": "embeddings.word_embeddings.weight",
-    # "encoder.embedding.token_type_embedder.token_embs.weight": "embeddings.token_type_embeddings.weight",
-    # "encoder.embedding.layer_norm.weight": "embeddings.LayerNorm.weight",
-    # "encoder.embedding.layer_norm.bias": "embeddings.LayerNorm.bias",
-    # "encoder.embed_to_hidden.weight": "encoder.embedding_hidden_mapping_in.weight",
-    # "encoder.embed_to_hidden.bias": "encoder.embedding_hidden_mapping_in.bias",
-    # "encoder.main_block.single_block.self_attention.w_qs.weight": "encoder.albert_layer_groups.0.albert_layers.0.attention.query.weight",
-    # "encoder.main_block.single_block.self_attention.w_qs.bias": "encoder.albert_layer_groups.0.albert_layers.0.attention.query.bias",
-    # "encoder.main_block.single_block.self_attention.w_ks.weight": "encoder.albert_layer_groups.0.albert_layers.0.attention.key.weight",
-    # "encoder.main_block.single_block.self_attention.w_ks.bias": "encoder.albert_layer_groups.0.albert_layers.0.attention.key.bias",
-    # "encoder.main_block.single_block.self_attention.w_vs.weight": "encoder.albert_layer_groups.0.albert_layers.0.attention.value.weight",
-    # "encoder.main_block.single_block.self_attention.w_vs.bias": "encoder.albert_layer_groups.0.albert_layers.0.attention.value.bias",
-    # "encoder.main_block.single_block.self_attention.dense_layer.weight": "encoder.albert_layer_groups.0.albert_layers.0.attention.dense.weight",
-    # "encoder.main_block.single_block.self_attention.dense_layer.bias": "encoder.albert_layer_groups.0.albert_layers.0.attention.dense.bias",
-    # "encoder.main_block.single_block.self_attention.layer_norm.weight": "encoder.albert_layer_groups.0.albert_layers.0.attention.LayerNorm.weight",
-    # "encoder.main_block.single_block.self_attention.layer_norm.bias": "encoder.albert_layer_groups.0.albert_layers.0.attention.LayerNorm.bias",
-    # "encoder.main_block.single_block.ffd_layer.layer1.weight": "encoder.albert_layer_groups.0.albert_layers.0.ffn.weight",
-    # "encoder.main_block.single_block.ffd_layer.layer1.bias": "encoder.albert_layer_groups.0.albert_layers.0.ffn.bias",
-    # "encoder.main_block.single_block.ffd_layer.layer2.weight": "encoder.albert_layer_groups.0.albert_layers.0.ffn_output.weight",
-    # "encoder.main_block.single_block.ffd_layer.layer2.bias": "encoder.albert_layer_groups.0.albert_layers.0.ffn_output.bias",
-    # "encoder.main_block.single_block.ffd_layer.layer_norm.weight": "encoder.albert_layer_groups.0.albert_layers.0.full_layer_layer_norm.weight",
-    # "encoder.main_block.single_block.ffd_layer.layer_norm.bias": "encoder.albert_layer_groups.0.albert_layers.0.full_layer_layer_norm.bias",
-    "decoder.embedding.pos_embedder": "embeddings.position_embeddings.weight",
-    "decoder.embedding.word_embedder.token_embs.weight": "embeddings.word_embeddings.weight",
-    # "decoder.embedding.token_type_embedder.token_embs.weight": "embeddings.token_type_embeddings.weight",
-    # "decoder.embedding.layer_norm.weight": "embeddings.LayerNorm.weight",
-    # "decoder.embedding.layer_norm.bias": "embeddings.LayerNorm.bias",
-    # "decoder.embed_to_hidden.weight": "encoder.embedding_hidden_mapping_in.weight",
-    # "decoder.embed_to_hidden.bias": "encoder.embedding_hidden_mapping_in.bias",
-    # "decoder.main_block.single_block.self_attention.w_qs.weight": "encoder.albert_layer_groups.0.albert_layers.0.attention.query.weight",
-    # "decoder.main_block.single_block.self_attention.w_qs.bias": "encoder.albert_layer_groups.0.albert_layers.0.attention.query.bias",
-    # "decoder.main_block.single_block.self_attention.w_ks.weight": "encoder.albert_layer_groups.0.albert_layers.0.attention.key.weight",
-    # "decoder.main_block.single_block.self_attention.w_ks.bias": "encoder.albert_layer_groups.0.albert_layers.0.attention.key.bias",
-    # "decoder.main_block.single_block.self_attention.w_vs.weight": "encoder.albert_layer_groups.0.albert_layers.0.attention.value.weight",
-    # "decoder.main_block.single_block.self_attention.w_vs.bias": "encoder.albert_layer_groups.0.albert_layers.0.attention.value.bias",
-    # "decoder.main_block.single_block.self_attention.dense_layer.weight": "encoder.albert_layer_groups.0.albert_layers.0.attention.dense.weight",
-    # "decoder.main_block.single_block.self_attention.dense_layer.bias": "encoder.albert_layer_groups.0.albert_layers.0.attention.dense.bias",
-    # "decoder.main_block.single_block.self_attention.layer_norm.weight": "encoder.albert_layer_groups.0.albert_layers.0.attention.LayerNorm.weight",
-    # "decoder.main_block.single_block.self_attention.layer_norm.bias": "encoder.albert_layer_groups.0.albert_layers.0.attention.LayerNorm.bias",
-    # "decoder.main_block.single_block.ffd_layer.layer1.weight": "encoder.albert_layer_groups.0.albert_layers.0.ffn.weight",
-    # "decoder.main_block.single_block.ffd_layer.layer1.bias": "encoder.albert_layer_groups.0.albert_layers.0.ffn.bias",
-    # "decoder.main_block.single_block.ffd_layer.layer2.weight": "encoder.albert_layer_groups.0.albert_layers.0.ffn_output.weight",
-    # "decoder.main_block.single_block.ffd_layer.layer2.bias": "encoder.albert_layer_groups.0.albert_layers.0.ffn_output.bias",
-    # "decoder.main_block.single_block.ffd_layer.layer_norm.weight": "encoder.albert_layer_groups.0.albert_layers.0.full_layer_layer_norm.weight",
-    # "decoder.main_block.single_block.ffd_layer.layer_norm.bias": "encoder.albert_layer_groups.0.albert_layers.0.full_layer_layer_norm.bias",
+    # "encoder.embedding.pos_embedder": "albert.embeddings.position_embeddings.weight",
+    "encoder.embedding.word_embedder.token_embs.weight": "albert.embeddings.word_embeddings.weight",
+    "encoder.embedding.token_type_embedder.token_embs.weight": "albert.embeddings.token_type_embeddings.weight",
+    "encoder.embedding.layer_norm.weight": "albert.embeddings.LayerNorm.weight",
+    "encoder.embedding.layer_norm.bias": "albert.embeddings.LayerNorm.bias",
+    "encoder.embed_to_hidden.weight": "albert.encoder.embedding_hidden_mapping_in.weight",
+    "encoder.embed_to_hidden.bias": "albert.encoder.embedding_hidden_mapping_in.bias",
+    "encoder.main_block.single_block.self_attention.w_qs.weight": "albert.encoder.albert_layer_groups.0.albert_layers.0.attention.query.weight",
+    "encoder.main_block.single_block.self_attention.w_qs.bias": "albert.encoder.albert_layer_groups.0.albert_layers.0.attention.query.bias",
+    "encoder.main_block.single_block.self_attention.w_ks.weight": "albert.encoder.albert_layer_groups.0.albert_layers.0.attention.key.weight",
+    "encoder.main_block.single_block.self_attention.w_ks.bias": "albert.encoder.albert_layer_groups.0.albert_layers.0.attention.key.bias",
+    "encoder.main_block.single_block.self_attention.w_vs.weight": "albert.encoder.albert_layer_groups.0.albert_layers.0.attention.value.weight",
+    "encoder.main_block.single_block.self_attention.w_vs.bias": "albert.encoder.albert_layer_groups.0.albert_layers.0.attention.value.bias",
+    "encoder.main_block.single_block.self_attention.dense_layer.weight": "albert.encoder.albert_layer_groups.0.albert_layers.0.attention.dense.weight",
+    "encoder.main_block.single_block.self_attention.dense_layer.bias": "albert.encoder.albert_layer_groups.0.albert_layers.0.attention.dense.bias",
+    "encoder.main_block.single_block.self_attention.layer_norm.weight": "albert.encoder.albert_layer_groups.0.albert_layers.0.attention.LayerNorm.weight",
+    "encoder.main_block.single_block.self_attention.layer_norm.bias": "albert.encoder.albert_layer_groups.0.albert_layers.0.attention.LayerNorm.bias",
+    "encoder.main_block.single_block.ffd_layer.layer1.weight": "albert.encoder.albert_layer_groups.0.albert_layers.0.ffn.weight",
+    "encoder.main_block.single_block.ffd_layer.layer1.bias": "albert.encoder.albert_layer_groups.0.albert_layers.0.ffn.bias",
+    "encoder.main_block.single_block.ffd_layer.layer2.weight": "albert.encoder.albert_layer_groups.0.albert_layers.0.ffn_output.weight",
+    "encoder.main_block.single_block.ffd_layer.layer2.bias": "albert.encoder.albert_layer_groups.0.albert_layers.0.ffn_output.bias",
+    "encoder.main_block.single_block.ffd_layer.layer_norm.weight": "albert.encoder.albert_layer_groups.0.albert_layers.0.full_layer_layer_norm.weight",
+    "encoder.main_block.single_block.ffd_layer.layer_norm.bias": "albert.encoder.albert_layer_groups.0.albert_layers.0.full_layer_layer_norm.bias",
+    # "decoder.embedding.pos_embedder": "albert.embeddings.position_embeddings.weight",
+    "decoder.embedding.word_embedder.token_embs.weight": "albert.embeddings.word_embeddings.weight",
+    "decoder.embedding.token_type_embedder.token_embs.weight": "albert.embeddings.token_type_embeddings.weight",
+    "decoder.embedding.layer_norm.weight": "albert.embeddings.LayerNorm.weight",
+    "decoder.embedding.layer_norm.bias": "albert.embeddings.LayerNorm.bias",
+    "decoder.embed_to_hidden.weight": "albert.encoder.embedding_hidden_mapping_in.weight",
+    "decoder.embed_to_hidden.bias": "albert.encoder.embedding_hidden_mapping_in.bias",
+    "decoder.main_block.single_block.self_attention.w_qs.weight": "albert.encoder.albert_layer_groups.0.albert_layers.0.attention.query.weight",
+    "decoder.main_block.single_block.self_attention.w_qs.bias": "albert.encoder.albert_layer_groups.0.albert_layers.0.attention.query.bias",
+    "decoder.main_block.single_block.self_attention.w_ks.weight": "albert.encoder.albert_layer_groups.0.albert_layers.0.attention.key.weight",
+    "decoder.main_block.single_block.self_attention.w_ks.bias": "albert.encoder.albert_layer_groups.0.albert_layers.0.attention.key.bias",
+    "decoder.main_block.single_block.self_attention.w_vs.weight": "albert.encoder.albert_layer_groups.0.albert_layers.0.attention.value.weight",
+    "decoder.main_block.single_block.self_attention.w_vs.bias": "albert.encoder.albert_layer_groups.0.albert_layers.0.attention.value.bias",
+    "decoder.main_block.single_block.self_attention.dense_layer.weight": "albert.encoder.albert_layer_groups.0.albert_layers.0.attention.dense.weight",
+    "decoder.main_block.single_block.self_attention.dense_layer.bias": "albert.encoder.albert_layer_groups.0.albert_layers.0.attention.dense.bias",
+    "decoder.main_block.single_block.self_attention.layer_norm.weight": "albert.encoder.albert_layer_groups.0.albert_layers.0.attention.LayerNorm.weight",
+    "decoder.main_block.single_block.self_attention.layer_norm.bias": "albert.encoder.albert_layer_groups.0.albert_layers.0.attention.LayerNorm.bias",
+    "decoder.main_block.single_block.ffd_layer.layer1.weight": "albert.encoder.albert_layer_groups.0.albert_layers.0.ffn.weight",
+    "decoder.main_block.single_block.ffd_layer.layer1.bias": "albert.encoder.albert_layer_groups.0.albert_layers.0.ffn.bias",
+    "decoder.main_block.single_block.ffd_layer.layer2.weight": "albert.encoder.albert_layer_groups.0.albert_layers.0.ffn_output.weight",
+    "decoder.main_block.single_block.ffd_layer.layer2.bias": "albert.encoder.albert_layer_groups.0.albert_layers.0.ffn_output.bias",
+    "decoder.main_block.single_block.ffd_layer.layer_norm.weight": "albert.encoder.albert_layer_groups.0.albert_layers.0.full_layer_layer_norm.weight",
+    "decoder.main_block.single_block.ffd_layer.layer_norm.bias": "albert.encoder.albert_layer_groups.0.albert_layers.0.full_layer_layer_norm.bias",
 }
 
 
@@ -1210,54 +933,18 @@ def save(model: torch.nn.Module, path: str) -> None:
     torch.save(model.state_dict(), path)
 
 
-def load_albert_lm_decoder(
-    mask_token_id,
-    source_max_length,
-):
-    """Load the pretrained model into a decoder lm model."""
-    config = AlbertConfig(
-        num_hidden_layers=12,
-        hidden_dropout_prob=0.1,
-        attention_probs_dropout_prob=0.2,
-        num_attention_heads=64,
-        go_symbol_id=mask_token_id,
-        source_max_position_embeddings=source_max_length,
-    )
-    model = LMAlbertModel(config)
-
-    pretrained_state_dict = torch.load(
-        "./albert-xxlarge-v2-pytorch.model", map_location=lambda storage, loc: storage
-    )["model_state_dict"]
-
-    model_dict = model.state_dict()
-    for key, _ in model_dict.items():
-        if key in lm_param_mapper:
-            model_dict[key] = pretrained_state_dict[lm_param_mapper[key]]
-
-    model.load_state_dict(model_dict)
-
-    return model
-
-
-def load_albert_encoder_decoder(
-    mask_token_id, source_max_length, decoder_max_length, model_type
-):
+def load_albert(source_max_length, decoder_max_length):
     """Load the pretrained model into a encoder-decoder model."""
     config = AlbertConfig(
-        num_hidden_layers=1,
-        hidden_dropout_prob=0.1,
-        attention_probs_dropout_prob=0.2,
-        num_attention_heads=1,
-        go_symbol_id=mask_token_id,
+        num_hidden_layers=2,
         source_max_position_embeddings=source_max_length,
         decoder_max_position_embeddings=decoder_max_length,
-        model_type=model_type,
     )
     model = AlbertEncoderDecoder(config)
 
     pretrained_state_dict = torch.load(
-        "./albert-xxlarge-v2-pytorch.model", map_location=lambda storage, loc: storage
-    )["model_state_dict"]
+        "./albert-base-v2.model", map_location=lambda storage, loc: storage
+    )
 
     model_dict = model.state_dict()
     for key, _ in model_dict.items():
@@ -1266,22 +953,9 @@ def load_albert_encoder_decoder(
 
     model.load_state_dict(model_dict)
 
-    return model
-
-
-def load_pretrained_race(path, mask_token_id, source_max_length, decoder_max_length):
-    """Load the pretrained model into a encoder-decoder model."""
-    config = AlbertConfig(
-        num_hidden_layers=1,
-        go_symbol_id=mask_token_id,
-        source_max_position_embeddings=source_max_length,
-        decoder_max_position_embeddings=decoder_max_length,
+    model.lm_head.weight.data = model.encoder.embed_to_hidden(
+        model.encoder.embedding.word_embedder.token_embs.weight
     )
-    model = AlbertEncoderDecoder(config)
-
-    model_dict = torch.load(path, map_location=lambda storage, loc: storage)
-    model.load_state_dict(model_dict)
-
     return model
 
 
@@ -1302,30 +976,41 @@ class Model(object):
             torch.cuda.device(cfg.gpu_device)
             torch.cuda.set_device(cfg.gpu_device)
 
-        tokenizer = AlbertTokenizer.from_pretrained("albert-xxlarge-v2")
+        tokenizer = AlbertTokenizer.from_pretrained("albert-base-v2")
         tokenizer.bos_token = tokenizer.cls_token
         tokenizer.eos_token = tokenizer.sep_token
 
         # Construct model
-        # model = load_albert_encoder_decoder(
-        #    mask_token_id=tokenizer.mask_token_id,
-        #    source_max_length=cfg.source_max_length,
-        #    decoder_max_length=cfg.decoder_max_length,
-        #    model_type=cfg.model_type,
-        # )
-        model = load_albert_lm_decoder(
-            mask_token_id=tokenizer.mask_token_id,
+        model = load_albert(
             source_max_length=cfg.source_max_length,
+            decoder_max_length=cfg.decoder_max_length,
         )
+
         if cfg.gpu:
             model.cuda(cfg.gpu_device)
 
         if cfg.mode == "train":
-            params_to_train = list(
-                filter(lambda x: x.requires_grad, model.parameters())
-            )
-            self.optimizer = optim.Adam(
-                params_to_train, lr=cfg.learning_rate, amsgrad=True
+            no_decay = ["bias", "gamma", "beta"]
+            optimizer_parameters = [
+                {
+                    "params": [
+                        p for n, p in model.named_parameters() if n not in no_decay
+                    ],
+                    "weight_decay_rate": 0.01,
+                },
+                {
+                    "params": [p for n, p in model.named_parameters() if n in no_decay],
+                    "weight_decay_rate": 0.0,
+                },
+            ]
+            # self.optimizer = BERTAdam(
+            #    optimizer_parameters, lr=cfg.learning_rate, warmup=-1, t_total=-1
+            # )
+            self.optimizer = torch.optim.Adam(
+                optimizer_parameters,
+                lr=cfg.learning_rate,
+                betas=(0.9, 0.999),
+                amsgrad=True,
             )
             if not os.path.exists(cfg.model_path):
                 os.makedirs(cfg.model_path)
@@ -1356,25 +1041,27 @@ class Model(object):
         self.model.eval()
 
         input_ids = batch["input_ids"]
-        input_mask = batch["input_mask"]
+        input_mask = 1 - batch["attention_mask"]  # our mask is 1, 0 for normal
+        input_token_type_ids = batch["token_type_ids"]
         target_ids = batch["target_ids"]
-        target_mask = batch["target_mask"]
         if self.config.gpu:
             input_ids = input_ids.to(self.config.gpu_device)
             input_mask = input_mask.to(self.config.gpu_device)
+            input_token_type_ids = input_token_type_ids.to(self.config.gpu_device)
             target_ids = target_ids.to(self.config.gpu_device)
-            target_mask = target_mask.to(self.config.gpu_device)
 
         predictions = self.model.greedy_decode(
-            input_ids=target_ids, input_mask=target_mask
+            input_ids=input_ids,
+            input_mask=input_mask,
+            token_type_ids=input_token_type_ids,
         )
 
         # all special tokens including will be removed
         predictions_str = self.tokenizer.batch_decode(
             predictions, skip_special_tokens=False
         )
-        input_str = self.tokenizer.batch_decode(target_ids, skip_special_tokens=False)
-        target_str = self.tokenizer.batch_decode(input_ids, skip_special_tokens=False)
+        input_str = self.tokenizer.batch_decode(input_ids, skip_special_tokens=False)
+        target_str = self.tokenizer.batch_decode(target_ids, skip_special_tokens=False)
         for index in range(len(predictions_str)):
             pred_str = predictions_str[index]
             pred_str = pred_str if pred_str != "" else "<EMPTY>"
@@ -1395,23 +1082,338 @@ class Model(object):
         self.optimizer.zero_grad()
 
         input_ids = batch["input_ids"]
-        input_mask = batch["input_mask"]
+        input_mask = 1 - batch["attention_mask"]  # our mask is 1, 0 for normal
+        input_token_type_ids = batch["token_type_ids"]
         target_ids = batch["target_ids"]
-        target_mask = batch["target_mask"]
-        labels = batch["labels"]
+        target_mask = 1 - batch["target_attention_mask"]  # our mask is 1, 0 for normal
         if self.config.gpu:
             input_ids = input_ids.to(self.config.gpu_device)
             input_mask = input_mask.to(self.config.gpu_device)
+            input_token_type_ids = input_token_type_ids.to(self.config.gpu_device)
             target_ids = target_ids.to(self.config.gpu_device)
             target_mask = target_mask.to(self.config.gpu_device)
-            labels = labels.to(self.config.gpu_device)
 
         output_dict = self.model(
             input_ids=input_ids,
             input_mask=input_mask,
-            labels=labels,
+            target_ids=target_ids,
+            target_mask=target_mask,
+            token_type_ids=input_token_type_ids,
         )
         loss = output_dict["loss"]
+        loss_value = loss.item()
+
+        # is loss nan? don't backpropagate!
+        if math.isnan(loss):
+            return {"loss_value": loss_value}
+
+        # BackProp
+        loss.backward()
+
+        # if self.config.gradient_clipping:
+        #    params = self.model.parameters()
+        #    nn.utils.clip_grad_norm_(params, self.config.max_gradient_norm)
+
+        # Optimize
+        self.optimizer.step()
+
+        return {"loss_value": loss_value}
+
+
+class BertGenerationModel(object):
+    """Wrapper class around the BertGeneration Model."""
+
+    def __init__(self, cfg: HyperParameters):
+        self.config = cfg
+
+        set_random_seed(cfg.seed)
+
+        # Check the gpu actually exists.
+        cfg.gpu = cfg.gpu and torch.cuda.is_available()
+
+        if cfg.gpu:
+            os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
+            os.environ["CUDA_VISIBLE_DEVICES"] = str(cfg.gpu_device)
+            torch.cuda.device(cfg.gpu_device)
+            torch.cuda.set_device(cfg.gpu_device)
+
+        tokenizer = BertTokenizer.from_pretrained("bert-base-cased")
+
+        # Construct model
+        encoder = BertGenerationEncoder.from_pretrained(
+            "bert-base-cased",
+            bos_token_id=tokenizer.bos_token_id,
+            eos_token_id=tokenizer.eos_token_id,
+        )
+        decoder = BertGenerationDecoder.from_pretrained(
+            "bert-base-cased",
+            add_cross_attention=True,
+            is_decoder=True,
+            bos_token_id=tokenizer.bos_token_id,
+            eos_token_id=tokenizer.eos_token_id,
+        )
+        model = EncoderDecoderModel(encoder=encoder, decoder=decoder)
+
+        if cfg.gpu:
+            model.cuda(cfg.gpu_device)
+
+        if cfg.mode == "train":
+            no_decay = ["bias", "gamma", "beta"]
+            optimizer_parameters = [
+                {
+                    "params": [
+                        p for n, p in model.named_parameters() if n not in no_decay
+                    ],
+                    "weight_decay_rate": 0.01,
+                },
+                {
+                    "params": [p for n, p in model.named_parameters() if n in no_decay],
+                    "weight_decay_rate": 0.0,
+                },
+            ]
+            self.optimizer = BERTAdam(
+                optimizer_parameters, lr=cfg.learning_rate, warmup=-1, t_total=-1
+            )
+            if not os.path.exists(cfg.model_path):
+                os.makedirs(cfg.model_path)
+            self.model_path = os.path.join(cfg.model_path, "model")
+
+        elif cfg.mode in ["test", "inference"]:
+            self.model_path = os.path.join(cfg.model_path, "model")
+            model.load_state_dict(
+                torch.load(
+                    self.model_path + "_best_model",
+                    map_location=lambda storage, loc: storage,
+                )
+            )
+        self.model = model
+        self.tokenizer = tokenizer
+
+    def save(self, checkpoint_name: str):
+        """Save the encoder model to the specified path name."""
+        path = self.model_path + "_" + checkpoint_name
+        save(self.model, path + "_model")
+
+    def predict(self, batch):
+        # Free memory in GPU, very important!
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
+        gc.collect()
+        # disable dropout
+        self.model.eval()
+
+        input_ids = batch["input_ids"]
+        input_mask = batch["attention_mask"]
+        target_ids = batch["target_ids"]
+        if self.config.gpu:
+            input_ids = input_ids.to(self.config.gpu_device)
+            input_mask = input_mask.to(self.config.gpu_device)
+            target_ids = target_ids.to(self.config.gpu_device)
+
+        predictions = self.model.generate(
+            input_ids=input_ids,
+            attention_mask=input_mask,
+            decoder_start_token_id=self.tokenizer.pad_token_id,
+            beam=5,
+            early_stopping=True,
+            no_repeat_ngram_size=2,
+            max_length=self.config.decoder_max_length,
+        )
+
+        # all special tokens including will be removed
+        predictions_str = self.tokenizer.batch_decode(
+            predictions[0], skip_special_tokens=False
+        )
+        input_str = self.tokenizer.batch_decode(input_ids, skip_special_tokens=False)
+        target_str = self.tokenizer.batch_decode(target_ids, skip_special_tokens=False)
+        for index in range(len(predictions_str)):
+            pred_str = predictions_str[index]
+            pred_str = pred_str if pred_str != "" else "<EMPTY>"
+            output_batch = {
+                "predictions_str": pred_str,
+                "input_str": input_str[index],
+                "target_str": target_str[index],
+            }
+            yield output_batch
+
+    def train(self, batch):
+        # Free memory in GPU, very important!
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
+        gc.collect()
+        # Turn on training mode which enables dropout.
+        self.model.train()
+        self.optimizer.zero_grad()
+
+        input_ids = batch["input_ids"]
+        input_mask = batch["attention_mask"]
+        labels = batch["labels"]
+        target_ids = batch["target_ids"]
+        target_mask = batch["target_attention_mask"]
+        if self.config.gpu:
+            input_ids = input_ids.to(self.config.gpu_device)
+            input_mask = input_mask.to(self.config.gpu_device)
+            labels = labels.to(self.config.gpu_device)
+            target_ids = target_ids.to(self.config.gpu_device)
+            target_mask = target_mask.to(self.config.gpu_device)
+
+        output = self.model(
+            input_ids=input_ids,
+            attention_mask=input_mask,
+            decoder_input_ids=target_ids,
+            decoder_attention_mask=target_mask,
+            labels=labels,
+        )
+        loss = output.loss
+        loss_value = loss.item()
+
+        # is loss nan? don't backpropagate!
+        if math.isnan(loss):
+            return {"loss_value": loss_value}
+
+        # BackProp
+        loss.backward()
+
+        # if self.config.gradient_clipping:
+        #    params = self.model.parameters()
+        #    nn.utils.clip_grad_norm_(params, self.config.max_gradient_norm)
+
+        # Optimize
+        self.optimizer.step()
+
+        return {"loss_value": loss_value}
+
+
+class T5QA(object):
+    """Wrapper class around the T5 Model."""
+
+    def __init__(self, cfg: HyperParameters):
+        self.config = cfg
+
+        set_random_seed(cfg.seed)
+
+        # Check the gpu actually exists.
+        cfg.gpu = cfg.gpu and torch.cuda.is_available()
+
+        if cfg.gpu:
+            os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
+            os.environ["CUDA_VISIBLE_DEVICES"] = str(cfg.gpu_device)
+            torch.cuda.device(cfg.gpu_device)
+            torch.cuda.set_device(cfg.gpu_device)
+
+        tokenizer = T5Tokenizer.from_pretrained("t5-base")
+
+        # Construct model
+        model = T5ForConditionalGeneration.from_pretrained(
+            "t5-base",
+            bos_token_id=tokenizer.bos_token_id,
+            eos_token_id=tokenizer.eos_token_id,
+        )
+        if cfg.gpu:
+            model.cuda(cfg.gpu_device)
+
+        if cfg.mode == "train":
+            params_to_train = list(
+                filter(lambda x: x.requires_grad, model.parameters())
+            )
+            self.optimizer = torch.optim.Adam(
+                params_to_train,
+                lr=cfg.learning_rate,
+                betas=(0.9, 0.999),
+                amsgrad=True,
+                weight_decay=0.01,
+            )
+            if not os.path.exists(cfg.model_path):
+                os.makedirs(cfg.model_path)
+            self.model_path = os.path.join(cfg.model_path, "model")
+
+        elif cfg.mode in ["test", "inference"]:
+            self.model_path = os.path.join(cfg.model_path, "model")
+            model.load_state_dict(
+                torch.load(
+                    self.model_path + "_best_model",
+                    map_location=lambda storage, loc: storage,
+                )
+            )
+        self.model = model
+        self.tokenizer = tokenizer
+
+    def save(self, checkpoint_name: str):
+        """Save the encoder model to the specified path name."""
+        path = self.model_path + "_" + checkpoint_name
+        save(self.model, path + "_model")
+
+    def predict(self, batch):
+        # Free memory in GPU, very important!
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
+        gc.collect()
+        # disable dropout
+        self.model.eval()
+
+        input_ids = batch["input_ids"]
+        input_mask = batch["attention_mask"]
+        target_ids = batch["target_ids"]
+        if self.config.gpu:
+            input_ids = input_ids.to(self.config.gpu_device)
+            input_mask = input_mask.to(self.config.gpu_device)
+            target_ids = target_ids.to(self.config.gpu_device)
+
+        predictions = self.model.generate(
+            input_ids=input_ids,
+            attention_mask=input_mask,
+            decoder_start_token_id=self.tokenizer.pad_token_id,
+            num_beams=5,
+            early_stopping=True,
+            no_repeat_ngram_size=2,
+            max_length=self.config.decoder_max_length,
+        )
+
+        # all special tokens including will be removed
+        predictions_str = self.tokenizer.batch_decode(
+            predictions, skip_special_tokens=True
+        )
+        input_str = self.tokenizer.batch_decode(input_ids, skip_special_tokens=True)
+        target_str = self.tokenizer.batch_decode(target_ids, skip_special_tokens=True)
+        for index in range(len(predictions_str)):
+            pred_str = predictions_str[index]
+            pred_str = pred_str if pred_str != "" else "<EMPTY>"
+            output_batch = {
+                "predictions_str": pred_str,
+                "input_str": input_str[index],
+                "target_str": target_str[index],
+            }
+            yield output_batch
+
+    def train(self, batch):
+        # Free memory in GPU, very important!
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
+        gc.collect()
+        # Turn on training mode which enables dropout.
+        self.model.train()
+        self.optimizer.zero_grad()
+
+        input_ids = batch["input_ids"]
+        input_mask = batch["attention_mask"]
+        labels = batch["labels"]
+        target_ids = batch["target_ids"]
+        target_mask = batch["target_attention_mask"]
+        if self.config.gpu:
+            input_ids = input_ids.to(self.config.gpu_device)
+            input_mask = input_mask.to(self.config.gpu_device)
+            labels = labels.to(self.config.gpu_device)
+            target_ids = target_ids.to(self.config.gpu_device)
+            target_mask = target_mask.to(self.config.gpu_device)
+
+        output = self.model(
+            input_ids=input_ids,
+            attention_mask=input_mask,
+            decoder_input_ids=target_ids,
+            decoder_attention_mask=target_mask,
+            labels=labels,
+        )
+        loss = output.loss
         loss_value = loss.item()
 
         # is loss nan? don't backpropagate!

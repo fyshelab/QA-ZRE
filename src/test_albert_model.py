@@ -6,7 +6,7 @@ from src.albert_model import (AlbertConfig, AlbertEmbedding,
                               AlbertTokenEmbedding, AttentionBlock,
                               AttentionConfig, AttentionData,
                               MultiHeadAttention, PositionwiseFeedForward,
-                              RNNModel, TransformerModel, list_parameters,
+                              TransformerModel, list_parameters,
                               set_random_seed)
 
 set_random_seed(len("dreamscape-qa"))
@@ -27,15 +27,17 @@ def test_embeddings():
     assert output_vectors.tolist()[0][3] == [0.0, 0.0]
 
     albert_emb = AlbertEmbedding(
+        word_pad_id=0,
         vocab_size=4,
-        word_pad_id=3,
-        token_type_pad_id=9,
         embedding_size=2,
         token_type_vocab_size=10,
     )
 
+    input_mask = torch.Tensor([[0, 1, 1, 1]])
     token_types = torch.LongTensor([[4, 5, 9, 9]])
-    final_embeddings = albert_emb(input_ids=tokens, token_type_ids=token_types)
+    final_embeddings = albert_emb(
+        input_ids=tokens, token_type_ids=token_types, input_mask=input_mask
+    )
 
     assert final_embeddings.size() == (1, 4, 2)
 
@@ -143,7 +145,6 @@ def test_attention_block():
 
     output = attn_block(layer_input=matrix, attention_mask=mask)
     assert output.size() == (3, 4, 2)
-    assert output.tolist()[0][3] == [0, 0]
 
     attn_block = AttentionBlock(
         hidden_size=2,
@@ -164,55 +165,16 @@ def test_attention_block():
     assert output.size() == (3, 4, 2)
 
 
-def test_rnn_models():
-    """Test the full block."""
-    model = RNNModel(
-        hidden_size=2,
-        is_decoder=False,
-        hidden_dropout_prob=0.2,
-    )
-    dec_model = RNNModel(
-        hidden_size=2,
-        is_decoder=True,
-        hidden_dropout_prob=0.2,
-    )
-    matrix = [
-        [[0.5, 0.5], [0.5, 0.5], [0.0, 0.0], [0.0, 0.0]],
-        [[1.0, 1.0], [1.0, 1.0], [1.0, 1.0], [0.0, 0.0]],
-        [[-1.0, -1.0], [-1.0, -1.0], [-1.0, -1.0], [-1.0, -1.0]],
-    ]
-    matrix = torch.FloatTensor(matrix)
-    mask = [[0, 0, 0, 1], [0, 0, 1, 1], [0, 0, 0, 0]]
-    mask = torch.ByteTensor(mask)
-    output = model(
-        layer_input=matrix,
-        attention_mask=mask,
-        encoder_hidden_output=matrix,
-        encoder_input_mask=mask,
-    )
-    assert output.size() == (3, 4, 2)
-
-    output = dec_model(
-        layer_input=matrix,
-        attention_mask=mask,
-        encoder_hidden_output=matrix,
-        encoder_input_mask=mask,
-    )
-    assert output.size() == (3, 4, 2)
-
-
 def test_full_model():
     """Test the full albert model."""
     config = AlbertConfig(
         is_decoder=False,
         vocab_size=100,
-        go_symbol_id=1,
         embedding_size=16,
         hidden_size=32,
         num_hidden_layers=4,
         num_attention_heads=2,
         intermediate_size=64,
-        model_type="transformer",
     )
     model = AlbertModel(config)
 
@@ -228,13 +190,11 @@ def test_full_model():
     decoder_config = AlbertConfig(
         is_decoder=True,
         vocab_size=100,
-        go_symbol_id=1,
         embedding_size=16,
         hidden_size=32,
         num_hidden_layers=4,
         num_attention_heads=2,
         intermediate_size=64,
-        model_type="transformer",
     )
 
     decoder_model = AlbertModel(decoder_config)
@@ -249,7 +209,6 @@ def test_full_model():
 
     config = AlbertConfig(
         vocab_size=100,
-        go_symbol_id=1,
         embedding_size=16,
         hidden_size=32,
         source_max_position_embeddings=64,

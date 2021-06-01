@@ -4,61 +4,335 @@ import io
 import json
 import math
 import os
-import random
 import time
 from configparser import ConfigParser
-from dataclasses import dataclass, field, replace
 from pathlib import Path
-from typing import Any, Callable, Generator, List, Optional, Union
+from typing import Generator, Optional
 
 import datasets
 import numpy as np
 import pandas as pd
 import torch
-import torch.optim as optim
-from datasets import Dataset, load_dataset
-from transformers import AlbertTokenizer, Trainer, TrainingArguments
+from datasets import load_dataset
+from torch.utils.data import DataLoader
 
-from src.albert_model import HyperParameters, Model
+from src.albert_model import T5QA, HyperParameters
+
+
+def read_squad(path):
+    path = Path(path)
+    with open(path, "rb") as f:
+        squad_dict = json.load(f)
+
+    contexts = []
+    answers = []
+    for group in squad_dict["data"]:
+        for passage in group["paragraphs"]:
+            context = passage["context"]
+            for qa in passage["qas"]:
+                question = qa["question"]
+                for answer in qa["answers"]:
+                    contexts.append("question: " + question + " context: " + context)
+                    answers.append(answer["text"])
+
+    return contexts, answers
+
+
+def create_narrative_dataset(
+    tokenizer, batch_size, source_max_length, decoder_max_length
+):
+    """Function to create the narrative dataset."""
+
+    def process_race_row(row):
+        """Helper function."""
+        max_answer_length = 0
+        answer = None
+        for asw in row["answers"]:
+            answer_len = len(asw["text"].split())
+            if answer_len > max_answer_length:
+                answer = asw["text"]
+                max_answer_length = answer_len
+
+        answer = " ".join(answer.split())
+
+        question = row["question"]["text"]
+        question = " ".join(question.split())
+
+        article = row["document"]["summary"]["text"]
+        article = " ".join(article.split())
+
+        return {
+            "article": "question: " + question + " context: " + article,
+            "answer": answer,
+        }
+
+    def process_data_to_model_inputs(batch):
+        # tokenize the inputs and labels
+        inputs = tokenizer(
+            batch["article"],
+            truncation=True,
+            padding="max_length",
+            max_length=source_max_length,
+            add_special_tokens=True,
+        )
+        outputs = tokenizer(
+            batch["answer"],
+            truncation=True,
+            padding="max_length",
+            max_length=decoder_max_length,
+            add_special_tokens=True,
+        )
+
+        batch["input_ids"] = inputs.input_ids
+        batch["attention_mask"] = inputs.attention_mask
+
+        batch["target_ids"] = outputs.input_ids
+        batch["target_attention_mask"] = outputs.attention_mask
+
+        batch["labels"] = outputs.input_ids.copy()
+
+        # because BERT automatically shifts the labels, the labels correspond exactly to `target_ids`.
+        # We have to make sure that the PAD token is ignored
+
+        labels = [
+            [-100 if token == tokenizer.pad_token_id else token for token in labels]
+            for labels in batch["labels"]
+        ]
+        batch["labels"] = labels
+
+        return batch
+
+    train_dataset = load_dataset("narrativeqa", "all", split="train")
+    dev_dataset = load_dataset("narrativeqa", "all", split="validation")
+    test_dataset = load_dataset("narrativeqa", "all", split="test")
+
+    train_dataset = train_dataset.map(
+        process_race_row,
+        remove_columns=["document", "answers"],
+    )
+    train_dataset = train_dataset.map(
+        process_data_to_model_inputs,
+        batched=True,
+        batch_size=batch_size,
+        remove_columns=["answer", "article"],
+    )
+    train_dataset.set_format(
+        type="torch",
+        columns=[
+            "input_ids",
+            "attention_mask",
+            "target_ids",
+            "target_attention_mask",
+            "labels",
+        ],
+    )
+
+    dev_dataset = dev_dataset.map(
+        process_race_row,
+        remove_columns=["document", "answers"],
+    )
+    dev_dataset = dev_dataset.map(
+        process_data_to_model_inputs,
+        batched=True,
+        batch_size=batch_size,
+        remove_columns=["answer", "article"],
+    )
+    dev_dataset.set_format(
+        type="torch",
+        columns=[
+            "input_ids",
+            "attention_mask",
+            "target_ids",
+            "target_attention_mask",
+            "labels",
+        ],
+    )
+    test_dataset = test_dataset.map(
+        process_race_row,
+        remove_columns=["document", "answers"],
+    )
+    test_dataset = test_dataset.map(
+        process_data_to_model_inputs,
+        batched=True,
+        batch_size=batch_size,
+        remove_columns=["answer", "article"],
+    )
+    test_dataset.set_format(
+        type="torch",
+        columns=[
+            "input_ids",
+            "attention_mask",
+            "target_ids",
+            "target_attention_mask",
+            "labels",
+        ],
+    )
+
+    train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
+    val_loader = DataLoader(dev_dataset, batch_size=batch_size, shuffle=True)
+    test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=True)
+
+    return train_loader, val_loader, test_loader
+
+
+def create_race_dataset(tokenizer, batch_size, source_max_length, decoder_max_length):
+    """Function to create the race dataset."""
+
+    def process_race_row(row):
+        """Helper function."""
+        option_code = row["answer"]
+        if option_code == "A":
+            option_idx = 0
+        elif option_code == "B":
+            option_idx = 1
+        elif option_code == "C":
+            option_idx = 2
+        elif option_code == "D":
+            option_idx = 3
+
+        answer = row["options"][option_idx]
+        answer = " ".join(answer.split())
+
+        question = row["question"]
+        question = " ".join(question.split())
+
+        article = row["article"]
+        article = " ".join(article.split())
+
+        return {
+            "article": "question: " + question + " context: " + article,
+            "answer": answer,
+        }
+
+    def process_data_to_model_inputs(batch):
+        # tokenize the inputs and labels
+        inputs = tokenizer(
+            batch["article"],
+            truncation=True,
+            padding="max_length",
+            max_length=source_max_length,
+            add_special_tokens=True,
+        )
+        outputs = tokenizer(
+            batch["answer"],
+            truncation=True,
+            padding="max_length",
+            max_length=decoder_max_length,
+            add_special_tokens=True,
+        )
+
+        batch["input_ids"] = inputs.input_ids
+        batch["attention_mask"] = inputs.attention_mask
+
+        batch["target_ids"] = outputs.input_ids
+        batch["target_attention_mask"] = outputs.attention_mask
+        batch["labels"] = outputs.input_ids.copy()
+
+        # because BERT automatically shifts the labels, the labels correspond exactly to `target_ids`.
+        # We have to make sure that the PAD token is ignored
+
+        labels = [
+            [-100 if token == tokenizer.pad_token_id else token for token in labels]
+            for labels in batch["labels"]
+        ]
+        batch["labels"] = labels
+
+        return batch
+
+    train_dataset = load_dataset("race", "all", split="train")
+    train_dataset = train_dataset.map(
+        process_race_row,
+        remove_columns=["options", "example_id"],
+    )
+    train_dataset = train_dataset.map(
+        process_data_to_model_inputs,
+        batched=True,
+        batch_size=batch_size,
+        remove_columns=["answer", "article"],
+    )
+    train_dataset.set_format(
+        type="torch",
+        columns=[
+            "input_ids",
+            "attention_mask",
+            "target_ids",
+            "target_attention_mask",
+        ],
+    )
+
+    dev_dataset = load_dataset("race", "all", split="validation")
+    dev_dataset = dev_dataset.map(
+        process_race_row,
+        remove_columns=["options", "example_id"],
+    )
+    dev_dataset = dev_dataset.map(
+        process_data_to_model_inputs,
+        batched=True,
+        batch_size=batch_size,
+        remove_columns=["answer", "article"],
+    )
+    dev_dataset.set_format(
+        type="torch",
+        columns=[
+            "input_ids",
+            "attention_mask",
+            "target_ids",
+            "target_attention_mask",
+        ],
+    )
+    test_dataset = load_dataset("race", "all", split="test")
+    test_dataset = test_dataset.map(
+        process_race_row,
+        remove_columns=["options", "example_id"],
+    )
+    test_dataset = test_dataset.map(
+        process_data_to_model_inputs,
+        batched=True,
+        batch_size=batch_size,
+        remove_columns=["answer", "article"],
+    )
+    test_dataset.set_format(
+        type="torch",
+        columns=[
+            "input_ids",
+            "attention_mask",
+            "target_ids",
+            "target_attention_mask",
+        ],
+    )
+
+    train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
+    val_loader = DataLoader(dev_dataset, batch_size=batch_size, shuffle=True)
+    test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=True)
+
+    return train_loader, val_loader, test_loader
 
 
 def run_train_epoch(
     model,
-    batch_size: int,
-    num_steps: int,
-    train_dataset,
+    train_dataloader,
 ) -> Generator:
     """Train the model and return the loss for 'num_steps' given the
     'batch_size' and the train_dataset.
 
     Randomly pick a batch from the train_dataset.
     """
-    shuff_dataset = train_dataset.shuffle(seed=42)
-    for step in range(num_steps):
-        batch_start = step * batch_size
-        batch_data = shuff_dataset.select(
-            range(batch_start, batch_start + batch_size, 1)
-        )
-        batch_data = batch_data.shuffle(seed=step)
-        loss_values = model.train(batch_data)
+    step = 0
+    for batch in train_dataloader:
+        loss_values = model.train(batch)
+        step += 1
         yield step, loss_values["loss_value"]
 
 
-def run_predict(model, batch_size: int, dev_dataset, prediction_file: str) -> None:
+def run_predict(model, dev_dataloader, prediction_file: str) -> None:
     """Read the 'dev_dataset' and predict results with the model, and save the
     results in the prediction_file."""
-
-    num_steps = math.ceil(len(dev_dataset) / batch_size)
     writerparams = {"quotechar": '"', "quoting": csv.QUOTE_ALL}
     with io.open(prediction_file, mode="w", encoding="utf-8") as out_fp:
         writer = csv.writer(out_fp, **writerparams)
         header_written = False
-        for step in range(num_steps):
-            batch_start = step * batch_size
-            batch_data = dev_dataset.select(
-                range(batch_start, batch_start + batch_size, 1)
-            )
-            for ret_row in model.predict(batch_data):
+        for batch in dev_dataloader:
+            for ret_row in model.predict(batch):
                 if not header_written:
                     headers = ret_row.keys()
                     writer.writerow(headers)
@@ -85,9 +359,9 @@ def run_model(
     model,
     config,
     evaluator,
-    train_dataset=None,
-    dev_dataset=None,
-    test_dataset=None,
+    train_dataloader=None,
+    dev_dataloader=None,
+    test_dataloader=None,
     save_always: Optional[bool] = False,
 ) -> None:
     """Run the model on input data (for training or testing)"""
@@ -107,9 +381,7 @@ def run_model(
             print("\nEpoch:{0}\n".format(epoch))
             start = time.time()
             total_loss = []
-            for step, loss in run_train_epoch(
-                model, config.batch_size, config.num_train_steps, train_dataset
-            ):
+            for step, loss in run_train_epoch(model, train_dataloader):
                 if math.isnan(loss):
                     print("nan loss")
 
@@ -128,7 +400,7 @@ def run_model(
                     )
                 )
             print("\nValidation:\n")
-            run_predict(model, config.batch_size, dev_dataset, prediction_file)
+            run_predict(model, dev_dataloader, prediction_file)
             val_cost = evaluator(prediction_file)
 
             print("\nValidation cost:{0}\n".format(val_cost))
@@ -150,29 +422,9 @@ def run_model(
     elif mode == "test":
         print("Predicting...")
         start = time.time()
-        run_predict(model, batch_size, test_dataset, config.prediction_file)
+        run_predict(model, test_dataloader, config.prediction_file)
         msg = "\nTotal prediction time:{} seconds\n".format(time.time() - start)
         print(msg)
-
-
-def glue_passage_question(bos_token, eos_token, passage, question=None, answer=None):
-    entries = {
-        "cls": bos_token,
-        "sep": eos_token,
-        "passage": passage,
-        "question": question,
-        "answer": answer,
-    }
-    if question is not None and answer is not None:
-        return "{passage} {sep} <Q> {cls} {question} {sep} <A> {cls} {answer}".format(
-            **entries
-        )
-    if question is not None and answer is None:
-        return "{cls} {passage} {sep} <Q> {cls} {question} {sep} <A> {cls}".format(
-            **entries
-        )
-
-    return "{passage}".format(**entries)
 
 
 def list_parameters(model):
@@ -204,218 +456,83 @@ def compute_rouge(prediction_file):
     return 1.0 - output["rouge2_fmeasure"]
 
 
-def create_race_dataset(tokenizer, batch_size, source_max_length, decoder_max_length):
-    """Function to create the race dataset."""
-
-    def process_race_row(row):
-        """Helper function to have access to the tokenizer."""
-        option_code = row["answer"]
-        if option_code == "A":
-            option_idx = 0
-        elif option_code == "B":
-            option_idx = 1
-        elif option_code == "C":
-            option_idx = 2
-        elif option_code == "D":
-            option_idx = 3
-
-        answer = row["options"][option_idx]
-        answer = " ".join(answer.split())
-
-        question = row["question"]
-        question = " ".join(question.split())
-
-        article = row["article"]
-        article = " ".join(article.split())
-
-        input_str = glue_passage_question(
-            tokenizer.bos_token, tokenizer.eos_token, article, question
-        )
-        output_str = glue_passage_question(
-            tokenizer.bos_token, tokenizer.eos_token, answer
-        )
-
-        return {"inputs": input_str, "outputs": output_str}
-
-    def process_data_to_model_inputs(batch):
-        # tokenize the inputs and labels
-        inputs = tokenizer(
-            batch["inputs"],
-            padding="max_length",
-            truncation="only_first",
-            max_length=source_max_length,
-        )
-        outputs = tokenizer(
-            batch["outputs"],
-            padding="max_length",
-            truncation="only_first",
-            max_length=decoder_max_length,
-        )
-
-        batch["input_ids"] = inputs.input_ids
-        batch["input_mask"] = inputs.attention_mask
-        batch["target_ids"] = outputs.input_ids
-        batch["target_mask"] = outputs.attention_mask
-        batch["labels"] = outputs.input_ids.copy()
-
-        # because BERT automatically shifts the labels, the labels correspond exactly to `target_ids`.
-        # We have to make sure that the PAD token is ignored
-
-        labels = [
-            [-100 if token == tokenizer.pad_token_id else token for token in labels]
-            for labels in batch["labels"]
-        ]
-        batch["labels"] = labels
-
-        return batch
-
-    train_dataset = load_dataset("race", "all", split="train")
-    train_dataset = train_dataset.map(
-        process_race_row,
-        remove_columns=["article", "options", "question", "answer", "example_id"],
-    )
-    train_dataset = train_dataset.map(
-        process_data_to_model_inputs,
-        batched=True,
-        batch_size=batch_size,
-        remove_columns=["inputs", "outputs"],
-    )
-    train_dataset.set_format(
-        type="torch",
-        columns=["input_ids", "input_mask", "target_ids", "target_mask", "labels"],
-    )
-
-    dev_dataset = load_dataset("race", "all", split="validation")
-    dev_dataset = dev_dataset.map(
-        process_race_row,
-        remove_columns=["article", "options", "question", "answer", "example_id"],
-    )
-    dev_dataset = dev_dataset.map(
-        process_data_to_model_inputs,
-        batched=True,
-        batch_size=batch_size,
-        remove_columns=["inputs", "outputs"],
-    )
-    dev_dataset.set_format(
-        type="torch",
-        columns=["input_ids", "input_mask", "target_ids", "target_mask", "labels"],
-    )
-    test_dataset = load_dataset("race", "all", split="test")
-    test_dataset = test_dataset.map(
-        process_race_row,
-        remove_columns=["article", "options", "question", "answer", "example_id"],
-    )
-    test_dataset = test_dataset.map(
-        process_data_to_model_inputs,
-        batched=True,
-        batch_size=batch_size,
-        remove_columns=["inputs", "outputs"],
-    )
-    test_dataset.set_format(
-        type="torch",
-        columns=["input_ids", "input_mask", "target_ids", "target_mask", "labels"],
-    )
-    return train_dataset, dev_dataset, test_dataset
-
-
 def create_squad_dataset(tokenizer, batch_size, source_max_length, decoder_max_length):
     """Function to create the squad dataset."""
+    train_contexts, train_answers = read_squad("./squad/train-v2.0.json")
+    val_contexts, val_answers = read_squad("./squad/dev-v2.0.json")
 
-    def process_squad_row(row):
-        """Helper function to have access to the tokenizer."""
-
-        try:
-            answer = row["answers"]["text"][0]
-            answer = " ".join(answer.split())
-        except:
-            answer = "<NoAnswer>"
-
-        question = row["question"]
-        question = " ".join(question.split())
-
-        article = row["context"]
-        article = " ".join(article.split())
-
-        input_str = glue_passage_question(
-            tokenizer.bos_token, tokenizer.eos_token, article, question, answer
-        )
-
-        output_str = glue_passage_question(
-            tokenizer.bos_token, tokenizer.eos_token, article, question
-        )
-
-        return {"inputs": input_str, "outputs": output_str}
-
-    def process_data_to_model_inputs(batch):
-        # tokenize the inputs and labels
-        inputs = tokenizer(
-            batch["inputs"],
-            padding="max_length",
-            truncation="only_first",
-            max_length=source_max_length,
-        )
-        outputs = tokenizer(
-            batch["outputs"],
-            padding="max_length",
-            truncation="only_first",
-            max_length=source_max_length,
-            add_special_tokens=False,
-        )
-
-        batch["input_ids"] = inputs.input_ids
-        batch["input_mask"] = inputs.attention_mask
-        batch["target_ids"] = outputs.input_ids
-        batch["target_mask"] = outputs.attention_mask
-        batch["labels"] = inputs.input_ids.copy()
-
-        # because BERT automatically shifts the labels, the labels correspond exactly to `target_ids`.
-        # We have to make sure that the PAD token is ignored
-
-        labels = [
-            [-100 if token == tokenizer.pad_token_id else token for token in labels]
-            for labels in batch["labels"]
-        ]
-        batch["labels"] = labels
-
-        return batch
-
-    train_dataset = load_dataset("squad_v2", split="train")
-    train_dataset = train_dataset.map(
-        process_squad_row,
-        remove_columns=["id", "title", "question", "answers", "context"],
-    ).filter(lambda row: "<NoAnswer>" not in row["outputs"])
-
-    train_dataset = train_dataset.map(
-        process_data_to_model_inputs,
-        batched=True,
-        batch_size=batch_size,
-        remove_columns=["inputs", "outputs"],
+    val_encodings = tokenizer(
+        val_contexts,
+        truncation=True,
+        padding="max_length",
+        max_length=source_max_length,
+        add_special_tokens=True,
+    )
+    val_answer_encodings = tokenizer(
+        val_answers,
+        truncation=True,
+        padding="max_length",
+        max_length=decoder_max_length,
+        add_special_tokens=True,
     )
 
-    train_dataset.set_format(
-        type="torch",
-        columns=["input_ids", "input_mask", "target_ids", "target_mask", "labels"],
+    train_encodings = tokenizer(
+        train_contexts,
+        truncation=True,
+        padding="max_length",
+        max_length=source_max_length,
+        add_special_tokens=True,
+    )
+    train_answer_encodings = tokenizer(
+        train_answers,
+        truncation=True,
+        padding="max_length",
+        max_length=decoder_max_length,
+        add_special_tokens=True,
     )
 
-    val_dataset = load_dataset("squad_v2", split="validation")
-    val_dataset = val_dataset.map(
-        process_squad_row,
-        remove_columns=["id", "title", "question", "answers", "context"],
-    ).filter(lambda row: "<NoAnswer>" not in row["outputs"])
+    train_encodings["target_ids"] = train_answer_encodings.input_ids
+    train_encodings["target_attention_mask"] = train_answer_encodings.attention_mask
+    train_encodings["labels"] = train_answer_encodings.input_ids.copy()
 
-    val_dataset = val_dataset.map(
-        process_data_to_model_inputs,
-        batched=True,
-        batch_size=batch_size,
-        remove_columns=["inputs", "outputs"],
-    )
+    # because BERT automatically shifts the labels, the labels correspond exactly to `target_ids`.
+    # We have to make sure that the PAD token is ignored
 
-    val_dataset.set_format(
-        type="torch",
-        columns=["input_ids", "input_mask", "target_ids", "target_mask", "labels"],
-    )
-    print(len(train_dataset))
-    return train_dataset, val_dataset
+    labels = [
+        [-100 if token == tokenizer.pad_token_id else token for token in labels]
+        for labels in train_encodings["labels"]
+    ]
+    train_encodings["labels"] = labels
+
+    val_encodings["target_ids"] = val_answer_encodings.input_ids
+    val_encodings["target_attention_mask"] = val_answer_encodings.attention_mask
+    val_encodings["labels"] = val_answer_encodings.input_ids.copy()
+
+    # because BERT automatically shifts the labels, the labels correspond exactly to `target_ids`.
+    # We have to make sure that the PAD token is ignored
+
+    labels = [
+        [-100 if token == tokenizer.pad_token_id else token for token in labels]
+        for labels in val_encodings["labels"]
+    ]
+    val_encodings["labels"] = labels
+
+    class SquadDataset(torch.utils.data.Dataset):
+        def __init__(self, encodings):
+            self.encodings = encodings
+
+        def __getitem__(self, idx):
+            return {key: torch.tensor(val[idx]) for key, val in self.encodings.items()}
+
+        def __len__(self):
+            return len(self.encodings.input_ids)
+
+    train_dataset = SquadDataset(train_encodings)
+    val_dataset = SquadDataset(val_encodings)
+
+    train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
+    val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=True)
+    return train_loader, val_loader, val_loader
 
 
 def run_squad(args):
@@ -427,8 +544,8 @@ def run_squad(args):
     config = HyperParameters(
         model_path=args.model_path,
         batch_size=args.batch_size,
-        source_max_length=512,
-        decoder_max_length=128,
+        source_max_length=1024,
+        decoder_max_length=64,
         gpu=args.gpu,
         gpu_device=args.gpu_device,
         learning_rate=args.learning_rate,
@@ -436,22 +553,22 @@ def run_squad(args):
         mode=mode,
         num_train_steps=args.num_train_steps,
         prediction_file=args.prediction_file,
-        model_type=args.model_type,
     )
-    albert2albert = Model(config)
-    train_dataset, val_dataset = create_squad_dataset(
-        tokenizer=albert2albert.tokenizer,
+    model = T5QA(config)
+
+    train_loader, val_loader, test_loader = create_squad_dataset(
+        tokenizer=model.tokenizer,
         batch_size=config.batch_size,
         source_max_length=config.source_max_length,
         decoder_max_length=config.decoder_max_length,
     )
     run_model(
-        albert2albert,
+        model,
         config=config,
         evaluator=compute_rouge,
-        train_dataset=train_dataset,
-        dev_dataset=val_dataset,
-        test_dataset=val_dataset,
+        train_dataloader=train_loader,
+        dev_dataloader=val_loader,
+        test_dataloader=test_loader,
     )
 
 
@@ -464,7 +581,7 @@ def run_race(args):
     config = HyperParameters(
         model_path=args.model_path,
         batch_size=args.batch_size,
-        source_max_length=512,
+        source_max_length=1024,
         decoder_max_length=128,
         gpu=args.gpu,
         gpu_device=args.gpu_device,
@@ -474,29 +591,69 @@ def run_race(args):
         num_train_steps=args.num_train_steps,
         prediction_file=args.prediction_file,
     )
-    albert2albert = Model(config)
-    train_dataset, dev_dataset, test_dataset = create_race_dataset(
-        tokenizer=albert2albert.tokenizer,
+    model = T5QA(config)
+
+    train_loader, val_loader, test_loader = create_race_dataset(
+        tokenizer=model.tokenizer,
         batch_size=config.batch_size,
         source_max_length=config.source_max_length,
         decoder_max_length=config.decoder_max_length,
     )
     run_model(
-        albert2albert,
+        model,
         config=config,
         evaluator=compute_rouge,
-        train_dataset=train_dataset,
-        dev_dataset=dev_dataset,
-        test_dataset=test_dataset,
+        train_dataloader=train_loader,
+        dev_dataloader=val_loader,
+        test_dataloader=test_loader,
+    )
+
+
+def run_narrative(args):
+    """Train albert model on narrative dataset."""
+    if args.mode == "narrative_train":
+        mode = "train"
+    elif args.mode == "narrative_test":
+        mode = "test"
+    config = HyperParameters(
+        model_path=args.model_path,
+        batch_size=args.batch_size,
+        source_max_length=1024,
+        decoder_max_length=256,
+        gpu=args.gpu,
+        gpu_device=args.gpu_device,
+        learning_rate=args.learning_rate,
+        max_epochs=args.max_epochs,
+        mode=mode,
+        num_train_steps=args.num_train_steps,
+        prediction_file=args.prediction_file,
+    )
+    model = T5QA(config)
+
+    train_loader, val_loader, test_loader = create_narrative_dataset(
+        tokenizer=model.tokenizer,
+        batch_size=config.batch_size,
+        source_max_length=config.source_max_length,
+        decoder_max_length=config.decoder_max_length,
+    )
+    run_model(
+        model,
+        config=config,
+        evaluator=compute_rouge,
+        train_dataloader=train_loader,
+        dev_dataloader=val_loader,
+        test_dataloader=test_loader,
     )
 
 
 def run_main(args):
     """Decides what to do in the code."""
-    if args.mode in ["race_train", "race_test"]:
-        run_race(args)
     if args.mode in ["squad_train", "squad_test"]:
         run_squad(args)
+    if args.mode in ["race_train", "race_test"]:
+        run_race(args)
+    if args.mode in ["narrative_train", "narrative_test"]:
+        run_narrative(args)
 
 
 def argument_parser():
@@ -506,7 +663,7 @@ def argument_parser():
         "--mode",
         type=str,
         required=True,
-        help="race_train | race_test| squad_train | squad_test",
+        help="squad_train | squad_test | race_train | race_test | narrative_train | narrative_test",
     )
     parser.add_argument(
         "--model_path",
@@ -570,11 +727,6 @@ def argument_parser():
 
     parser.add_argument(
         "--dream_path", type=str, help="path for reading dream scape data!"
-    )
-    parser.add_argument(
-        "--model_type",
-        type=str,
-        help="Type of model used for training: rnn or transformer.",
     )
     args, _ = parser.parse_known_args()
     return args
