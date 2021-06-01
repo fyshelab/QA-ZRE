@@ -16,7 +16,7 @@ import torch
 from datasets import load_dataset
 from torch.utils.data import DataLoader
 
-from src.albert_model import T5QA, BertGenerationModel, HyperParameters, Model
+from src.albert_model import T5QA, HyperParameters
 
 
 def read_squad(path):
@@ -25,7 +25,6 @@ def read_squad(path):
         squad_dict = json.load(f)
 
     contexts = []
-    questions = []
     answers = []
     for group in squad_dict["data"]:
         for passage in group["paragraphs"]:
@@ -33,11 +32,10 @@ def read_squad(path):
             for qa in passage["qas"]:
                 question = qa["question"]
                 for answer in qa["answers"]:
-                    contexts.append(context)
-                    questions.append(question)
+                    contexts.append("question: " + question + " context: " + context)
                     answers.append(answer["text"])
 
-    return contexts, questions, answers
+    return contexts, answers
 
 
 def create_narrative_dataset(
@@ -209,12 +207,14 @@ def create_race_dataset(tokenizer, batch_size, source_max_length, decoder_max_le
         article = row["article"]
         article = " ".join(article.split())
 
-        return {"article": article, "question": question, "answer": answer}
+        return {
+            "article": "question: " + question + " context: " + article,
+            "answer": answer,
+        }
 
     def process_data_to_model_inputs(batch):
         # tokenize the inputs and labels
         inputs = tokenizer(
-            batch["question"],
             batch["article"],
             truncation=True,
             padding="max_length",
@@ -231,11 +231,9 @@ def create_race_dataset(tokenizer, batch_size, source_max_length, decoder_max_le
 
         batch["input_ids"] = inputs.input_ids
         batch["attention_mask"] = inputs.attention_mask
-        batch["token_type_ids"] = inputs.token_type_ids
 
         batch["target_ids"] = outputs.input_ids
         batch["target_attention_mask"] = outputs.attention_mask
-        batch["target_token_type_ids"] = outputs.token_type_ids
 
         return batch
 
@@ -248,7 +246,7 @@ def create_race_dataset(tokenizer, batch_size, source_max_length, decoder_max_le
         process_data_to_model_inputs,
         batched=True,
         batch_size=batch_size,
-        remove_columns=["question", "answer", "article"],
+        remove_columns=["answer", "article"],
     )
     train_dataset.set_format(
         type="torch",
@@ -257,8 +255,6 @@ def create_race_dataset(tokenizer, batch_size, source_max_length, decoder_max_le
             "attention_mask",
             "target_ids",
             "target_attention_mask",
-            "token_type_ids",
-            "target_token_type_ids",
         ],
     )
 
@@ -271,7 +267,7 @@ def create_race_dataset(tokenizer, batch_size, source_max_length, decoder_max_le
         process_data_to_model_inputs,
         batched=True,
         batch_size=batch_size,
-        remove_columns=["question", "answer", "article"],
+        remove_columns=["answer", "article"],
     )
     dev_dataset.set_format(
         type="torch",
@@ -280,8 +276,6 @@ def create_race_dataset(tokenizer, batch_size, source_max_length, decoder_max_le
             "attention_mask",
             "target_ids",
             "target_attention_mask",
-            "token_type_ids",
-            "target_token_type_ids",
         ],
     )
     test_dataset = load_dataset("race", "all", split="test")
@@ -293,7 +287,7 @@ def create_race_dataset(tokenizer, batch_size, source_max_length, decoder_max_le
         process_data_to_model_inputs,
         batched=True,
         batch_size=batch_size,
-        remove_columns=["question", "answer", "article"],
+        remove_columns=["answer", "article"],
     )
     test_dataset.set_format(
         type="torch",
@@ -302,8 +296,6 @@ def create_race_dataset(tokenizer, batch_size, source_max_length, decoder_max_le
             "attention_mask",
             "target_ids",
             "target_attention_mask",
-            "token_type_ids",
-            "target_token_type_ids",
         ],
     )
 
@@ -470,7 +462,6 @@ def create_squad_dataset(tokenizer, batch_size, source_max_length, decoder_max_l
     val_contexts, val_questions, val_answers = read_squad("./squad/dev-v2.0.json")
 
     val_encodings = tokenizer(
-        val_questions,
         val_contexts,
         truncation=True,
         padding="max_length",
@@ -486,7 +477,6 @@ def create_squad_dataset(tokenizer, batch_size, source_max_length, decoder_max_l
     )
 
     train_encodings = tokenizer(
-        train_questions,
         train_contexts,
         truncation=True,
         padding="max_length",
@@ -503,11 +493,9 @@ def create_squad_dataset(tokenizer, batch_size, source_max_length, decoder_max_l
 
     train_encodings["target_ids"] = train_answer_encodings.input_ids
     train_encodings["target_attention_mask"] = train_answer_encodings.attention_mask
-    train_encodings["target_token_type_ids"] = train_answer_encodings.token_type_ids
 
     val_encodings["target_ids"] = val_answer_encodings.input_ids
     val_encodings["target_attention_mask"] = val_answer_encodings.attention_mask
-    val_encodings["target_token_type_ids"] = val_answer_encodings.token_type_ids
 
     class SquadDataset(torch.utils.data.Dataset):
         def __init__(self, encodings):
@@ -524,7 +512,7 @@ def create_squad_dataset(tokenizer, batch_size, source_max_length, decoder_max_l
 
     train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
     val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=True)
-    return train_loader, val_loader
+    return train_loader, val_loader, val_loader
 
 
 def run_squad(args):
@@ -536,7 +524,7 @@ def run_squad(args):
     config = HyperParameters(
         model_path=args.model_path,
         batch_size=args.batch_size,
-        source_max_length=512,
+        source_max_length=1024,
         decoder_max_length=64,
         gpu=args.gpu,
         gpu_device=args.gpu_device,
@@ -546,21 +534,21 @@ def run_squad(args):
         num_train_steps=args.num_train_steps,
         prediction_file=args.prediction_file,
     )
-    albert2albert = Model(config)
+    model = T5QA(config)
 
-    train_loader, val_loader = create_squad_dataset(
-        tokenizer=albert2albert.tokenizer,
+    train_loader, val_loader, test_loader = create_squad_dataset(
+        tokenizer=model.tokenizer,
         batch_size=config.batch_size,
         source_max_length=config.source_max_length,
         decoder_max_length=config.decoder_max_length,
     )
     run_model(
-        albert2albert,
+        model,
         config=config,
         evaluator=compute_rouge,
         train_dataloader=train_loader,
         dev_dataloader=val_loader,
-        test_dataloader=val_loader,
+        test_dataloader=test_loader,
     )
 
 
@@ -573,7 +561,7 @@ def run_race(args):
     config = HyperParameters(
         model_path=args.model_path,
         batch_size=args.batch_size,
-        source_max_length=512,
+        source_max_length=1024,
         decoder_max_length=128,
         gpu=args.gpu,
         gpu_device=args.gpu_device,
@@ -583,16 +571,16 @@ def run_race(args):
         num_train_steps=args.num_train_steps,
         prediction_file=args.prediction_file,
     )
-    albert2albert = Model(config)
+    model = T5QA(config)
 
     train_loader, val_loader, test_loader = create_race_dataset(
-        tokenizer=albert2albert.tokenizer,
+        tokenizer=model.tokenizer,
         batch_size=config.batch_size,
         source_max_length=config.source_max_length,
         decoder_max_length=config.decoder_max_length,
     )
     run_model(
-        albert2albert,
+        model,
         config=config,
         evaluator=compute_rouge,
         train_dataloader=train_loader,
