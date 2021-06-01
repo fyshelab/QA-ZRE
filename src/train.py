@@ -399,14 +399,14 @@ def run_model(
                         step, loss, mean_loss
                     )
                 )
-            print("\nValidation:\n")
-            run_predict(model, dev_dataloader, prediction_file)
-            val_cost = evaluator(prediction_file)
+            # print("\nValidation:\n")
+            # run_predict(model, dev_dataloader, prediction_file)
+            # val_cost = evaluator(prediction_file)
 
-            print("\nValidation cost:{0}\n".format(val_cost))
-            if val_cost < best_val_cost:
-                best_val_cost = val_cost
-                model.save("best")
+            # print("\nValidation cost:{0}\n".format(val_cost))
+            # if val_cost < best_val_cost:
+            #    best_val_cost = val_cost
+            #    model.save("best")
             if save_always:
                 model.save(str(epoch))
             msg = "\nEpoch training time:{} seconds\n".format(time.time() - start)
@@ -569,6 +569,7 @@ def run_squad(args):
         train_dataloader=train_loader,
         dev_dataloader=val_loader,
         test_dataloader=test_loader,
+        save_always=True,
     )
 
 
