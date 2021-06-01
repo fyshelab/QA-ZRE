@@ -545,7 +545,7 @@ def run_squad(args):
         model_path=args.model_path,
         batch_size=args.batch_size,
         source_max_length=1024,
-        decoder_max_length=64,
+        decoder_max_length=32,
         gpu=args.gpu,
         gpu_device=args.gpu_device,
         learning_rate=args.learning_rate,
