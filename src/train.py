@@ -544,7 +544,7 @@ def run_squad(args):
     config = HyperParameters(
         model_path=args.model_path,
         batch_size=args.batch_size,
-        source_max_length=1024,
+        source_max_length=512,
         decoder_max_length=32,
         gpu=args.gpu,
         gpu_device=args.gpu_device,
