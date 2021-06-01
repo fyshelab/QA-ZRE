@@ -87,11 +87,9 @@ def create_narrative_dataset(
 
         batch["input_ids"] = inputs.input_ids
         batch["attention_mask"] = inputs.attention_mask
-        batch["token_type_ids"] = inputs.token_type_ids
 
         batch["target_ids"] = outputs.input_ids
         batch["target_attention_mask"] = outputs.attention_mask
-        batch["target_token_type_ids"] = outputs.token_type_ids
 
         batch["labels"] = outputs.input_ids.copy()
 
@@ -127,8 +125,6 @@ def create_narrative_dataset(
             "attention_mask",
             "target_ids",
             "target_attention_mask",
-            "token_type_ids",
-            "target_token_type_ids",
             "labels",
         ],
     )
@@ -150,8 +146,6 @@ def create_narrative_dataset(
             "attention_mask",
             "target_ids",
             "target_attention_mask",
-            "token_type_ids",
-            "target_token_type_ids",
             "labels",
         ],
     )
@@ -172,8 +166,6 @@ def create_narrative_dataset(
             "attention_mask",
             "target_ids",
             "target_attention_mask",
-            "token_type_ids",
-            "target_token_type_ids",
             "labels",
         ],
     )
@@ -536,7 +528,7 @@ def run_squad(args):
     config = HyperParameters(
         model_path=args.model_path,
         batch_size=args.batch_size,
-        source_max_length=512,
+        source_max_length=1024,
         decoder_max_length=64,
         gpu=args.gpu,
         gpu_device=args.gpu_device,
@@ -610,7 +602,7 @@ def run_narrative(args):
     config = HyperParameters(
         model_path=args.model_path,
         batch_size=args.batch_size,
-        source_max_length=1024,
+        source_max_length=512,
         decoder_max_length=256,
         gpu=args.gpu,
         gpu_device=args.gpu_device,
@@ -620,7 +612,7 @@ def run_narrative(args):
         num_train_steps=args.num_train_steps,
         prediction_file=args.prediction_file,
     )
-    model = T5QA(config)
+    model = BertGenerationModel(config)
 
     train_loader, val_loader, test_loader = create_narrative_dataset(
         tokenizer=model.tokenizer,
