@@ -930,7 +930,7 @@ param_mapper = {
 
 def save(model: torch.nn.Module, path: str) -> None:
     """Save the model to task at the specified path."""
-    torch.save(model.state_dict()["module"], path)
+    torch.save(model.state_dict(), path)
 
 
 def load_albert(source_max_length, decoder_max_length):
@@ -1298,11 +1298,11 @@ class T5QA(object):
         self.device = torch.device("cuda" if cfg.gpu else "cpu")
 
         if cfg.mode == "train":
-            tokenizer = T5Tokenizer.from_pretrained("t5-small")
+            tokenizer = T5Tokenizer.from_pretrained("t5-base")
 
             # Construct model
             model = torch.nn.DataParallel(
-                T5ForConditionalGeneration.from_pretrained("t5-small")
+                T5ForConditionalGeneration.from_pretrained("t5-base")
             )
             model.to(self.device)
 
@@ -1321,9 +1321,9 @@ class T5QA(object):
             self.model_path = os.path.join(cfg.model_path, "model")
 
         elif cfg.mode in ["test", "inference"]:
-            tokenizer = T5Tokenizer.from_pretrained("t5-small")
+            tokenizer = T5Tokenizer.from_pretrained("t5-base")
             # Construct model
-            model = T5ForConditionalGeneration.from_pretrained("t5-small")
+            model = T5ForConditionalGeneration.from_pretrained("t5-base")
             model.to(self.device)
             self.model_path = os.path.join(cfg.model_path, "model")
             model.load_state_dict(
@@ -1403,7 +1403,7 @@ class T5QA(object):
             decoder_attention_mask=target_mask,
             labels=labels,
         )
-        loss = output.loss.mean()
+        loss = output.loss.sum()
         loss_value = loss.item()
 
         # is loss nan? don't backpropagate!
