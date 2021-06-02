@@ -930,7 +930,7 @@ param_mapper = {
 
 def save(model: torch.nn.Module, path: str) -> None:
     """Save the model to task at the specified path."""
-    torch.save(model.state_dict(), path)
+    torch.save(model.state_dict()["module"], path)
 
 
 def load_albert(source_max_length, decoder_max_length):
@@ -1297,13 +1297,15 @@ class T5QA(object):
         cfg.gpu = cfg.gpu and torch.cuda.is_available()
         self.device = torch.device("cuda" if cfg.gpu else "cpu")
 
-        tokenizer = T5Tokenizer.from_pretrained("t5-base")
-
-        # Construct model
-        model = T5ForConditionalGeneration.from_pretrained("t5-base")
-        model.to(self.device)
-
         if cfg.mode == "train":
+            tokenizer = T5Tokenizer.from_pretrained("t5-small")
+
+            # Construct model
+            model = torch.nn.DataParallel(
+                T5ForConditionalGeneration.from_pretrained("t5-small")
+            )
+            model.to(self.device)
+
             params_to_train = list(
                 filter(lambda x: x.requires_grad, model.parameters())
             )
@@ -1319,13 +1321,17 @@ class T5QA(object):
             self.model_path = os.path.join(cfg.model_path, "model")
 
         elif cfg.mode in ["test", "inference"]:
+            tokenizer = T5Tokenizer.from_pretrained("t5-small")
+            # Construct model
+            model = T5ForConditionalGeneration.from_pretrained("t5-small")
+            model.to(self.device)
             self.model_path = os.path.join(cfg.model_path, "model")
-            # model.load_state_dict(
-            #    torch.load(
-            #        self.model_path + "_best_model",
-            #        map_location=lambda storage, loc: storage,
-            #    )
-            # )
+            model.load_state_dict(
+                torch.load(
+                    self.model_path + "_best_model",
+                    map_location=lambda storage, loc: storage,
+                )
+            )
         self.model = model
         self.tokenizer = tokenizer
 
@@ -1397,7 +1403,7 @@ class T5QA(object):
             decoder_attention_mask=target_mask,
             labels=labels,
         )
-        loss = output.loss
+        loss = output.loss.mean()
         loss_value = loss.item()
 
         # is loss nan? don't backpropagate!
