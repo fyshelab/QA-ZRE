@@ -495,6 +495,8 @@ def create_squad_dataset(tokenizer, batch_size, source_max_length, decoder_max_l
 
     train_encodings["target_ids"] = train_answer_encodings.input_ids
     train_encodings["target_attention_mask"] = train_answer_encodings.attention_mask
+
+    """
     train_encodings["labels"] = train_answer_encodings.input_ids.copy()
 
     # because BERT automatically shifts the labels, the labels correspond exactly to `target_ids`.
@@ -505,9 +507,12 @@ def create_squad_dataset(tokenizer, batch_size, source_max_length, decoder_max_l
         for labels in train_encodings["labels"]
     ]
     train_encodings["labels"] = labels
+    """
 
     val_encodings["target_ids"] = val_answer_encodings.input_ids
     val_encodings["target_attention_mask"] = val_answer_encodings.attention_mask
+
+    """
     val_encodings["labels"] = val_answer_encodings.input_ids.copy()
 
     # because BERT automatically shifts the labels, the labels correspond exactly to `target_ids`.
@@ -518,6 +523,7 @@ def create_squad_dataset(tokenizer, batch_size, source_max_length, decoder_max_l
         for labels in val_encodings["labels"]
     ]
     val_encodings["labels"] = labels
+    """
 
     class SquadDataset(torch.utils.data.Dataset):
         def __init__(self, encodings):
