@@ -1309,8 +1309,6 @@ class T5QA(object):
         model = nn.DataParallel(
             T5ForConditionalGeneration.from_pretrained(
                 "t5-base",
-                bos_token_id=tokenizer.bos_token_id,
-                eos_token_id=tokenizer.eos_token_id,
             )
         )
         model.to(self.device)
@@ -1416,7 +1414,7 @@ class T5QA(object):
             decoder_attention_mask=target_mask,
             labels=labels,
         )
-        loss = output.loss.mean()
+        loss = output.loss.sum()
         loss_value = loss.item()
 
         # is loss nan? don't backpropagate!
