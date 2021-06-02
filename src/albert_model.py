@@ -1297,20 +1297,10 @@ class T5QA(object):
         cfg.gpu = cfg.gpu and torch.cuda.is_available()
         self.device = torch.device("cuda" if cfg.gpu else "cpu")
 
-        # if cfg.gpu:
-        #    os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
-        #    os.environ["CUDA_VISIBLE_DEVICES"] = str(cfg.gpu_device)
-        #    torch.cuda.device(cfg.gpu_device)
-        #    torch.cuda.set_device(cfg.gpu_device)
-
         tokenizer = T5Tokenizer.from_pretrained("t5-base")
 
         # Construct model
-        model = nn.DataParallel(
-            T5ForConditionalGeneration.from_pretrained(
-                "t5-base",
-            )
-        )
+        model = T5ForConditionalGeneration.from_pretrained("t5-base")
         model.to(self.device)
 
         if cfg.mode == "train":
@@ -1361,13 +1351,7 @@ class T5QA(object):
             target_ids = target_ids.to(self.device)
 
         predictions = self.model.generate(
-            input_ids=input_ids,
-            attention_mask=input_mask,
-            decoder_start_token_id=self.tokenizer.pad_token_id,
-            # num_beams=5,
-            # early_stopping=True,
-            # no_repeat_ngram_size=2,
-            max_length=self.config.decoder_max_length,
+            input_ids=input_ids, attention_mask=input_mask
         )
 
         # all special tokens including will be removed
@@ -1397,24 +1381,21 @@ class T5QA(object):
 
         input_ids = batch["input_ids"]
         input_mask = batch["attention_mask"]
-        labels = batch["labels"]
         target_ids = batch["target_ids"]
         target_mask = batch["target_attention_mask"]
         if self.config.gpu:
             input_ids = input_ids.to(self.device)
             input_mask = input_mask.to(self.device)
-            labels = labels.to(self.device)
             target_ids = target_ids.to(self.device)
             target_mask = target_mask.to(self.device)
 
         output = self.model(
             input_ids=input_ids,
             attention_mask=input_mask,
-            decoder_input_ids=target_ids,
             decoder_attention_mask=target_mask,
-            labels=labels,
+            labels=target_ids,
         )
-        loss = output.loss.sum()
+        loss = output.loss
         loss_value = loss.item()
 
         # is loss nan? don't backpropagate!
