@@ -1018,12 +1018,12 @@ class Model(object):
 
         elif cfg.mode in ["test", "inference"]:
             self.model_path = os.path.join(cfg.model_path, "model")
-            model.load_state_dict(
-                torch.load(
-                    self.model_path + "_best_model",
-                    map_location=lambda storage, loc: storage,
-                )
-            )
+            # model.load_state_dict(
+            #    torch.load(
+            #        self.model_path + "_best_model",
+            #        map_location=lambda storage, loc: storage,
+            #    )
+            # )
         self.model = model
         self.tokenizer = tokenizer
 
@@ -1320,12 +1320,12 @@ class T5QA(object):
 
         elif cfg.mode in ["test", "inference"]:
             self.model_path = os.path.join(cfg.model_path, "model")
-            model.load_state_dict(
-                torch.load(
-                    self.model_path + "_best_model",
-                    map_location=lambda storage, loc: storage,
-                )
-            )
+            # model.load_state_dict(
+            #    torch.load(
+            #        self.model_path + "_best_model",
+            #        map_location=lambda storage, loc: storage,
+            #    )
+            # )
         self.model = model
         self.tokenizer = tokenizer
 
@@ -1381,19 +1381,21 @@ class T5QA(object):
 
         input_ids = batch["input_ids"]
         input_mask = batch["attention_mask"]
-        target_ids = batch["target_ids"]
+        # target_ids = batch["target_ids"]
         target_mask = batch["target_attention_mask"]
+        labels = batch["labels"]
         if self.config.gpu:
             input_ids = input_ids.to(self.device)
             input_mask = input_mask.to(self.device)
-            target_ids = target_ids.to(self.device)
+            # target_ids = target_ids.to(self.device)
             target_mask = target_mask.to(self.device)
+            labels = labels.to(self.device)
 
         output = self.model(
             input_ids=input_ids,
             attention_mask=input_mask,
             decoder_attention_mask=target_mask,
-            labels=target_ids,
+            labels=labels,
         )
         loss = output.loss
         loss_value = loss.item()
