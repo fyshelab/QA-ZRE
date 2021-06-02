@@ -32,8 +32,10 @@ def read_squad(path):
             for qa in passage["qas"]:
                 question = qa["question"]
                 for answer in qa["answers"]:
-                    contexts.append("question: " + question + " context: " + context)
-                    answers.append(answer["text"])
+                    contexts.append(
+                        "question: " + question + " context: " + context + " </s>"
+                    )
+                    answers.append(answer["text"] + " </s>")
 
     return contexts, answers
 
@@ -466,14 +468,14 @@ def create_squad_dataset(tokenizer, batch_size, source_max_length, decoder_max_l
         truncation=True,
         padding="max_length",
         max_length=source_max_length,
-        add_special_tokens=True,
+        add_special_tokens=False,
     )
     val_answer_encodings = tokenizer(
         val_answers,
         truncation=True,
         padding="max_length",
         max_length=decoder_max_length,
-        add_special_tokens=True,
+        add_special_tokens=False,
     )
 
     train_encodings = tokenizer(
@@ -481,14 +483,14 @@ def create_squad_dataset(tokenizer, batch_size, source_max_length, decoder_max_l
         truncation=True,
         padding="max_length",
         max_length=source_max_length,
-        add_special_tokens=True,
+        add_special_tokens=False,
     )
     train_answer_encodings = tokenizer(
         train_answers,
         truncation=True,
         padding="max_length",
         max_length=decoder_max_length,
-        add_special_tokens=True,
+        add_special_tokens=False,
     )
 
     train_encodings["target_ids"] = train_answer_encodings.input_ids
