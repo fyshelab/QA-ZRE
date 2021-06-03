@@ -501,11 +501,11 @@ def create_squad_dataset(tokenizer, batch_size, source_max_length, decoder_max_l
     # because BERT automatically shifts the labels, the labels correspond exactly to `target_ids`.
     # We have to make sure that the PAD token is ignored
 
-    labels = [
+    train_labels = [
         [-100 if token == tokenizer.pad_token_id else token for token in labels]
         for labels in train_encodings["labels"]
     ]
-    train_encodings["labels"] = labels
+    train_encodings["labels"] = train_labels
 
     val_encodings["target_ids"] = val_answer_encodings.input_ids
     val_encodings["target_attention_mask"] = val_answer_encodings.attention_mask
@@ -515,11 +515,11 @@ def create_squad_dataset(tokenizer, batch_size, source_max_length, decoder_max_l
     # because BERT automatically shifts the labels, the labels correspond exactly to `target_ids`.
     # We have to make sure that the PAD token is ignored
 
-    labels = [
+    val_labels = [
         [-100 if token == tokenizer.pad_token_id else token for token in labels]
         for labels in val_encodings["labels"]
     ]
-    val_encodings["labels"] = labels
+    val_encodings["labels"] = val_labels
 
     class SquadDataset(torch.utils.data.Dataset):
         def __init__(self, encodings):
