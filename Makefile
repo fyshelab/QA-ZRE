@@ -20,5 +20,5 @@ clean_code:
 
 .PHONY: train_on_lambda
 train_on_lambda:
-	python src/train.py --mode squad_train --model_path ./t5_squad/ learning_rate 0.001 --gpu True --gpu_device 0 --max_epochs 8 --batch_size 148
+	python src/train.py --mode squad_train --model_path ./t5_squad/ learning_rate 0.001 --gpu True --gpu_device 0 --max_epochs 6 --batch_size 128
 
