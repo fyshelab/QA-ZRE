@@ -19,7 +19,7 @@ import numpy as np
 import six
 import torch
 import torch.nn as nn
-from transformers import (AlbertTokenizer, BertGenerationDecoder,
+from transformers import (Adafactor, AlbertTokenizer, BertGenerationDecoder,
                           BertGenerationEncoder, BertTokenizer,
                           EncoderDecoderModel, T5ForConditionalGeneration,
                           T5Tokenizer)
@@ -1306,15 +1306,17 @@ class T5QA(object):
             )
             model.to(self.device)
 
-            params_to_train = list(
-                filter(lambda x: x.requires_grad, model.parameters())
-            )
-            self.optimizer = torch.optim.Adam(
-                params_to_train,
+            self.optimizer = Adafactor(
+                model.parameters(),
                 lr=cfg.learning_rate,
-                betas=(0.9, 0.999),
-                amsgrad=True,
-                weight_decay=0.01,
+                eps=(1e-30, 1e-3),
+                clip_threshold=1.0,
+                decay_rate=-0.8,
+                beta1=None,
+                weight_decay=0.0,
+                relative_step=False,
+                scale_parameter=False,
+                warmup_init=False,
             )
             if not os.path.exists(cfg.model_path):
                 os.makedirs(cfg.model_path)
@@ -1326,14 +1328,23 @@ class T5QA(object):
             model = T5ForConditionalGeneration.from_pretrained("t5-base")
             model.to(self.device)
             self.model_path = os.path.join(cfg.model_path, "model")
-            model.load_state_dict(
-                torch.load(
-                    self.model_path + "_best_model",
-                    map_location=lambda storage, loc: storage,
-                )
+            loaded_weights = torch.load(
+                self.model_path + "_best_model",
+                map_location=lambda storage, loc: storage,
             )
+            new_weights = {}
+            for name, param in loaded_weights.items():
+                new_weights[self.remove_prefix(name, "module.")] = param
+
+            model.load_state_dict(new_weights)
+
         self.model = model
         self.tokenizer = tokenizer
+
+    def remove_prefix(self, text, prefix):
+        if text.startswith(prefix):
+            return text[len(prefix) :]
+        return text  # or whatever
 
     def save(self, checkpoint_name: str):
         """Save the encoder model to the specified path name."""
@@ -1403,7 +1414,7 @@ class T5QA(object):
             decoder_attention_mask=target_mask,
             labels=labels,
         )
-        loss = output.loss.sum()
+        loss = output.loss.mean()
         loss_value = loss.item()
 
         # is loss nan? don't backpropagate!
