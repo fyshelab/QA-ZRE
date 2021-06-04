@@ -1306,6 +1306,7 @@ class T5QA(object):
             )
             model.to(self.device)
 
+            #self.optimizer = BERTAdam(model.parameters(), lr=cfg.learning_rate) 
             self.optimizer = Adafactor(
                 model.parameters(),
                 lr=cfg.learning_rate,
@@ -1329,7 +1330,7 @@ class T5QA(object):
             model.to(self.device)
             self.model_path = os.path.join(cfg.model_path, "model")
             loaded_weights = torch.load(
-                self.model_path + "_best_model",
+                self.model_path + "_4_model",
                 map_location=lambda storage, loc: storage,
             )
             new_weights = {}
