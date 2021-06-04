@@ -1,4 +1,10 @@
 import argparse
+from collections import Counter
+import string
+import re
+import argparse
+import json
+import sys
 import csv
 import io
 import json
@@ -36,9 +42,27 @@ def read_squad(path):
                         "question: " + question + " context: " + context + " </s>"
                     )
                     answers.append(answer["text"] + " </s>")
+                    break
 
     return contexts, answers
 
+
+def read_squad_refs(path):
+    path = Path(path)
+    with open(path, "rb") as f:
+        squad_dict = json.load(f)
+
+    all_refs = []
+    for group in squad_dict["data"]:
+        for passage in group["paragraphs"]:
+            for qa in passage["qas"]:
+                temp = []
+                for answer in qa["answers"]:
+                    temp.append(answer["text"])
+                if temp:
+                    all_refs.append(temp)
+
+    return all_refs
 
 def create_narrative_dataset(
     tokenizer, batch_size, source_max_length, decoder_max_length
@@ -304,8 +328,8 @@ def create_race_dataset(tokenizer, batch_size, source_max_length, decoder_max_le
     )
 
     train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
-    val_loader = DataLoader(dev_dataset, batch_size=batch_size, shuffle=True)
-    test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=True)
+    val_loader = DataLoader(dev_dataset, batch_size=batch_size, shuffle=False)
+    test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False)
 
     return train_loader, val_loader, test_loader
 
@@ -439,23 +463,84 @@ def list_parameters(model):
 
 
 # load rouge for validation
+
 rouge = datasets.load_metric("rouge")
 
 
+def normalize_answer(s):
+    """Lower text and remove punctuation, articles and extra whitespace."""
+    def remove_articles(text):
+        return re.sub(r'\b(a|an|the)\b', ' ', text)
+
+    def white_space_fix(text):
+        return ' '.join(text.split())
+
+    def remove_punc(text):
+        exclude = set(string.punctuation)
+        return ''.join(ch for ch in text if ch not in exclude)
+
+    def lower(text):
+        return text.lower()
+
+    return white_space_fix(remove_articles(remove_punc(lower(s))))
+
+
+def f1_score(prediction, ground_truth):
+    prediction_tokens = normalize_answer(prediction).split()
+    ground_truth_tokens = normalize_answer(ground_truth).split()
+    common = Counter(prediction_tokens) & Counter(ground_truth_tokens)
+    num_same = sum(common.values())
+    if num_same == 0:
+        return 0
+    precision = 1.0 * num_same / len(prediction_tokens)
+    recall = 1.0 * num_same / len(ground_truth_tokens)
+    f1 = (2 * precision * recall) / (precision + recall)
+    return f1
+
+
+def exact_match_score(prediction, ground_truth):
+    return (normalize_answer(prediction) == normalize_answer(ground_truth))
+
+
+def metric_max_over_ground_truths(metric_fn, prediction, ground_truths):
+    scores_for_ground_truths = []
+    for ground_truth in ground_truths:
+        score = metric_fn(prediction, ground_truth)
+        scores_for_ground_truths.append(score)
+    return max(scores_for_ground_truths)
+
+
+def evaluate(gold_answers, predictions):
+    f1 = exact_match = total = 0
+
+    for ground_truths, prediction in zip(gold_answers, predictions):
+      total += 1
+      exact_match += metric_max_over_ground_truths(
+                    exact_match_score, prediction, ground_truths)
+      f1 += metric_max_over_ground_truths(
+          f1_score, prediction, ground_truths)
+    
+    exact_match = 100.0 * exact_match / total
+    f1 = 100.0 * f1 / total
+
+    return {'exact_match': exact_match, 'f1': f1}
+
 def compute_rouge(prediction_file):
     df = pd.read_csv(prediction_file).astype(str)
+    predictions = df["predictions_str"].tolist()
+    dev_refs = read_squad("./squad/dev-v2.0.json")
     rouge_output = rouge.compute(
-        predictions=df["predictions_str"].tolist(),
-        references=df["target_str"].tolist(),
-        rouge_types=["rouge2"],
-    )["rouge2"].mid
+        predictions = predictions,
+        references = references,
+        rouge_types=["rougeL"],
+    )["rougeL"].mid
 
     output = {
-        "rouge2_precision": round(rouge_output.precision, 4),
-        "rouge2_recall": round(rouge_output.recall, 4),
-        "rouge2_fmeasure": round(rouge_output.fmeasure, 4),
+        "rougeL_precision": round(rouge_output.precision, 4),
+        "rougeL_recall": round(rouge_output.recall, 4),
+        "rougeL_fmeasure": round(rouge_output.fmeasure, 4),
     }
-    return 1.0 - output["rouge2_fmeasure"]
+    return 1.0 - output["rougeL_fmeasure"]
 
 
 def create_squad_dataset(tokenizer, batch_size, source_max_length, decoder_max_length):
@@ -535,7 +620,7 @@ def create_squad_dataset(tokenizer, batch_size, source_max_length, decoder_max_l
     val_dataset = SquadDataset(val_encodings)
 
     train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
-    val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=True)
+    val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False)
     return train_loader, val_loader, val_loader
 
 
