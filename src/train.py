@@ -1,16 +1,13 @@
 import argparse
-from collections import Counter
-import string
-import re
-import argparse
-import json
-import sys
 import csv
 import io
 import json
 import math
 import os
+import re
+import string
 import time
+from collections import Counter
 from configparser import ConfigParser
 from pathlib import Path
 from typing import Generator, Optional
@@ -64,6 +61,7 @@ def read_squad_refs(path):
 
     return all_refs
 
+
 def create_narrative_dataset(
     tokenizer, batch_size, source_max_length, decoder_max_length
 ):
@@ -88,8 +86,8 @@ def create_narrative_dataset(
         article = " ".join(article.split())
 
         return {
-            "article": "question: " + question + " context: " + article,
-            "answer": answer,
+            "article": "question: " + question + " context: " + article + " </s>",
+            "answer": answer["text"] + " </s>",
         }
 
     def process_data_to_model_inputs(batch):
@@ -99,14 +97,14 @@ def create_narrative_dataset(
             truncation=True,
             padding="max_length",
             max_length=source_max_length,
-            add_special_tokens=True,
+            add_special_tokens=False,
         )
         outputs = tokenizer(
             batch["answer"],
             truncation=True,
             padding="max_length",
             max_length=decoder_max_length,
-            add_special_tokens=True,
+            add_special_tokens=False,
         )
 
         batch["input_ids"] = inputs.input_ids
@@ -195,8 +193,8 @@ def create_narrative_dataset(
     )
 
     train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
-    val_loader = DataLoader(dev_dataset, batch_size=batch_size, shuffle=True)
-    test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=True)
+    val_loader = DataLoader(dev_dataset, batch_size=batch_size, shuffle=False)
+    test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False)
 
     return train_loader, val_loader, test_loader
 
@@ -469,15 +467,16 @@ rouge = datasets.load_metric("rouge")
 
 def normalize_answer(s):
     """Lower text and remove punctuation, articles and extra whitespace."""
+
     def remove_articles(text):
-        return re.sub(r'\b(a|an|the)\b', ' ', text)
+        return re.sub(r"\b(a|an|the)\b", " ", text)
 
     def white_space_fix(text):
-        return ' '.join(text.split())
+        return " ".join(text.split())
 
     def remove_punc(text):
         exclude = set(string.punctuation)
-        return ''.join(ch for ch in text if ch not in exclude)
+        return "".join(ch for ch in text if ch not in exclude)
 
     def lower(text):
         return text.lower()
@@ -499,7 +498,7 @@ def f1_score(prediction, ground_truth):
 
 
 def exact_match_score(prediction, ground_truth):
-    return (normalize_answer(prediction) == normalize_answer(ground_truth))
+    return normalize_answer(prediction) == normalize_answer(ground_truth)
 
 
 def metric_max_over_ground_truths(metric_fn, prediction, ground_truths):
@@ -514,24 +513,25 @@ def evaluate(gold_answers, predictions):
     f1 = exact_match = total = 0
 
     for ground_truths, prediction in zip(gold_answers, predictions):
-      total += 1
-      exact_match += metric_max_over_ground_truths(
-                    exact_match_score, prediction, ground_truths)
-      f1 += metric_max_over_ground_truths(
-          f1_score, prediction, ground_truths)
-    
+        total += 1
+        exact_match += metric_max_over_ground_truths(
+            exact_match_score, prediction, ground_truths
+        )
+        f1 += metric_max_over_ground_truths(f1_score, prediction, ground_truths)
+
     exact_match = 100.0 * exact_match / total
     f1 = 100.0 * f1 / total
 
-    return {'exact_match': exact_match, 'f1': f1}
+    return {"exact_match": exact_match, "f1": f1}
+
 
 def compute_rouge(prediction_file):
     df = pd.read_csv(prediction_file).astype(str)
     predictions = df["predictions_str"].tolist()
-    dev_refs = read_squad("./squad/dev-v2.0.json")
+    references = df["target_str"].tolist()
     rouge_output = rouge.compute(
-        predictions = predictions,
-        references = references,
+        predictions=predictions,
+        references=references,
         rouge_types=["rougeL"],
     )["rougeL"].mid
 
@@ -708,8 +708,8 @@ def run_narrative(args):
     config = HyperParameters(
         model_path=args.model_path,
         batch_size=args.batch_size,
-        source_max_length=1024,
-        decoder_max_length=256,
+        source_max_length=512,
+        decoder_max_length=128,
         gpu=args.gpu,
         gpu_device=args.gpu_device,
         learning_rate=args.learning_rate,
@@ -733,6 +733,7 @@ def run_narrative(args):
         train_dataloader=train_loader,
         dev_dataloader=val_loader,
         test_dataloader=test_loader,
+        save_always=True,
     )
 
 

@@ -1328,15 +1328,15 @@ class T5QA(object):
             model = T5ForConditionalGeneration.from_pretrained("t5-base")
             model.to(self.device)
             self.model_path = os.path.join(cfg.model_path, "model")
-            #loaded_weights = torch.load(
-            #    self.model_path + "_model",
-            #    map_location=lambda storage, loc: storage,
-            #)
-            #new_weights = {}
-            #for name, param in loaded_weights.items():
-            #    new_weights[self.remove_prefix(name, "module.")] = param
+            loaded_weights = torch.load(
+                self.model_path + "_best_model",
+                map_location=lambda storage, loc: storage,
+            )
+            new_weights = {}
+            for name, param in loaded_weights.items():
+                new_weights[self.remove_prefix(name, "module.")] = param
 
-            #model.load_state_dict(new_weights)
+            model.load_state_dict(new_weights)
 
         self.model = model
         self.tokenizer = tokenizer
