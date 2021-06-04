@@ -1,4 +1,5 @@
 import argparse
+import random
 import csv
 import io
 import json
@@ -69,14 +70,15 @@ def create_narrative_dataset(
 
     def process_race_row(row):
         """Helper function."""
-        max_answer_length = 0
-        answer = None
-        for asw in row["answers"]:
-            answer_len = len(asw["text"].split())
-            if answer_len > max_answer_length:
-                answer = asw["text"]
-                max_answer_length = answer_len
+        #max_answer_length = 0
+        #answer = None
+        #for asw in row["answers"]:
+        #    answer_len = len(asw["text"].split())
+        #    if answer_len > max_answer_length:
+        #        answer = asw["text"]
+        #        max_answer_length = answer_len
 
+        answer = random.choice(row["answers"])["text"]
         answer = " ".join(answer.split())
 
         question = row["question"]["text"]
@@ -87,7 +89,7 @@ def create_narrative_dataset(
 
         return {
             "article": "question: " + question + " context: " + article + " </s>",
-            "answer": answer["text"] + " </s>",
+            "answer": answer + " </s>",
         }
 
     def process_data_to_model_inputs(batch):
@@ -161,6 +163,7 @@ def create_narrative_dataset(
         batch_size=batch_size,
         remove_columns=["answer", "article"],
     )
+
     dev_dataset.set_format(
         type="torch",
         columns=[
@@ -540,7 +543,7 @@ def compute_rouge(prediction_file):
         "rougeL_recall": round(rouge_output.recall, 4),
         "rougeL_fmeasure": round(rouge_output.fmeasure, 4),
     }
-    return 1.0 - output["rougeL_fmeasure"]
+    return output["rougeL_fmeasure"]
 
 
 def create_squad_dataset(tokenizer, batch_size, source_max_length, decoder_max_length):
@@ -732,7 +735,7 @@ def run_narrative(args):
         evaluator=compute_rouge,
         train_dataloader=train_loader,
         dev_dataloader=val_loader,
-        test_dataloader=test_loader,
+        test_dataloader=val_loader,
         save_always=True,
     )
 
