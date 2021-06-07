@@ -22,6 +22,55 @@ from torch.utils.data import DataLoader
 
 from src.albert_model import T5QA, HyperParameters
 
+def white_space_fix(text):
+    return " ".join(text.split())
+
+def read_dream_data(file):
+    df = pd.read_csv(file)
+    articles_df = df["text"].tolist()
+    questions_df = df["question"].tolist()
+    answers_df = df["correctAnswers"].tolist()
+    num_articles = len(articles_df)
+    
+    contexts = []
+    answers = []
+    for i in range(num_articles):
+        question = white_space_fix(questions_df[i])
+        article = white_space_fix(articles_df[i])
+        answer = answers_df[i]
+        contexts.append("question: " + question + " context: " + article + " </s>")
+        answers.append(answer)
+
+    return contexts, answers
+
+
+def create_dream_dataset(file_name, tokenizer, batch_size, source_max_length, decoder_max_length):
+    """Function to create the squad dataset."""
+    val_contexts, val_answers = read_dream_data(file_name)
+
+    val_encodings = tokenizer(
+        val_contexts,
+        truncation=True,
+        padding="max_length",
+        max_length=source_max_length,
+        add_special_tokens=False,
+    )
+
+    class SquadDataset(torch.utils.data.Dataset):
+        def __init__(self, encodings):
+            self.encodings = encodings
+
+        def __getitem__(self, idx):
+            return {key: torch.tensor(val[idx]) for key, val in self.encodings.items()}
+
+        def __len__(self):
+            return len(self.encodings.input_ids)
+
+    val_dataset = SquadDataset(val_encodings)
+
+    val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False)
+    return val_loader
+
 
 def read_squad(path):
     path = Path(path)
@@ -624,6 +673,7 @@ def create_squad_dataset(tokenizer, batch_size, source_max_length, decoder_max_l
 
     train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
     val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False)
+    
     return train_loader, val_loader, val_loader
 
 
@@ -740,6 +790,42 @@ def run_narrative(args):
     )
 
 
+def run_dream(args):
+    """Test the model on dream dataset."""
+    if args.mode == "dream_test":
+        mode = "test"
+    config = HyperParameters(
+        model_path=args.model_path,
+        batch_size=args.batch_size,
+        source_max_length=512,
+        decoder_max_length=128,
+        gpu=args.gpu,
+        gpu_device=args.gpu_device,
+        learning_rate=args.learning_rate,
+        max_epochs=args.max_epochs,
+        mode=mode,
+        num_train_steps=args.num_train_steps,
+        prediction_file=args.prediction_file,
+    )
+    model = T5QA(config)
+
+    val_loader = create_dream_dataset(
+        args.input_file_name,
+        tokenizer=model.tokenizer,
+        batch_size=config.batch_size,
+        source_max_length=config.source_max_length,
+        decoder_max_length=config.decoder_max_length,
+    )
+    run_model(
+        model,
+        config=config,
+        evaluator=compute_rouge,
+        train_dataloader=None,
+        dev_dataloader=None,
+        test_dataloader=val_loader,
+    )
+
+
 def run_main(args):
     """Decides what to do in the code."""
     if args.mode in ["squad_train", "squad_test"]:
@@ -748,6 +834,8 @@ def run_main(args):
         run_race(args)
     if args.mode in ["narrative_train", "narrative_test"]:
         run_narrative(args)
+    if args.mode in ["dream_test"]:
+        run_dream(args)
 
 
 def argument_parser():
@@ -757,7 +845,7 @@ def argument_parser():
         "--mode",
         type=str,
         required=True,
-        help="squad_train | squad_test | race_train | race_test | narrative_train | narrative_test",
+        help="dream_test | squad_train | squad_test | race_train | race_test | narrative_train | narrative_test",
     )
     parser.add_argument(
         "--model_path",
@@ -776,6 +864,10 @@ def argument_parser():
 
     parser.add_argument(
         "--prediction_file", type=str, help="file for saving predictions"
+    )
+
+    parser.add_argument(
+        "--input_file_name", type=str, help="input file name"
     )
 
     # Hyper-Parameters
