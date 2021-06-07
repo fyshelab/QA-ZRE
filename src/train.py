@@ -93,7 +93,7 @@ def read_squad(path):
                     contexts.append(
                         "question: " + question + " context: " + context + " </s>"
                     )
-                    answers.append(answ + " </s>")
+                    answers.append(answ["text"] + " </s>")
 
     return contexts, answers
 
@@ -890,6 +890,8 @@ def run_main(args):
         run_narrative(args)
     if args.mode in ["dream_test"]:
         run_dream(args)
+    if args.mode in ["all_train"]:
+        run_all(args)
 
 
 def argument_parser():
