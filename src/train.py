@@ -1,10 +1,10 @@
 import argparse
-import random
 import csv
 import io
 import json
 import math
 import os
+import random
 import re
 import string
 import time
@@ -22,8 +22,10 @@ from torch.utils.data import DataLoader
 
 from src.albert_model import T5QA, HyperParameters
 
+
 def white_space_fix(text):
     return " ".join(text.split())
+
 
 def read_dream_data(file):
     df = pd.read_csv(file)
@@ -31,7 +33,7 @@ def read_dream_data(file):
     questions_df = df["question"].tolist()
     answers_df = df["correctAnswers"].tolist()
     num_articles = len(articles_df)
-    
+
     contexts = []
     answers = []
     for i in range(num_articles):
@@ -44,7 +46,9 @@ def read_dream_data(file):
     return contexts, answers
 
 
-def create_dream_dataset(file_name, tokenizer, batch_size, source_max_length, decoder_max_length):
+def create_dream_dataset(
+    file_name, tokenizer, batch_size, source_max_length, decoder_max_length
+):
     """Function to create the squad dataset."""
     val_contexts, val_answers = read_dream_data(file_name)
 
@@ -84,12 +88,12 @@ def read_squad(path):
             context = passage["context"]
             for qa in passage["qas"]:
                 question = qa["question"]
-                for answer in qa["answers"]:
+                if qa["answers"]:
+                    answ = random.choice(qa["answers"])
                     contexts.append(
                         "question: " + question + " context: " + context + " </s>"
                     )
-                    answers.append(answer["text"] + " </s>")
-                    break
+                    answers.append(answ + " </s>")
 
     return contexts, answers
 
@@ -117,16 +121,8 @@ def create_narrative_dataset(
 ):
     """Function to create the narrative dataset."""
 
-    def process_race_row(row):
+    def process_narrative_row(row):
         """Helper function."""
-        #max_answer_length = 0
-        #answer = None
-        #for asw in row["answers"]:
-        #    answer_len = len(asw["text"].split())
-        #    if answer_len > max_answer_length:
-        #        answer = asw["text"]
-        #        max_answer_length = answer_len
-
         answer = random.choice(row["answers"])["text"]
         answer = " ".join(answer.split())
 
@@ -182,7 +178,7 @@ def create_narrative_dataset(
     test_dataset = load_dataset("narrativeqa", "all", split="test")
 
     train_dataset = train_dataset.map(
-        process_race_row,
+        process_narrative_row,
         remove_columns=["document", "answers"],
     )
     train_dataset = train_dataset.map(
@@ -203,7 +199,7 @@ def create_narrative_dataset(
     )
 
     dev_dataset = dev_dataset.map(
-        process_race_row,
+        process_narrative_row,
         remove_columns=["document", "answers"],
     )
     dev_dataset = dev_dataset.map(
@@ -224,7 +220,7 @@ def create_narrative_dataset(
         ],
     )
     test_dataset = test_dataset.map(
-        process_race_row,
+        process_narrative_row,
         remove_columns=["document", "answers"],
     )
     test_dataset = test_dataset.map(
@@ -244,11 +240,11 @@ def create_narrative_dataset(
         ],
     )
 
-    train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
-    val_loader = DataLoader(dev_dataset, batch_size=batch_size, shuffle=False)
-    test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False)
+    # train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
+    # val_loader = DataLoader(dev_dataset, batch_size=batch_size, shuffle=False)
+    # test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False)
 
-    return train_loader, val_loader, test_loader
+    return train_dataset  # , val_loader, test_loader
 
 
 def create_race_dataset(tokenizer, batch_size, source_max_length, decoder_max_length):
@@ -276,8 +272,8 @@ def create_race_dataset(tokenizer, batch_size, source_max_length, decoder_max_le
         article = " ".join(article.split())
 
         return {
-            "article": "question: " + question + " context: " + article,
-            "answer": answer,
+            "article": "question: " + question + " context: " + article + " </s>",
+            "answer": answer + " </s>",
         }
 
     def process_data_to_model_inputs(batch):
@@ -287,14 +283,14 @@ def create_race_dataset(tokenizer, batch_size, source_max_length, decoder_max_le
             truncation=True,
             padding="max_length",
             max_length=source_max_length,
-            add_special_tokens=True,
+            add_special_tokens=False,
         )
         outputs = tokenizer(
             batch["answer"],
             truncation=True,
             padding="max_length",
             max_length=decoder_max_length,
-            add_special_tokens=True,
+            add_special_tokens=False,
         )
 
         batch["input_ids"] = inputs.input_ids
@@ -333,6 +329,7 @@ def create_race_dataset(tokenizer, batch_size, source_max_length, decoder_max_le
             "attention_mask",
             "target_ids",
             "target_attention_mask",
+            "labels",
         ],
     )
 
@@ -354,6 +351,7 @@ def create_race_dataset(tokenizer, batch_size, source_max_length, decoder_max_le
             "attention_mask",
             "target_ids",
             "target_attention_mask",
+            "labels",
         ],
     )
     test_dataset = load_dataset("race", "all", split="test")
@@ -374,14 +372,15 @@ def create_race_dataset(tokenizer, batch_size, source_max_length, decoder_max_le
             "attention_mask",
             "target_ids",
             "target_attention_mask",
+            "labels",
         ],
     )
 
-    train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
-    val_loader = DataLoader(dev_dataset, batch_size=batch_size, shuffle=False)
-    test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False)
+    # train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
+    # val_loader = DataLoader(dev_dataset, batch_size=batch_size, shuffle=False)
+    # test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False)
 
-    return train_loader, val_loader, test_loader
+    return train_dataset  # , val_loader, test_loader
 
 
 def run_train_epoch(
@@ -671,10 +670,10 @@ def create_squad_dataset(tokenizer, batch_size, source_max_length, decoder_max_l
     train_dataset = SquadDataset(train_encodings)
     val_dataset = SquadDataset(val_encodings)
 
-    train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
-    val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False)
-    
-    return train_loader, val_loader, val_loader
+    # train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
+    # val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False)
+
+    return train_dataset  # , val_loader, val_loader
 
 
 def run_squad(args):
@@ -790,6 +789,61 @@ def run_narrative(args):
     )
 
 
+def run_all(args):
+    """Run the T5 on squad, race and narrative qa."""
+    config = HyperParameters(
+        model_path=args.model_path,
+        batch_size=args.batch_size,
+        source_max_length=512,
+        decoder_max_length=128,
+        gpu=args.gpu,
+        gpu_device=args.gpu_device,
+        learning_rate=args.learning_rate,
+        max_epochs=args.max_epochs,
+        mode="train",
+        num_train_steps=args.num_train_steps,
+        prediction_file=args.prediction_file,
+    )
+    model = T5QA(config)
+
+    nar_train_dataset = create_narrative_dataset(
+        tokenizer=model.tokenizer,
+        batch_size=config.batch_size,
+        source_max_length=config.source_max_length,
+        decoder_max_length=config.decoder_max_length,
+    )
+
+    race_train_dataset = create_race_dataset(
+        tokenizer=model.tokenizer,
+        batch_size=config.batch_size,
+        source_max_length=config.source_max_length,
+        decoder_max_length=config.decoder_max_length,
+    )
+
+    sq_train_dataset = create_squad_dataset(
+        tokenizer=model.tokenizer,
+        batch_size=config.batch_size,
+        source_max_length=config.source_max_length,
+        decoder_max_length=config.decoder_max_length,
+    )
+
+    concat_dataset = torch.utils.data.ConcatDataset(
+        [nar_train_dataset, race_train_dataset, sq_train_dataset]
+    )
+    train_loader = torch.utils.data.DataLoader(
+        concat_dataset, batch_size=config.batch_size, shuffle=True
+    )
+    run_model(
+        model,
+        config=config,
+        evaluator=compute_rouge,
+        train_dataloader=train_loader,
+        dev_dataloader=None,
+        test_dataloader=None,
+        save_always=True,
+    )
+
+
 def run_dream(args):
     """Test the model on dream dataset."""
     if args.mode == "dream_test":
@@ -866,9 +920,7 @@ def argument_parser():
         "--prediction_file", type=str, help="file for saving predictions"
     )
 
-    parser.add_argument(
-        "--input_file_name", type=str, help="input file name"
-    )
+    parser.add_argument("--input_file_name", type=str, help="input file name")
 
     # Hyper-Parameters
     parser.add_argument("--dim_model", type=int, default=100, help="dim of model units")
