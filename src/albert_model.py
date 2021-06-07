@@ -1305,6 +1305,15 @@ class T5QA(object):
                 T5ForConditionalGeneration.from_pretrained("t5-base")
             )
             model.to(self.device)
+            #loaded_weights = torch.load(
+            #    self.model_path + "_4_model",
+            #    map_location=lambda storage, loc: storage,
+            #)
+            #new_weights = {}
+            #for name, param in loaded_weights.items():
+            #    new_weights[self.remove_prefix(name, "module.")] = param
+
+            #model.load_state_dict(new_weights)
 
             #self.optimizer = BERTAdam(model.parameters(), lr=cfg.learning_rate) 
             self.optimizer = Adafactor(
@@ -1362,11 +1371,11 @@ class T5QA(object):
 
         input_ids = batch["input_ids"]
         input_mask = batch["attention_mask"]
-        target_ids = batch["target_ids"]
+        #target_ids = batch["target_ids"]
         if self.config.gpu:
             input_ids = input_ids.to(self.device)
             input_mask = input_mask.to(self.device)
-            target_ids = target_ids.to(self.device)
+            #target_ids = target_ids.to(self.device)
 
         predictions = self.model.generate(
             input_ids=input_ids, attention_mask=input_mask
@@ -1377,14 +1386,14 @@ class T5QA(object):
             predictions, skip_special_tokens=True
         )
         input_str = self.tokenizer.batch_decode(input_ids, skip_special_tokens=True)
-        target_str = self.tokenizer.batch_decode(target_ids, skip_special_tokens=True)
+        #target_str = self.tokenizer.batch_decode(target_ids, skip_special_tokens=True)
         for index in range(len(predictions_str)):
             pred_str = predictions_str[index]
             pred_str = pred_str if pred_str != "" else "<EMPTY>"
             output_batch = {
                 "predictions_str": pred_str,
                 "input_str": input_str[index],
-                "target_str": target_str[index],
+                #"target_str": target_str[index],
             }
             yield output_batch
 
