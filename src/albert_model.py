@@ -1333,20 +1333,23 @@ class T5QA(object):
             self.model_path = os.path.join(cfg.model_path, "model")
 
         elif cfg.mode in ["test", "inference"]:
-            tokenizer = T5Tokenizer.from_pretrained("t5-base")
-            # Construct model
-            model = T5ForConditionalGeneration.from_pretrained("t5-base")
+            tokenizer = T5Tokenizer.from_pretrained("allenai/unifiedqa-t5-base")
+            model = T5ForConditionalGeneration.from_pretrained("allenai/unifiedqa-t5-base")
             model.to(self.device)
-            self.model_path = os.path.join(cfg.model_path, "model")
-            loaded_weights = torch.load(
-                self.model_path + "_4_model",
-                map_location=lambda storage, loc: storage,
-            )
-            new_weights = {}
-            for name, param in loaded_weights.items():
-                new_weights[self.remove_prefix(name, "module.")] = param
+            #tokenizer = T5Tokenizer.from_pretrained("t5-base")
+            # Construct model
+            #model = T5ForConditionalGeneration.from_pretrained("t5-base")
+            #model.to(self.device)
+            #self.model_path = os.path.join(cfg.model_path, "model")
+            #loaded_weights = torch.load(
+            #    self.model_path + "_3_model",
+            #    map_location=lambda storage, loc: storage,
+            #)
+            #new_weights = {}
+            #for name, param in loaded_weights.items():
+            #    new_weights[self.remove_prefix(name, "module.")] = param
 
-            model.load_state_dict(new_weights)
+            #model.load_state_dict(new_weights)
 
         self.model = model
         self.tokenizer = tokenizer
@@ -1378,12 +1381,13 @@ class T5QA(object):
             # target_ids = target_ids.to(self.device)
 
         predictions = self.model.generate(
-            input_ids=input_ids, attention_mask=input_mask
+            input_ids=input_ids, attention_mask=input_mask,
+            #temperature=0.9, num_return_sequences=1, num_beams=20
         )
 
         # all special tokens including will be removed
         predictions_str = self.tokenizer.batch_decode(
-            predictions, skip_special_tokens=True
+                predictions, skip_special_tokens=True
         )
         input_str = self.tokenizer.batch_decode(input_ids, skip_special_tokens=True)
         # target_str = self.tokenizer.batch_decode(target_ids, skip_special_tokens=True)
