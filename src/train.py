@@ -12,7 +12,6 @@ from collections import Counter
 from configparser import ConfigParser
 from pathlib import Path
 from typing import Generator, Optional
-
 import datasets
 import numpy as np
 import pandas as pd
@@ -27,6 +26,12 @@ def white_space_fix(text):
     return " ".join(text.split())
 
 
+def normalize_text(text):
+    """Lowercase and remove quotes from a TensorFlow string."""
+    text = tf.strings.lower(text)
+    text = tf.strings.regex_replace(text, "'(.*)'", r"\1")
+    return text
+
 def read_dream_data(file):
     df = pd.read_csv(file)
     articles_df = df["text"].tolist()
@@ -40,7 +45,11 @@ def read_dream_data(file):
         question = white_space_fix(questions_df[i])
         article = white_space_fix(articles_df[i])
         answer = answers_df[i]
-        contexts.append("question: " + question + " context: " + article + " </s>")
+        #contexts.append("question: " + question + " context: " + article + " </s>")
+        context = question + " \n " + article
+        ctx = context.lower()
+        ctx = re.sub("'(.*)'", r"\1", ctx)
+        contexts.append(ctx)
         answers.append(answer)
 
     return contexts, answers
@@ -132,8 +141,12 @@ def create_narrative_dataset(
         article = row["document"]["summary"]["text"]
         article = " ".join(article.split())
 
+        context = question + " \n " + article
+        ctx = context.lower()
+        ctx = re.sub("'(.*)'", r"\1", ctx)
         return {
-            "article": "question: " + question + " context: " + article + " </s>",
+            #"article": "question: " + question + " context: " + article + " </s>",
+            "article": ctx,
             "answer": answer + " </s>",
         }
 
@@ -240,11 +253,11 @@ def create_narrative_dataset(
         ],
     )
 
-    # train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
-    # val_loader = DataLoader(dev_dataset, batch_size=batch_size, shuffle=False)
-    # test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False)
+    train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
+    val_loader = DataLoader(dev_dataset, batch_size=batch_size, shuffle=False)
+    test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False)
 
-    return train_dataset  # , val_loader, test_loader
+    return train_dataset, val_loader, test_loader
 
 
 def create_race_dataset(tokenizer, batch_size, source_max_length, decoder_max_length):
@@ -670,10 +683,10 @@ def create_squad_dataset(tokenizer, batch_size, source_max_length, decoder_max_l
     train_dataset = SquadDataset(train_encodings)
     val_dataset = SquadDataset(val_encodings)
 
-    # train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
-    # val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False)
+    train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
+    val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False)
 
-    return train_dataset  # , val_loader, val_loader
+    return train_dataset, val_loader, val_loader
 
 
 def run_squad(args):
