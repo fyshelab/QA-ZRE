@@ -1,4 +1,5 @@
 import random
+import re
 
 from datasets import load_dataset
 from torch.utils.data import DataLoader
@@ -25,7 +26,9 @@ def create_narrative_dataset(
         article = white_space_fix(article)
 
         context = "question: " + question + " context: " + article + " </s>"
-
+        # context = question + " \n " + article
+        # context = context.lower()
+        # context = re.sub("'(.*)'", r"\1", context)
         return {
             "article": context,
             "answer": answer + " </s>",

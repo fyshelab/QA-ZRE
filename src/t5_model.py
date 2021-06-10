@@ -70,6 +70,7 @@ def save(model: torch.nn.Module, path: str) -> None:
 
 
 MODEL_NAME = "t5-base"
+# MODEL_NAME = "allenai/unifiedqa-t5-base"
 
 
 class T5QA(object):
