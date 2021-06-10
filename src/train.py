@@ -23,7 +23,11 @@ from torch.utils.data import DataLoader
 from src.nq_utils import create_narrative_dataset
 from src.t5_model import T5QA, HyperParameters
 
-"""
+
+def white_space_fix(text):
+    return " ".join(text.split())
+
+
 def read_dream_data(file):
     df = pd.read_csv(file)
     articles_df = df["text"].tolist()
@@ -37,15 +41,14 @@ def read_dream_data(file):
         question = white_space_fix(questions_df[i])
         article = white_space_fix(articles_df[i])
         answer = answers_df[i]
-        # contexts.append("question: " + question + " context: " + article + " </s>")
-        context = question + " \n " + article
-        ctx = context.lower()
-        ctx = re.sub("'(.*)'", r"\1", ctx)
-        contexts.append(ctx)
+        contexts.append("question: " + question + " context: " + article + " </s>")
+        # context = question + " \n " + article
+        # ctx = context.lower()
+        # ctx = re.sub("'(.*)'", r"\1", ctx)
+        # contexts.append(ctx)
         answers.append(answer)
 
     return contexts, answers
-"""
 
 
 def create_dream_dataset(
@@ -304,7 +307,6 @@ def save_config(config: HyperParameters, path: str) -> None:
 def run_model(
     model,
     config,
-    evaluator,
     train_dataloader=None,
     dev_dataloader=None,
     test_dataloader=None,
@@ -637,6 +639,7 @@ def run_narrative(args):
         max_epochs=args.max_epochs,
         mode=mode,
         prediction_file=args.prediction_file,
+        checkpoint=args.checkpoint,
     )
     model = T5QA(config)
 
@@ -651,7 +654,7 @@ def run_narrative(args):
         config=config,
         train_dataloader=train_loader,
         dev_dataloader=val_loader,
-        test_dataloader=val_loader,
+        test_dataloader=test_loader,
         save_always=True,
     )
 
@@ -721,12 +724,11 @@ def run_dream(args):
         source_max_length=512,
         decoder_max_length=128,
         gpu=args.gpu,
-        gpu_device=args.gpu_device,
         learning_rate=args.learning_rate,
         max_epochs=args.max_epochs,
         mode=mode,
-        num_train_steps=args.num_train_steps,
         prediction_file=args.prediction_file,
+        checkpoint=args.checkpoint,
     )
     model = T5QA(config)
 
@@ -740,7 +742,6 @@ def run_dream(args):
     run_model(
         model,
         config=config,
-        evaluator=compute_rouge,
         train_dataloader=None,
         dev_dataloader=None,
         test_dataloader=val_loader,
@@ -834,6 +835,9 @@ def argument_parser():
 
     parser.add_argument(
         "--dream_path", type=str, help="path for reading dream scape data!"
+    )
+    parser.add_argument(
+        "--checkpoint", type=str, help="checkpoint of the trained model."
     )
     args, _ = parser.parse_known_args()
     return args
