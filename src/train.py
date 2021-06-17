@@ -721,7 +721,7 @@ def run_dream(args):
     config = HyperParameters(
         model_path=args.model_path,
         batch_size=args.batch_size,
-        source_max_length=512,
+        source_max_length=256,
         decoder_max_length=128,
         gpu=args.gpu,
         learning_rate=args.learning_rate,
