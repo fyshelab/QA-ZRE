@@ -104,7 +104,7 @@ class BleuScorer(object):
     # special_reflen is used in oracle (proportional effective ref len for a node).
 
     def copy(self):
-        """ copy the refs."""
+        """copy the refs."""
         new = BleuScorer(n=self.n)
         new.ctest = copy.copy(self.ctest)
         new.crefs = copy.copy(self.crefs)
@@ -112,7 +112,7 @@ class BleuScorer(object):
         return new
 
     def __init__(self, test=None, refs=None, n=4, special_reflen=None):
-        """ singular instance """
+        """singular instance"""
 
         self.n = n
         self.crefs = []
@@ -164,7 +164,7 @@ class BleuScorer(object):
         return self
 
     def rescore(self, new_test):
-        """ replace test(s) with new test(s), and returns the new score."""
+        """replace test(s) with new test(s), and returns the new score."""
 
         return self.retest(new_test).compute_score()
 

@@ -53,14 +53,14 @@ class CiderScorer(object):
     """CIDEr scorer."""
 
     def copy(self):
-        """ copy the refs."""
+        """copy the refs."""
         new = CiderScorer(n=self.n)
         new.ctest = copy.copy(self.ctest)
         new.crefs = copy.copy(self.crefs)
         return new
 
     def __init__(self, test=None, refs=None, n=4, sigma=6.0):
-        """ singular instance """
+        """singular instance"""
         self.n = n
         self.sigma = sigma
         self.crefs = []
