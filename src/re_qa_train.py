@@ -78,9 +78,11 @@ def create_docred_dataset(
     val_passages, val_contexts, val_answers = read_docred(
         "./docred/dev.json", "./docred/rel_info.json"
     )
+    """
     test_passages, test_contexts, test_answers = read_docred(
         "./docred/test.json", "./docred/rel_info.json"
     )
+    """
 
     val_encodings = question_tokenizer(
         val_contexts,
@@ -111,7 +113,7 @@ def create_docred_dataset(
         max_length=decoder_max_length,
         add_special_tokens=False,
     )
-
+    """
     test_encodings = question_tokenizer(
         test_contexts,
         truncation=True,
@@ -126,7 +128,7 @@ def create_docred_dataset(
         max_length=decoder_max_length,
         add_special_tokens=False,
     )
-
+    """
     train_encodings["passages"] = train_passages
     train_encodings["entity_relation_passage_input_ids"] = train_encodings.pop(
         "input_ids"
@@ -169,6 +171,7 @@ def create_docred_dataset(
     ]
     val_encodings["second_entity_labels"] = val_labels
 
+    """
     test_encodings["passages"] = test_passages
     test_encodings["entity_relation_passage_input_ids"] = test_encodings.pop(
         "input_ids"
@@ -190,6 +193,7 @@ def create_docred_dataset(
         for labels in test_encodings["second_entity_labels"]
     ]
     test_encodings["second_entity_labels"] = test_labels
+    """
 
     class SquadDataset(torch.utils.data.Dataset):
         def __init__(self, encodings):
@@ -199,23 +203,25 @@ def create_docred_dataset(
             return {key: torch.tensor(val[idx]) for key, val in self.encodings.items()}
 
         def __len__(self):
-            return len(self.encodings.input_ids)
+            return len(self.encodings.entity_relation_passage_input_ids)
 
     train_dataset = SquadDataset(train_encodings)
     val_dataset = SquadDataset(val_encodings)
-    test_dataset = SquadDataset(test_encodings)
+    # test_dataset = SquadDataset(test_encodings)
 
     train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
     val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False)
-    test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False)
+    # test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False)
 
     return (
         train_loader,
         val_loader,
-        test_loader,
+        None,
+        # test_loader,
         train_dataset,
         val_dataset,
-        test_dataset,
+        None
+        # test_dataset,
     )
 
 
@@ -429,20 +435,34 @@ def create_race_dataset(tokenizer, batch_size, source_max_length, decoder_max_le
     )
 
 
-def run_train_epoch(
-    model,
-    train_dataloader,
-) -> Generator:
+def run_train_epoch(model, train_dataloader, phase="answer") -> Generator:
     """Train the model and return the loss for 'num_steps' given the
     'batch_size' and the train_dataset.
 
     Randomly pick a batch from the train_dataset.
     """
     step = 0
-    for batch in train_dataloader:
-        loss_values = model.train(batch)
-        step += 1
-        yield step, loss_values["loss_value"]
+    answer_train_loader, question_train_loader, docred_train_loader = train_dataloader
+    if phase == "answer":
+        for i in range(len(docred_train_loader)):
+            main_batch = docred_train_loader[i]
+            answer_batch = answer_train_loader[
+                random.randint(0, len(answer_train_loader) - 1)
+            ]
+            main_batch.update(answer_batch)
+            loss_values = model.train(main_batch, phase="answer")
+            step += 1
+            yield step, loss_values["loss_value"]
+    elif phase == "question":
+        for i in range(len(docred_train_loader)):
+            main_batch = docred_train_loader[i]
+            answer_batch = question_train_loader[
+                random.randint(0, len(question_train_loader) - 1)
+            ]
+            main_batch.update(answer_batch)
+            loss_values = model.train(main_batch, phase="question")
+            step += 1
+            yield step, loss_values["loss_value"]
 
 
 def run_predict(model, dev_dataloader, prediction_file: str) -> None:
@@ -491,43 +511,65 @@ def run_model(
     mode = config.mode
     if mode == "train":
         print("\nINFO: ML training\n")
-        # Used to save dev set predictions.
-        # prediction_file = os.path.join(model_path, "temp.predicted")
-        # best_val_cost = float("inf")
         first_start = time.time()
         epoch = 0
+        question_inner_loop = config.question_training_steps
+        answer_inner_loop = config.answer_training_steps
         while epoch < max_epochs:
             print("\nEpoch:{0}\n".format(epoch))
             start = time.time()
-            total_loss = []
-            for step, loss in run_train_epoch(model, train_dataloader):
-                if math.isnan(loss):
-                    print("nan loss")
+            for question_loop in question_inner_loop:
+                total_loss = []
+                print("\rInfo: Question Phase Training {0}\n".format(question_loop))
+                for step, loss in run_train_epoch(
+                    model, train_dataloader, phase="question"
+                ):
+                    if math.isnan(loss):
+                        print("nan loss")
 
-                if loss:
-                    total_loss.append(loss)
+                    if loss:
+                        total_loss.append(loss)
 
-                if total_loss:
-                    mean_loss = np.mean(total_loss)
+                    if total_loss:
+                        mean_loss = np.mean(total_loss)
 
-                else:
-                    mean_loss = float("-inf")
+                    else:
+                        mean_loss = float("-inf")
 
-                print(
-                    "\rBatch:{0} | Loss:{1} | Mean Loss:{2}\n".format(
-                        step, loss, mean_loss
+                    print(
+                        "\rBatch:{0} | Loss:{1} | Mean Loss:{2}\n".format(
+                            step, loss, mean_loss
+                        )
                     )
-                )
-            # print("\nValidation:\n")
-            # run_predict(model, dev_dataloader, prediction_file)
-            # val_cost = evaluator(prediction_file)
+                if save_always:
+                    model.save(str(epoch), which_model="question")
 
-            # print("\nValidation cost:{0}\n".format(val_cost))
-            # if val_cost < best_val_cost:
-            #    best_val_cost = val_cost
-            #    model.save("best")
-            if save_always:
-                model.save(str(epoch))
+            for answer_loop in answer_inner_loop:
+                total_loss = []
+                print("\rInfo: Answer Phase Training {0}\n".format(answer_loop))
+                for step, loss in run_train_epoch(
+                    model, train_dataloader, phase="answer"
+                ):
+                    if math.isnan(loss):
+                        print("nan loss")
+
+                    if loss:
+                        total_loss.append(loss)
+
+                    if total_loss:
+                        mean_loss = np.mean(total_loss)
+
+                    else:
+                        mean_loss = float("-inf")
+
+                    print(
+                        "\rBatch:{0} | Loss:{1} | Mean Loss:{2}\n".format(
+                            step, loss, mean_loss
+                        )
+                    )
+                if save_always:
+                    model.save(str(epoch), which_model="answer")
+
             msg = "\nEpoch training time:{} seconds\n".format(time.time() - start)
             print(msg)
             epoch += 1
@@ -535,8 +577,6 @@ def run_model(
         save_config(config, model_path)
         msg = "\nTotal training time:{} seconds\n".format(time.time() - first_start)
         print(msg)
-        # Remove the temp output file
-        # os.remove(prediction_file)
 
     elif mode == "test":
         print("Predicting...")
@@ -709,7 +749,7 @@ def create_rev_squad_dataset(
             return {key: torch.tensor(val[idx]) for key, val in self.encodings.items()}
 
         def __len__(self):
-            return len(self.encodings.input_ids)
+            return len(self.encodings.question_input_ids)
 
     train_dataset = SquadDataset(train_encodings)
     val_dataset = SquadDataset(val_encodings)
@@ -831,12 +871,14 @@ def run_reqa(args):
         source_max_length=512,
         decoder_max_length=128,
         gpu=args.gpu,
-        gpu_device=args.gpu_device,
         learning_rate=args.learning_rate,
         max_epochs=args.max_epochs,
         mode="train",
-        num_train_steps=args.num_train_steps,
         prediction_file=args.prediction_file,
+        answer_checkpoint=args.answer_checkpoint,
+        question_checkpoint=args.question_checkpoint,
+        question_training_steps=args.question_training_steps,
+        answer_training_steps=args.answer_training_steps,
     )
     model = REQA(config)
 
@@ -848,6 +890,7 @@ def run_reqa(args):
         decoder_max_length=config.decoder_max_length,
     )
 
+    exit()
     run_model(
         model,
         config=config,
@@ -945,6 +988,16 @@ def argument_parser():
         "--question_checkpoint",
         type=str,
         help="checkpoint of the trained question model.",
+    )
+    parser.add_argument(
+        "--answer_training_steps",
+        type=int,
+        help="number of epochs to train the answer model compared to the question model.",
+    )
+    parser.add_argument(
+        "--question_training_steps",
+        type=int,
+        help="number of epochs to train the question model compared to the answer model.",
     )
     args, _ = parser.parse_known_args()
     return args
