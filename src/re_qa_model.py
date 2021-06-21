@@ -48,6 +48,8 @@ class HyperParameters:
     num_beams: Optional[int] = 5
     no_repeat_ngram_size: Optional[int] = 2
     early_stopping: Optional[bool] = True
+    question_training_steps: Optional[int] = 5
+    answer_training_steps: Optional[int] = 1
 
 
 def set_random_seed(seed: int) -> Any:
@@ -140,6 +142,7 @@ class REQA(object):
             self.model_path = os.path.join(cfg.model_path, "model")
 
             # Load the answer model from the checkpoint.
+            """
             loaded_weights = torch.load(
                 self.model_path + cfg.answer_checkpoint,
                 map_location=lambda storage, loc: storage,
@@ -149,6 +152,7 @@ class REQA(object):
                 new_weights[self.remove_prefix(name, "module.")] = param
 
             answer_model.load_state_dict(new_weights)
+            """
 
         elif cfg.mode in ["test", "inference"]:
             self.model_path = os.path.join(cfg.model_path, "model")
@@ -225,12 +229,12 @@ class REQA(object):
         )
 
         new_articles = []
-        for i in range(len(batch["passage"])):
+        for i in range(len(batch["passages"])):
             new_article = (
                 "question: "
                 + question_predictions_str[i]
                 + " context: "
-                + batch["passage"][i]
+                + batch["passages"][i]
                 + " </s>"
             )
             new_articles.append(new_article)
@@ -287,12 +291,12 @@ class REQA(object):
             )
 
             new_articles = []
-            for i in range(len(batch["passage"])):
+            for i in range(len(batch["passages"])):
                 new_article = (
                     "question: "
                     + question_predictions_str[i]
                     + " context: "
-                    + batch["passage"][i]
+                    + batch["passages"][i]
                     + " </s>"
                 )
                 new_articles.append(new_article)
@@ -471,7 +475,7 @@ class REQA(object):
                     "question: "
                     + predictions[i]
                     + " context: "
-                    + batch["passage"][i // self.config.num_beams]
+                    + batch["passages"][i // self.config.num_beams]
                     + " </s>"
                 )
                 new_articles.append(new_article)
