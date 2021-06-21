@@ -22,11 +22,201 @@ from torch.utils.data import DataLoader
 
 from src.nq_utils import (create_narrative_dataset,
                           create_reverse_narrative_dataset)
-from src.t5_model import T5QA, HyperParameters
+from src.re_qa_model import REQA, HyperParameters
 
 
 def white_space_fix(text):
     return " ".join(text.split())
+
+
+def read_docred(path, rel_info_path):
+    path = Path(path)
+    rel_info_path = Path(rel_info_path)
+
+    with open(path, "rb") as fd:
+        docred_dict = json.load(fd)
+
+    with open(rel_info_path, "rb") as fd:
+        rel_info_dict = json.load(fd)
+
+    passages = []
+    contexts = []
+    answers = []
+    for group in docred_dict:
+        paragraph = ""
+        for sent in group["sents"]:
+            paragraph += " ".join(sent) + " "
+        for relation in group["labels"]:
+            head_entity = random.choice(group["vertexSet"][relation["h"]])["name"]
+            tail_entity = random.choice(group["vertexSet"][relation["t"]])["name"]
+            relation_type = relation["r"]
+            passages.append(white_space_fix(paragraph))
+            contexts.append(
+                "answer: "
+                + white_space_fix(head_entity)
+                + " <SEP> "
+                + white_space_fix(rel_info_dict[relation_type])
+                + " context: "
+                + white_space_fix(paragraph)
+                + " </s>"
+            )
+            answers.append(white_space_fix(tail_entity) + " </s>")
+    return passages, contexts, answers
+
+
+def create_docred_dataset(
+    answer_tokenizer,
+    question_tokenizer,
+    batch_size,
+    source_max_length,
+    decoder_max_length,
+):
+    """Function to create the docred dataset."""
+    train_passages, train_contexts, train_answers = read_docred(
+        "./docred/train_annotated.json", "./docred/rel_info.json"
+    )
+    val_passages, val_contexts, val_answers = read_docred(
+        "./docred/dev.json", "./docred/rel_info.json"
+    )
+    test_passages, test_contexts, test_answers = read_docred(
+        "./docred/test.json", "./docred/rel_info.json"
+    )
+
+    val_encodings = question_tokenizer(
+        val_contexts,
+        truncation=True,
+        padding="max_length",
+        max_length=source_max_length,
+        add_special_tokens=False,
+    )
+    val_answer_encodings = answer_tokenizer(
+        val_answers,
+        truncation=True,
+        padding="max_length",
+        max_length=decoder_max_length,
+        add_special_tokens=False,
+    )
+
+    train_encodings = question_tokenizer(
+        train_contexts,
+        truncation=True,
+        padding="max_length",
+        max_length=source_max_length,
+        add_special_tokens=False,
+    )
+    train_answer_encodings = answer_tokenizer(
+        train_answers,
+        truncation=True,
+        padding="max_length",
+        max_length=decoder_max_length,
+        add_special_tokens=False,
+    )
+
+    test_encodings = question_tokenizer(
+        test_contexts,
+        truncation=True,
+        padding="max_length",
+        max_length=source_max_length,
+        add_special_tokens=False,
+    )
+    test_answer_encodings = answer_tokenizer(
+        test_answers,
+        truncation=True,
+        padding="max_length",
+        max_length=decoder_max_length,
+        add_special_tokens=False,
+    )
+
+    train_encodings["passages"] = train_passages
+    train_encodings["entity_relation_passage_input_ids"] = train_encodings.pop(
+        "input_ids"
+    )
+    train_encodings["entity_relation_passage_attention_mask"] = train_encodings.pop(
+        "attention_mask"
+    )
+
+    train_encodings["second_entity_labels"] = train_answer_encodings.pop("input_ids")
+    train_encodings["second_entity_attention_mask"] = train_answer_encodings.pop(
+        "attention_mask"
+    )
+
+    # because BERT automatically shifts the labels, the labels correspond exactly to `target_ids`.
+    # We have to make sure that the PAD token is ignored
+
+    train_labels = [
+        [-100 if token == answer_tokenizer.pad_token_id else token for token in labels]
+        for labels in train_encodings["second_entity_labels"]
+    ]
+    train_encodings["second_entity_labels"] = train_labels
+
+    val_encodings["passages"] = val_passages
+    val_encodings["entity_relation_passage_input_ids"] = val_encodings.pop("input_ids")
+    val_encodings["entity_relation_passage_attention_mask"] = val_encodings.pop(
+        "attention_mask"
+    )
+
+    val_encodings["second_entity_labels"] = val_answer_encodings.pop("input_ids")
+    val_encodings["second_entity_attention_mask"] = val_answer_encodings.pop(
+        "attention_mask"
+    )
+
+    # because BERT automatically shifts the labels, the labels correspond exactly to `target_ids`.
+    # We have to make sure that the PAD token is ignored.
+
+    val_labels = [
+        [-100 if token == answer_tokenizer.pad_token_id else token for token in labels]
+        for labels in val_encodings["second_entity_labels"]
+    ]
+    val_encodings["second_entity_labels"] = val_labels
+
+    test_encodings["passages"] = test_passages
+    test_encodings["entity_relation_passage_input_ids"] = test_encodings.pop(
+        "input_ids"
+    )
+    test_encodings["entity_relation_passage_attention_mask"] = test_encodings.pop(
+        "attention_mask"
+    )
+
+    test_encodings["second_entity_labels"] = test_answer_encodings.pop("input_ids")
+    test_encodings["second_entity_attention_mask"] = test_answer_encodings.pop(
+        "attention_mask"
+    )
+
+    # because BERT automatically shifts the labels, the labels correspond exactly to `target_ids`.
+    # We have to make sure that the PAD token is ignored.
+
+    test_labels = [
+        [-100 if token == answer_tokenizer.pad_token_id else token for token in labels]
+        for labels in test_encodings["second_entity_labels"]
+    ]
+    test_encodings["second_entity_labels"] = test_labels
+
+    class SquadDataset(torch.utils.data.Dataset):
+        def __init__(self, encodings):
+            self.encodings = encodings
+
+        def __getitem__(self, idx):
+            return {key: torch.tensor(val[idx]) for key, val in self.encodings.items()}
+
+        def __len__(self):
+            return len(self.encodings.input_ids)
+
+    train_dataset = SquadDataset(train_encodings)
+    val_dataset = SquadDataset(val_encodings)
+    test_dataset = SquadDataset(test_encodings)
+
+    train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
+    val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False)
+    test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False)
+
+    return (
+        train_loader,
+        val_loader,
+        test_loader,
+        train_dataset,
+        val_dataset,
+        test_dataset,
+    )
 
 
 def read_squad(path):
@@ -435,7 +625,7 @@ def create_squad_dataset(tokenizer, batch_size, source_max_length, decoder_max_l
     train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
     val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False)
 
-    return train_dataset, val_loader, val_loader
+    return train_loader, val_loader, train_dataset, val_dataset
 
 
 def create_rev_squad_dataset(
@@ -527,11 +717,114 @@ def create_rev_squad_dataset(
     train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
     val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False)
 
-    return train_dataset, val_loader, val_loader
+    return train_loader, val_loader, train_dataset, val_dataset
 
 
-def run_all(args):
-    """Run the T5 on squad, race and narrative qa."""
+def create_all_relation_qa_dataset(
+    answer_tokenizer,
+    question_tokenizer,
+    batch_size,
+    source_max_length,
+    decoder_max_length,
+):
+    (
+        squad_train_loader,
+        squad_val_loader,
+        squad_train_dataset,
+        squad_val_dataset,
+    ) = create_squad_dataset(
+        answer_tokenizer, batch_size, source_max_length, decoder_max_length
+    )
+    (
+        rev_squad_train_loader,
+        rev_squad_val_loader,
+        rev_squad_train_dataset,
+        rev_squad_val_dataset,
+    ) = create_rev_squad_dataset(
+        question_tokenizer, batch_size, source_max_length, decoder_max_length
+    )
+    (
+        nq_train_loader,
+        nq_val_loader,
+        nq_test_loader,
+        nq_train_dataset,
+        nq_dev_dataset,
+        nq_test_dataset,
+    ) = create_narrative_dataset(
+        answer_tokenizer, batch_size, source_max_length, decoder_max_length
+    )
+    (
+        rev_nq_train_loader,
+        rev_nq_val_loader,
+        rev_nq_test_loader,
+        rev_nq_train_dataset,
+        rev_nq_dev_dataset,
+        rev_nq_test_dataset,
+    ) = create_reverse_narrative_dataset(
+        question_tokenizer, batch_size, source_max_length, decoder_max_length
+    )
+    (
+        race_train_loader,
+        race_val_loader,
+        race_test_loader,
+        race_train_dataset,
+        race_dev_dataset,
+        race_test_dataset,
+    ) = create_race_dataset(
+        answer_tokenizer, batch_size, source_max_length, decoder_max_length
+    )
+    (
+        docred_train_loader,
+        docred_val_loader,
+        docred_test_loader,
+        docred_train_dataset,
+        docred_dev_dataset,
+        docred_test_dataset,
+    ) = create_docred_dataset(
+        answer_tokenizer,
+        question_tokenizer,
+        batch_size,
+        source_max_length,
+        decoder_max_length,
+    )
+
+    answer_train_datasets = torch.utils.data.ConcatDataset(
+        [squad_train_dataset, nq_train_dataset, race_train_dataset]
+    )
+    answer_eval_datasets = torch.utils.data.ConcatDataset(
+        [squad_val_dataset, nq_dev_dataset, race_dev_dataset]
+    )
+
+    question_train_datasets = torch.utils.data.ConcatDataset(
+        [rev_squad_train_dataset, rev_nq_train_dataset]
+    )
+    question_eval_datasets = torch.utils.data.ConcatDataset(
+        [rev_squad_val_dataset, rev_nq_dev_dataset]
+    )
+
+    answer_train_loader = DataLoader(
+        answer_train_datasets, batch_size=batch_size, shuffle=True
+    )
+    answer_eval_loader = DataLoader(
+        answer_eval_datasets, batch_size=batch_size, shuffle=False
+    )
+
+    question_train_loader = DataLoader(
+        question_train_datasets, batch_size=batch_size, shuffle=True
+    )
+    question_eval_loader = DataLoader(
+        question_eval_datasets, batch_size=batch_size, shuffle=False
+    )
+
+    return (answer_train_loader, question_train_loader, docred_train_loader), (
+        answer_eval_loader,
+        question_eval_loader,
+        docred_val_loader,
+    )
+
+
+def run_reqa(args):
+    """Run the relation-extraction qa models."""
     config = HyperParameters(
         model_path=args.model_path,
         batch_size=args.batch_size,
@@ -545,41 +838,21 @@ def run_all(args):
         num_train_steps=args.num_train_steps,
         prediction_file=args.prediction_file,
     )
-    model = T5QA(config)
+    model = REQA(config)
 
-    nar_train_dataset = create_narrative_dataset(
-        tokenizer=model.tokenizer,
+    train_loaders, val_loaders = create_all_relation_qa_dataset(
+        answer_tokenizer=model.answer_tokenizer,
+        question_tokenizer=model.question_tokenizer,
         batch_size=config.batch_size,
         source_max_length=config.source_max_length,
         decoder_max_length=config.decoder_max_length,
     )
 
-    race_train_dataset = create_race_dataset(
-        tokenizer=model.tokenizer,
-        batch_size=config.batch_size,
-        source_max_length=config.source_max_length,
-        decoder_max_length=config.decoder_max_length,
-    )
-
-    sq_train_dataset = create_squad_dataset(
-        tokenizer=model.tokenizer,
-        batch_size=config.batch_size,
-        source_max_length=config.source_max_length,
-        decoder_max_length=config.decoder_max_length,
-    )
-
-    concat_dataset = torch.utils.data.ConcatDataset(
-        [nar_train_dataset, race_train_dataset, sq_train_dataset]
-    )
-    train_loader = torch.utils.data.DataLoader(
-        concat_dataset, batch_size=config.batch_size, shuffle=True
-    )
     run_model(
         model,
         config=config,
-        evaluator=compute_rouge,
-        train_dataloader=train_loader,
-        dev_dataloader=None,
+        train_dataloader=train_loaders,
+        dev_dataloader=val_loaders,
         test_dataloader=None,
         save_always=True,
     )
