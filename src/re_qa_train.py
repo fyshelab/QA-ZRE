@@ -879,6 +879,7 @@ def run_reqa(args):
         question_checkpoint=args.question_checkpoint,
         question_training_steps=args.question_training_steps,
         answer_training_steps=args.answer_training_steps,
+        num_beams=args.num_beams,
     )
     model = REQA(config)
 
@@ -890,7 +891,6 @@ def run_reqa(args):
         decoder_max_length=config.decoder_max_length,
     )
 
-    exit()
     run_model(
         model,
         config=config,
@@ -964,6 +964,7 @@ def argument_parser():
     parser.add_argument(
         "--max_epochs", type=int, default=25, help="max number of training iterations"
     )
+    parser.add_argument("--num_beams", type=int, default=32, help="Number of beam size")
 
     parser.add_argument("--gpu_device", type=int, default=0, help="gpu device to use")
 
