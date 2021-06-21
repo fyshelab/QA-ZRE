@@ -275,7 +275,7 @@ class REQA(object):
                 question_input_mask = question_input_mask.to(self.device)
 
             # Greedy Policy
-            question_predictions = self.question_model.generate(
+            question_predictions = self.question_model.module.generate(
                 input_ids=question_input_ids,
                 attention_mask=question_input_mask,
             )
@@ -376,7 +376,7 @@ class REQA(object):
 
             b_sz, _ = question_input_ids.size()
             # Use top-p sampling to collect random samples.
-            sampled_question_outputs = self.question_model.generate(
+            sampled_question_outputs = self.question_model.module.generate(
                 input_ids=question_input_ids,
                 attention_mask=question_input_mask,
                 do_sample=True,
@@ -413,7 +413,7 @@ class REQA(object):
             sampled_p = torch.exp(log_p)
 
             # Use beam search to collect samples.
-            beam_question_outputs = self.question_model.generate(
+            beam_question_outputs = self.question_model.module.generate(
                 input_ids=question_input_ids,
                 attention_mask=question_input_mask,
                 no_repeat_ngram_size=self.config.no_repeat_ngram_size,
