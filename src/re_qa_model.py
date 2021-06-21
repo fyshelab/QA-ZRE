@@ -142,17 +142,11 @@ class REQA(object):
             self.model_path = os.path.join(cfg.model_path, "model")
 
             # Load the answer model from the checkpoint.
-            """
             loaded_weights = torch.load(
                 self.model_path + cfg.answer_checkpoint,
                 map_location=lambda storage, loc: storage,
             )
-            new_weights = {}
-            for name, param in loaded_weights.items():
-                new_weights[self.remove_prefix(name, "module.")] = param
-
-            answer_model.load_state_dict(new_weights)
-            """
+            answer_model.load_state_dict(loaded_weights)
 
         elif cfg.mode in ["test", "inference"]:
             self.model_path = os.path.join(cfg.model_path, "model")
@@ -200,9 +194,9 @@ class REQA(object):
         """Save the encoder model to the specified path name."""
         path = self.model_path + "_" + checkpoint_name
         if which_model == "answer":
-            save(self.answer_model, path + "_model")
+            save(self.answer_model, path + "_answer_model")
         elif which_model == "question":
-            save(self.question_model, path + "_model")
+            save(self.question_model, path + "_question_model")
 
     def predict(self, batch):
         # Free memory in GPU, very important!
@@ -407,7 +401,12 @@ class REQA(object):
             sampled_scores = torch.index_select(
                 sampled_question_scores.view(-1, v), sampled_question_predictions_flat
             ).squeeze()
-            log_p = (sampled_scores - sampled_logsumexp(-1)).view(l, n)
+            log_p = (
+                sampled_scores
+                - sampled_logsumexp.view(
+                    -1,
+                )
+            ).view(l, n)
             pad_mask = torch.transpose(sampled_question_predictions, 0, 1) == 0
             good_log_p = log_p.masked_fill_(pad_mask, 0.0)
             log_p = torch.sum(good_log_p, dim=0).squeeze()
@@ -437,7 +436,12 @@ class REQA(object):
             beam_scores = torch.index_select(
                 beam_question_scores.view(-1, v), beam_question_predictions_flat
             ).squeeze()
-            log_p = (beam_scores - beam_logsumexp(-1)).view(l, n)
+            log_p = (
+                beam_scores
+                - beam_logsumexp.view(
+                    -1,
+                )
+            ).view(l, n)
             pad_mask = torch.transpose(beam_question_predictions, 0, 1) == 0
             good_log_p = log_p.masked_fill_(pad_mask, 0.0)
             log_p = torch.sum(good_log_p, dim=0).squeeze()
@@ -510,7 +514,15 @@ class REQA(object):
             # mean loss from multiple GPUs
             re_p_answer = torch.exp(-output.loss).view(self.config.num_beams, b_sz)
             re_loss = torch.mean(
-                torch.log(torch.sum(torch.mul(re_p_answer, re_p_question), dim=1)),
+                torch.log(
+                    torch.sum(
+                        torch.mul(
+                            torch.transpose(re_p_answer, 0, 1),
+                            torch.transpose(re_p_question, 0, 1),
+                        ),
+                        dim=1,
+                    )
+                ),
                 dim=0,
             )
 
