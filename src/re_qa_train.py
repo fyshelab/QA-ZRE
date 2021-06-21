@@ -200,7 +200,13 @@ def create_docred_dataset(
             self.encodings = encodings
 
         def __getitem__(self, idx):
-            return {key: torch.tensor(val[idx]) for key, val in self.encodings.items()}
+            row = {}
+            for key, val in self.encodings.items():
+                if key == "passages":
+                    row[key] = val[idx]
+                else:
+                    row[key] = torch.tensor(val[idx])
+            return row
 
         def __len__(self):
             return len(self.encodings.entity_relation_passage_input_ids)
@@ -444,21 +450,17 @@ def run_train_epoch(model, train_dataloader, phase="answer") -> Generator:
     step = 0
     answer_train_loader, question_train_loader, docred_train_loader = train_dataloader
     if phase == "answer":
-        for i in range(len(docred_train_loader)):
-            main_batch = docred_train_loader[i]
-            answer_batch = answer_train_loader[
-                random.randint(0, len(answer_train_loader) - 1)
-            ]
+        answer_iter = iter(answer_train_loader)
+        for main_batch in docred_train_loader:
+            answer_batch = next(answer_iter)
             main_batch.update(answer_batch)
             loss_values = model.train(main_batch, phase="answer")
             step += 1
             yield step, loss_values["loss_value"]
     elif phase == "question":
-        for i in range(len(docred_train_loader)):
-            main_batch = docred_train_loader[i]
-            answer_batch = question_train_loader[
-                random.randint(0, len(question_train_loader) - 1)
-            ]
+        question_iter = iter(question_train_loader)
+        for main_batch in docred_train_loader:
+            answer_batch = next(question_iter)
             main_batch.update(answer_batch)
             loss_values = model.train(main_batch, phase="question")
             step += 1
@@ -518,7 +520,7 @@ def run_model(
         while epoch < max_epochs:
             print("\nEpoch:{0}\n".format(epoch))
             start = time.time()
-            for question_loop in question_inner_loop:
+            for question_loop in range(question_inner_loop):
                 total_loss = []
                 print("\rInfo: Question Phase Training {0}\n".format(question_loop))
                 for step, loss in run_train_epoch(
@@ -544,7 +546,7 @@ def run_model(
                 if save_always:
                     model.save(str(epoch), which_model="question")
 
-            for answer_loop in answer_inner_loop:
+            for answer_loop in range(answer_inner_loop):
                 total_loss = []
                 print("\rInfo: Answer Phase Training {0}\n".format(answer_loop))
                 for step, loss in run_train_epoch(
