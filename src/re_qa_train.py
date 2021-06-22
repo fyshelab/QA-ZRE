@@ -215,8 +215,8 @@ def create_docred_dataset(
     val_dataset = SquadDataset(val_encodings)
     # test_dataset = SquadDataset(test_encodings)
 
-    train_loader = DataLoader(train_dataset[:16], batch_size=batch_size, shuffle=True)
-    val_loader = DataLoader(val_dataset[:16], batch_size=batch_size, shuffle=False)
+    train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
+    val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False)
     # test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False)
 
     return (

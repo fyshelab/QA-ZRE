@@ -18,6 +18,10 @@ import torch
 from transformers import Adafactor, T5ForConditionalGeneration, T5Tokenizer
 
 
+def tuple_of_tensors_to_tensor(tuple_of_tensors):
+    return torch.stack(list(tuple_of_tensors), dim=0)
+
+
 @dataclass
 class HyperParameters:
     """General Model configuration."""
@@ -391,6 +395,9 @@ class REQA(object):
 
             sampled_question_predictions = sampled_question_outputs.sequences[:, 1:]
             sampled_question_scores = sampled_question_outputs.scores
+            sampled_question_scores = tuple_of_tensors_to_tensor(
+                sampled_question_scores
+            )
             l, n, v = sampled_question_scores.size()
             sampled_logsumexp = torch.logsumexp(sampled_question_scores, dim=2)
             sampled_question_predictions_flat = torch.transpose(
@@ -426,6 +433,7 @@ class REQA(object):
             )
             beam_question_predictions = beam_question_outputs.sequences[:, 1:]
             beam_question_scores = beam_question_outputs.scores
+            beam_question_scores = tuple_of_tensors_to_tensor(beam_question_scores)
             l, n, v = beam_question_scores.size()
             beam_logsumexp = torch.logsumexp(beam_question_scores, dim=2)
             beam_question_predictions_flat = torch.transpose(
