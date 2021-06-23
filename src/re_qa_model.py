@@ -76,8 +76,8 @@ def save(model: torch.nn.Module, path: str) -> None:
     torch.save(model.state_dict(), path)
 
 
-MODEL_NAME = "t5-base"
-# MODEL_NAME = "allenai/unifiedqa-t5-base"
+# MODEL_NAME = "t5-base"
+MODEL_NAME = "allenai/unifiedqa-t5-base"
 Q_MODEL_NAME = "iarfmoose/t5-base-question-generator"
 
 
@@ -146,11 +146,11 @@ class REQA(object):
             self.model_path = os.path.join(cfg.model_path, "model")
 
             # Load the answer model from the checkpoint.
-            loaded_weights = torch.load(
-                self.model_path + cfg.answer_checkpoint,
-                map_location=lambda storage, loc: storage,
-            )
-            answer_model.load_state_dict(loaded_weights)
+            # loaded_weights = torch.load(
+            #    self.model_path + cfg.answer_checkpoint,
+            #    map_location=lambda storage, loc: storage,
+            # )
+            # answer_model.load_state_dict(loaded_weights)
 
         elif cfg.mode in ["test", "inference"]:
             self.model_path = os.path.join(cfg.model_path, "model")

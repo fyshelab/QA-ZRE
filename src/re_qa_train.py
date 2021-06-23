@@ -347,9 +347,8 @@ def create_race_dataset(tokenizer, batch_size, source_max_length, decoder_max_le
         batch["input_ids"] = inputs.input_ids
         batch["attention_mask"] = inputs.attention_mask
 
-        batch["target_ids"] = outputs.input_ids
         batch["target_attention_mask"] = outputs.attention_mask
-        batch["labels"] = outputs.input_ids.copy()
+        batch["labels"] = outputs.input_ids
 
         # because BERT automatically shifts the labels, the labels correspond exactly to `target_ids`.
         # We have to make sure that the PAD token is ignored
@@ -378,7 +377,6 @@ def create_race_dataset(tokenizer, batch_size, source_max_length, decoder_max_le
         columns=[
             "input_ids",
             "attention_mask",
-            "target_ids",
             "target_attention_mask",
             "labels",
         ],
@@ -400,7 +398,6 @@ def create_race_dataset(tokenizer, batch_size, source_max_length, decoder_max_le
         columns=[
             "input_ids",
             "attention_mask",
-            "target_ids",
             "target_attention_mask",
             "labels",
         ],
@@ -421,7 +418,6 @@ def create_race_dataset(tokenizer, batch_size, source_max_length, decoder_max_le
         columns=[
             "input_ids",
             "attention_mask",
-            "target_ids",
             "target_attention_mask",
             "labels",
         ],
@@ -623,10 +619,9 @@ def create_squad_dataset(tokenizer, batch_size, source_max_length, decoder_max_l
         add_special_tokens=False,
     )
 
-    train_encodings["target_ids"] = train_answer_encodings.input_ids
     train_encodings["target_attention_mask"] = train_answer_encodings.attention_mask
 
-    train_encodings["labels"] = train_answer_encodings.input_ids.copy()
+    train_encodings["labels"] = train_answer_encodings.input_ids
 
     # because BERT automatically shifts the labels, the labels correspond exactly to `target_ids`.
     # We have to make sure that the PAD token is ignored
@@ -637,10 +632,9 @@ def create_squad_dataset(tokenizer, batch_size, source_max_length, decoder_max_l
     ]
     train_encodings["labels"] = train_labels
 
-    val_encodings["target_ids"] = val_answer_encodings.input_ids
     val_encodings["target_attention_mask"] = val_answer_encodings.attention_mask
 
-    val_encodings["labels"] = val_answer_encodings.input_ids.copy()
+    val_encodings["labels"] = val_answer_encodings.input_ids
 
     # because BERT automatically shifts the labels, the labels correspond exactly to `target_ids`.
     # We have to make sure that the PAD token is ignored.
@@ -709,12 +703,11 @@ def create_rev_squad_dataset(
 
     train_encodings["question_input_ids"] = train_encodings.pop("input_ids")
     train_encodings["question_attention_mask"] = train_encodings.pop("attention_mask")
-    train_encodings["question_target_ids"] = train_answer_encodings.input_ids
     train_encodings[
         "question_target_attention_mask"
     ] = train_answer_encodings.attention_mask
 
-    train_encodings["question_labels"] = train_answer_encodings.input_ids.copy()
+    train_encodings["question_labels"] = train_answer_encodings.input_ids
 
     # because BERT automatically shifts the labels, the labels correspond exactly to `target_ids`.
     # We have to make sure that the PAD token is ignored
@@ -727,12 +720,11 @@ def create_rev_squad_dataset(
 
     val_encodings["question_input_ids"] = val_encodings.pop("input_ids")
     val_encodings["question_attention_mask"] = val_encodings.pop("attention_mask")
-    val_encodings["question_target_ids"] = val_answer_encodings.input_ids
     val_encodings[
         "question_target_attention_mask"
     ] = val_answer_encodings.attention_mask
 
-    val_encodings["question_labels"] = val_answer_encodings.input_ids.copy()
+    val_encodings["question_labels"] = val_answer_encodings.input_ids
 
     # because BERT automatically shifts the labels, the labels correspond exactly to `target_ids`.
     # We have to make sure that the PAD token is ignored.

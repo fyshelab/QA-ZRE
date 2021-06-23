@@ -54,7 +54,7 @@ def create_reverse_narrative_dataset(
         batch["question_input_ids"] = inputs.input_ids
         batch["question_attention_mask"] = inputs.attention_mask
         batch["question_target_attention_mask"] = outputs.attention_mask
-        batch["question_labels"] = outputs.input_ids
+        batch["question_labels"] = outputs.input_ids.copy()
 
         # We have to make sure that the PAD token is ignored, -100 is being ignored in the loss function.
 
