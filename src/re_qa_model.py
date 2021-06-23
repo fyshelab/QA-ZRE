@@ -537,7 +537,7 @@ class REQA(object):
             target_mask = target_mask.repeat(1, self.config.num_beams).view(-1, seq_len)
 
             # Reduce memory requirement.
-            outputs = []
+            good_ps = []
             answer_input_ids_re = answer_input_ids.view(self.config.num_beams, b_sz, -1)
             answer_input_mask_re = answer_input_mask.view(
                 self.config.num_beams, b_sz, -1
@@ -551,18 +551,15 @@ class REQA(object):
                     decoder_attention_mask=target_mask_re[i, :, :],
                     labels=labels_re[i, :, :],
                 )
-                outputs.append(output.logits)
+                re_ps_answer = torch.softmax(output.logits, dim=2)
+                re_p_answer = torch.gather(
+                    re_ps_answer, 2, labels_re[i, :, :].view(b_sz, seq_len, 1)
+                ).squeeze()
+                pad_mask = labels_re[i, :, :] == 0
+                good_p = torch.prod(re_p_answer.masked_fill_(pad_mask, 1.0), dim=1)
+                good_ps.append(good_p)
 
-            logits = torch.stack(outputs, 0)
-            logits = logits.view(self.config.num_beams * b_sz, seq_len, -1)
-            # mean loss from multiple GPUs
-            re_ps_answer = torch.softmax(logits, dim=2)
-            new_bz, seq_len, v = re_ps_answer.size()
-            re_p_answer = torch.gather(
-                re_ps_answer, 2, labels.view(new_bz, seq_len, 1)
-            ).squeeze()
-            pad_mask = labels == 0
-            good_p = torch.prod(re_p_answer.masked_fill_(pad_mask, 1.0), dim=1)
+            good_p = torch.stack(good_ps, 0)
             re_p_answer = good_p.view(self.config.num_beams, b_sz)
             re_loss = -torch.mean(
                 torch.log(
