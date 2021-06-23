@@ -146,53 +146,48 @@ class REQA(object):
             self.model_path = os.path.join(cfg.model_path, "model")
 
             # Load the answer model from the checkpoint.
+            """
             loaded_weights = torch.load(
                 self.model_path + cfg.answer_checkpoint,
                 map_location=lambda storage, loc: storage,
             )
             answer_model.load_state_dict(loaded_weights)
+            """
 
         elif cfg.mode in ["test", "inference"]:
             self.model_path = os.path.join(cfg.model_path, "model")
             # answer model
             answer_tokenizer = T5Tokenizer.from_pretrained(MODEL_NAME)
-            answer_model = T5ForConditionalGeneration.from_pretrained(MODEL_NAME)
+            answer_model = torch.nn.DataParallel(
+                T5ForConditionalGeneration.from_pretrained(MODEL_NAME)
+            )
             answer_model.to(self.device)
 
-            loaded_weights = torch.load(
-                self.model_path + cfg.answer_checkpoint,
-                map_location=lambda storage, loc: storage,
+            answer_model.load_state_dict(
+                torch.load(
+                    self.model_path + cfg.answer_checkpoint,
+                    map_location=lambda storage, loc: storage,
+                )
             )
-            new_weights = {}
-            for name, param in loaded_weights.items():
-                new_weights[self.remove_prefix(name, "module.")] = param
-
-            answer_model.load_state_dict(new_weights)
 
             # question model
             question_tokenizer = T5Tokenizer.from_pretrained(Q_MODEL_NAME)
-            question_model = T5ForConditionalGeneration.from_pretrained(Q_MODEL_NAME)
+            question_model = torch.nn.DataParallel(
+                T5ForConditionalGeneration.from_pretrained(Q_MODEL_NAME)
+            )
             question_model.to(self.device)
 
-            loaded_weights = torch.load(
-                self.model_path + cfg.question_checkpoint,
-                map_location=lambda storage, loc: storage,
+            question_model.load_state_dict(
+                torch.load(
+                    self.model_path + cfg.question_checkpoint,
+                    map_location=lambda storage, loc: storage,
+                )
             )
-            new_weights = {}
-            for name, param in loaded_weights.items():
-                new_weights[self.remove_prefix(name, "module.")] = param
-
-            question_model.load_state_dict(new_weights)
 
         self.answer_model = answer_model
         self.answer_tokenizer = answer_tokenizer
         self.question_model = question_model
         self.question_tokenizer = question_tokenizer
-
-    def remove_prefix(self, text, prefix):
-        if text.startswith(prefix):
-            return text[len(prefix) :]
-        return text
 
     def save(self, checkpoint_name: str, which_model="answer"):
         """Save the encoder model to the specified path name."""
@@ -217,7 +212,7 @@ class REQA(object):
             question_input_ids = question_input_ids.to(self.device)
             question_input_mask = question_input_mask.to(self.device)
 
-        question_predictions = self.question_model.generate(
+        question_predictions = self.question_model.module.generate(
             input_ids=question_input_ids,
             attention_mask=question_input_mask,
         )
@@ -243,12 +238,15 @@ class REQA(object):
             padding="max_length",
             max_length=self.config.source_max_length,
             add_special_tokens=False,
+            return_tensors="pt",
         )
+        answer_input_ids = answer_inputs.input_ids
+        answer_input_mask = answer_inputs.attention_mask
         if self.config.gpu:
-            answer_input_ids = answer_inputs.input_ids.to(self.device)
-            answer_input_mask = answer_inputs.attention_mask.to(self.device)
+            answer_input_ids = answer_input_ids.to(self.device)
+            answer_input_mask = answer_input_mask.to(self.device)
 
-        second_entity_predictions = self.answer_model.generate(
+        second_entity_predictions = self.answer_model.module.generate(
             input_ids=answer_input_ids,
             attention_mask=answer_input_mask,
         )
@@ -305,10 +303,13 @@ class REQA(object):
                 padding="max_length",
                 max_length=self.config.source_max_length,
                 add_special_tokens=False,
+                return_tensors="pt",
             )
+            answer_input_ids = answer_inputs.input_ids
+            answer_input_mask = answer_inputs.attention_mask
             if self.config.gpu:
-                answer_input_ids = answer_inputs.input_ids.to(self.device)
-                answer_input_mask = answer_inputs.attention_mask.to(self.device)
+                answer_input_ids = answer_input_ids.to(self.device)
+                answer_input_mask = answer_input_mask.to(self.device)
 
             self.answer_model.train()
             self.answer_optimizer.zero_grad()
@@ -400,13 +401,13 @@ class REQA(object):
             )
             l, n, v = sampled_question_scores.size()
             sampled_logsumexp = torch.logsumexp(sampled_question_scores, dim=2)
-            sampled_question_predictions_flat = torch.transpose(
-                sampled_question_predictions, 0, 1
-            ).view(
-                -1,
+            sampled_question_predictions_flat = torch.reshape(
+                torch.transpose(sampled_question_predictions, 0, 1), (l * n, 1)
             )
-            sampled_scores = torch.index_select(
-                sampled_question_scores.view(-1, v), sampled_question_predictions_flat
+            sampled_scores = torch.gather(
+                sampled_question_scores.view(-1, v),
+                1,
+                sampled_question_predictions_flat,
             ).squeeze()
             log_p = (
                 sampled_scores
@@ -414,6 +415,7 @@ class REQA(object):
                     -1,
                 )
             ).view(l, n)
+
             pad_mask = torch.transpose(sampled_question_predictions, 0, 1) == 0
             good_log_p = log_p.masked_fill_(pad_mask, 0.0)
             log_p = torch.sum(good_log_p, dim=0).squeeze()
@@ -427,7 +429,7 @@ class REQA(object):
                 early_stopping=self.config.early_stopping,
                 max_length=self.config.decoder_max_length,
                 num_return_sequences=self.config.num_beams // 2,
-                num_beams=self.config.num_beams,
+                num_beams=self.config.num_beams // 2,
                 output_scores=True,
                 return_dict_in_generate=True,
             )
@@ -436,13 +438,11 @@ class REQA(object):
             beam_question_scores = tuple_of_tensors_to_tensor(beam_question_scores)
             l, n, v = beam_question_scores.size()
             beam_logsumexp = torch.logsumexp(beam_question_scores, dim=2)
-            beam_question_predictions_flat = torch.transpose(
-                beam_question_predictions, 0, 1
-            ).view(
-                -1,
+            beam_question_predictions_flat = torch.reshape(
+                torch.transpose(beam_question_predictions, 0, 1), (l * n, 1)
             )
-            beam_scores = torch.index_select(
-                beam_question_scores.view(-1, v), beam_question_predictions_flat
+            beam_scores = torch.gather(
+                beam_question_scores.view(-1, v), 1, beam_question_predictions_flat
             ).squeeze()
             log_p = (
                 beam_scores
@@ -455,20 +455,6 @@ class REQA(object):
             log_p = torch.sum(good_log_p, dim=0).squeeze()
             beam_p = torch.exp(log_p)
 
-            # size of scores: (L, B * N, V)
-            predictions = torch.cat(
-                (
-                    sampled_question_predictions.view(
-                        self.config.num_beams // 2, b_sz, -1
-                    ),
-                    beam_question_predictions.view(
-                        self.config.num_beams // 2, b_sz, -1
-                    ),
-                ),
-                dim=0,
-            )
-            predictions = predictions.view(self.config.num_beams * b_sz, -1)
-
             p = torch.cat(
                 (
                     sampled_p.view(self.config.num_beams // 2, b_sz),
@@ -480,17 +466,52 @@ class REQA(object):
                 self.config.num_beams, b_sz
             )
 
+            sampled_question_predictions_str = self.question_tokenizer.batch_decode(
+                sampled_question_predictions, skip_special_tokens=True
+            )
+
+            sampled_question_predictions_str_reshaped = [
+                sampled_question_predictions_str[
+                    i
+                    * (self.config.num_beams // 2) : (i + 1)
+                    * (self.config.num_beams // 2)
+                ]
+                for i in range(b_sz)
+            ]
+
+            beam_question_predictions_str = self.question_tokenizer.batch_decode(
+                beam_question_predictions, skip_special_tokens=True
+            )
+
+            beam_question_predictions_str_reshaped = [
+                beam_question_predictions_str[
+                    i
+                    * (self.config.num_beams // 2) : (i + 1)
+                    * (self.config.num_beams // 2)
+                ]
+                for i in range(b_sz)
+            ]
+
             new_articles = []
-            new_b_sz = b_sz * self.config.num_beams
-            for i in range(new_b_sz):
-                new_article = (
-                    "question: "
-                    + predictions[i]
-                    + " context: "
-                    + batch["passages"][i // self.config.num_beams]
-                    + " </s>"
-                )
-                new_articles.append(new_article)
+            for i in range(b_sz):
+                for j in range(self.config.num_beams // 2):
+                    new_article = (
+                        "question: "
+                        + sampled_question_predictions_str_reshaped[i][j]
+                        + " context: "
+                        + batch["passages"][i]
+                        + " </s>"
+                    )
+                    new_articles.append(new_article)
+                for j in range(self.config.num_beams // 2):
+                    new_article = (
+                        "question: "
+                        + beam_question_predictions_str_reshaped[i][j]
+                        + " context: "
+                        + batch["passages"][i]
+                        + " </s>"
+                    )
+                    new_articles.append(new_article)
 
             answer_inputs = self.answer_tokenizer(
                 new_articles,
@@ -498,10 +519,14 @@ class REQA(object):
                 padding="max_length",
                 max_length=self.config.source_max_length,
                 add_special_tokens=False,
+                return_tensors="pt",
             )
+
+            answer_input_ids = answer_inputs.input_ids
+            answer_input_mask = answer_inputs.attention_mask
             if self.config.gpu:
-                answer_input_ids = answer_inputs.input_ids.to(self.device)
-                answer_input_mask = answer_inputs.attention_mask.to(self.device)
+                answer_input_ids = answer_input_ids.to(self.device)
+                answer_input_mask = answer_input_mask.to(self.device)
 
             target_mask = batch["second_entity_attention_mask"]
             labels = batch["second_entity_labels"]
@@ -520,8 +545,15 @@ class REQA(object):
             )
 
             # mean loss from multiple GPUs
-            re_p_answer = torch.exp(-output.loss).view(self.config.num_beams, b_sz)
-            re_loss = torch.mean(
+            re_ps_answer = torch.softmax(output.logits, dim=2)
+            new_bz, seq_len, v = re_ps_answer.size()
+            re_p_answer = torch.gather(
+                re_ps_answer, 2, labels.view(new_bz, seq_len, 1)
+            ).squeeze()
+            pad_mask = labels == 0
+            good_p = torch.prod(re_p_answer.masked_fill_(pad_mask, 1.0), dim=1)
+            re_p_answer = good_p.view(self.config.num_beams, b_sz)
+            re_loss = -torch.mean(
                 torch.log(
                     torch.sum(
                         torch.mul(
