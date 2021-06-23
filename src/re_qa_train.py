@@ -195,7 +195,7 @@ def create_docred_dataset(
     test_encodings["second_entity_labels"] = test_labels
     """
 
-    class SquadDataset(torch.utils.data.Dataset):
+    class DocRedDataset(torch.utils.data.Dataset):
         def __init__(self, encodings):
             self.encodings = encodings
 
@@ -211,8 +211,8 @@ def create_docred_dataset(
         def __len__(self):
             return len(self.encodings.entity_relation_passage_input_ids)
 
-    train_dataset = SquadDataset(train_encodings)
-    val_dataset = SquadDataset(val_encodings)
+    train_dataset = DocRedDataset(train_encodings)
+    val_dataset = DocRedDataset(val_encodings)
     # test_dataset = SquadDataset(test_encodings)
 
     train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
@@ -909,7 +909,7 @@ def run_main(args):
 
 
 def argument_parser():
-    """augments arguments for protein-gene model."""
+    """augments arguments for model."""
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "--mode",
