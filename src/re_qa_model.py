@@ -76,8 +76,8 @@ def save(model: torch.nn.Module, path: str) -> None:
     torch.save(model.state_dict(), path)
 
 
-# MODEL_NAME = "t5-base"
-MODEL_NAME = "allenai/unifiedqa-t5-base"
+MODEL_NAME = "t5-base"
+# MODEL_NAME = "allenai/unifiedqa-t5-base"
 Q_MODEL_NAME = "iarfmoose/t5-base-question-generator"
 
 
@@ -535,15 +535,28 @@ class REQA(object):
             b_sz, seq_len = labels.size()
             labels = labels.repeat(1, self.config.num_beams).view(-1, seq_len)
             target_mask = target_mask.repeat(1, self.config.num_beams).view(-1, seq_len)
-            output = self.answer_model(
-                input_ids=answer_input_ids,
-                attention_mask=answer_input_mask,
-                decoder_attention_mask=target_mask,
-                labels=labels,
-            )
 
+            # Reduce memory requirement.
+            outputs = []
+            answer_input_ids_re = answer_input_ids.view(self.config.num_beams, b_sz, -1)
+            answer_input_mask_re = answer_input_mask.view(
+                self.config.num_beams, b_sz, -1
+            )
+            target_mask_re = target_mask.view(self.config.num_beams, b_sz, -1)
+            labels_re = labels.view(self.config.num_beams, b_sz, -1)
+            for i in range(self.config.num_beams):
+                output = self.answer_model(
+                    input_ids=answer_input_ids_re[i, :, :],
+                    attention_mask=answer_input_mask_re[i, :, :],
+                    decoder_attention_mask=target_mask_re[i, :, :],
+                    labels=labels_re[i, :, :],
+                )
+                outputs.append(output.logits)
+
+            logits = torch.stack(outputs, 0)
+            logits = logits.view(self.config.num_beams * b_sz, seq_len, -1)
             # mean loss from multiple GPUs
-            re_ps_answer = torch.softmax(output.logits, dim=2)
+            re_ps_answer = torch.softmax(logits, dim=2)
             new_bz, seq_len, v = re_ps_answer.size()
             re_p_answer = torch.gather(
                 re_ps_answer, 2, labels.view(new_bz, seq_len, 1)
