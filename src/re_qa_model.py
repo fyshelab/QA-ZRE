@@ -146,11 +146,11 @@ class REQA(object):
             self.model_path = os.path.join(cfg.model_path, "model")
 
             # Load the answer model from the checkpoint.
-            # loaded_weights = torch.load(
-            #    self.model_path + cfg.answer_checkpoint,
-            #    map_location=lambda storage, loc: storage,
-            # )
-            # answer_model.load_state_dict(loaded_weights)
+            loaded_weights = torch.load(
+                self.model_path + cfg.answer_checkpoint,
+                map_location=lambda storage, loc: storage,
+            )
+            answer_model.load_state_dict(loaded_weights)
 
         elif cfg.mode in ["test", "inference"]:
             self.model_path = os.path.join(cfg.model_path, "model")
@@ -551,13 +551,22 @@ class REQA(object):
                     decoder_attention_mask=target_mask_re[i, :, :],
                     labels=labels_re[i, :, :],
                 )
-                re_ps_answer = torch.softmax(output.logits, dim=2)
-                re_p_answer = torch.gather(
-                    re_ps_answer, 2, labels_re[i, :, :].view(b_sz, seq_len, 1)
+                logsumexp = torch.logsumexp(output.logits, dim=2)
+                b, sz, v = output.logits.size()
+                scores = torch.gather(
+                    output.logits.view(-1, v), 1, labels_re[i, :, :].view(-1, 1)
                 ).squeeze()
+                log_p = (
+                    scores
+                    - logsumexp.view(
+                        -1,
+                    )
+                ).view(b, sz)
                 pad_mask = labels_re[i, :, :] == 0
-                good_p = torch.prod(re_p_answer.masked_fill_(pad_mask, 1.0), dim=1)
-                good_ps.append(good_p)
+                good_log_p = log_p.masked_fill_(pad_mask, 0.0)
+                log_p = torch.sum(good_log_p, dim=1).squeeze()
+                p = torch.exp(log_p)
+                good_ps.append(p)
 
             good_p = torch.stack(good_ps, 0)
             re_p_answer = good_p.view(self.config.num_beams, b_sz)
