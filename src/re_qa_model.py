@@ -146,11 +146,11 @@ class REQA(object):
             self.model_path = os.path.join(cfg.model_path, "model")
 
             # Load the answer model from the checkpoint.
-            loaded_weights = torch.load(
-                self.model_path + cfg.answer_checkpoint,
-                map_location=lambda storage, loc: storage,
-            )
-            answer_model.load_state_dict(loaded_weights)
+            # loaded_weights = torch.load(
+            #    self.model_path + cfg.answer_checkpoint,
+            #    map_location=lambda storage, loc: storage,
+            # )
+            # answer_model.load_state_dict(loaded_weights)
 
         elif cfg.mode in ["test", "inference"]:
             self.model_path = os.path.join(cfg.model_path, "model")
@@ -553,8 +553,11 @@ class REQA(object):
                 )
                 logsumexp = torch.logsumexp(output.logits, dim=2)
                 b, sz, v = output.logits.size()
+
+                target_ids = labels_re[i, :, :].detach().clone()
+                target_ids = target_ids.masked_fill_(target_ids == -100, 0)
                 scores = torch.gather(
-                    output.logits.view(-1, v), 1, labels_re[i, :, :].view(-1, 1)
+                    output.logits.view(-1, v), 1, target_ids.view(-1, 1)
                 ).squeeze()
                 log_p = (
                     scores
@@ -562,7 +565,7 @@ class REQA(object):
                         -1,
                     )
                 ).view(b, sz)
-                pad_mask = labels_re[i, :, :] == 0
+                pad_mask = target_ids == 0
                 good_log_p = log_p.masked_fill_(pad_mask, 0.0)
                 log_p = torch.sum(good_log_p, dim=1).squeeze()
                 p = torch.exp(log_p)
