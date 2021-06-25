@@ -543,7 +543,7 @@ def run_model(
                     )
                 if save_always:
                     model.save(str(epoch), which_model="question")
-            """
+            ''' 
             for answer_loop in range(answer_inner_loop):
                 total_loss = []
                 print("\rInfo: Answer Phase Training {0}\n".format(answer_loop))
@@ -569,11 +569,11 @@ def run_model(
                     )
                 if save_always:
                     model.save(str(epoch), which_model="answer")
-            """
+            '''
             msg = "\nEpoch training time:{} seconds\n".format(time.time() - start)
             print(msg)
             epoch += 1
-
+            
         save_config(config, model_path)
         msg = "\nTotal training time:{} seconds\n".format(time.time() - first_start)
         print(msg)
@@ -876,27 +876,23 @@ def run_reqa(args):
         answer_training_steps=args.answer_training_steps,
         num_beams=args.num_beams,
     )
-    with torch.autograd.profiler.profile(use_cuda=True) as prof:
-        model = REQA(config)
-        train_loaders, val_loaders = create_all_relation_qa_dataset(
+    model = REQA(config)
+    train_loaders, val_loaders = create_all_relation_qa_dataset(
             answer_tokenizer=model.answer_tokenizer,
             question_tokenizer=model.question_tokenizer,
             batch_size=config.batch_size,
             source_max_length=config.source_max_length,
             decoder_max_length=config.decoder_max_length,
-        )
+    )
 
-        print(len(train_loaders[2]))
-        run_model(
+    run_model(
             model,
             config=config,
             train_dataloader=train_loaders,
             dev_dataloader=val_loaders,
             test_dataloader=None,
             save_always=True,
-        )
-    print(prof.key_averages().table(sort_by="self_cpu_time_total"))
-    exit()
+    )
 
 
 def run_main(args):

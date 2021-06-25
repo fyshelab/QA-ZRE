@@ -369,7 +369,7 @@ class REQA(object):
             self.answer_optimizer.zero_grad()
             self.question_model.train()
             self.answer_model.eval()
-            loss_fct = CrossEntropyLoss(ignore_index=-100, reduction=None)
+            loss_fct = torch.nn.CrossEntropyLoss(ignore_index=-100, reduction='none')
 
             # Loss from the entity relation examples!
             question_input_ids = batch["entity_relation_passage_input_ids"]
@@ -550,6 +550,7 @@ class REQA(object):
                     input_ids=answer_input_ids_re[i, :, :],
                     attention_mask=answer_input_mask_re[i, :, :],
                     decoder_attention_mask=target_mask_re[i, :, :],
+                    decoder_input_ids= self.answer_model.module._shift_right(labels_re[i, :, :]),
                     labels=None,
                 )
                 log_p = -loss_fct(
@@ -601,8 +602,7 @@ class REQA(object):
             # mean loss from multiple GPUs
             qa_loss = output.loss.mean()
 
-            # loss = question_lambda * qa_loss + re_loss
-            loss = question_lambda * qa_loss
+            loss = question_lambda * qa_loss + re_loss
             loss_value = loss.item()
 
             # is loss nan? don't backpropagate!
