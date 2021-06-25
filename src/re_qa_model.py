@@ -369,6 +369,7 @@ class REQA(object):
             self.answer_optimizer.zero_grad()
             self.question_model.train()
             self.answer_model.eval()
+            loss_fct = CrossEntropyLoss(ignore_index=-100, reduction=None)
 
             # Loss from the entity relation examples!
             question_input_ids = batch["entity_relation_passage_input_ids"]
@@ -549,23 +550,15 @@ class REQA(object):
                     input_ids=answer_input_ids_re[i, :, :],
                     attention_mask=answer_input_mask_re[i, :, :],
                     decoder_attention_mask=target_mask_re[i, :, :],
-                    labels=labels_re[i, :, :],
+                    labels=None,
                 )
-                logsumexp = torch.logsumexp(output.logits, dim=2)
+                log_p = -loss_fct(
+                    output.logits.view(-1, output.logits.size(-1)),
+                    labels_re[i, :, :].view(-1),
+                )
                 b, sz, v = output.logits.size()
-
-                target_ids = labels_re[i, :, :].detach().clone()
-                target_ids = target_ids.masked_fill_(target_ids == -100, 0)
-                scores = torch.gather(
-                    output.logits.view(-1, v), 1, target_ids.view(-1, 1)
-                ).squeeze()
-                log_p = (
-                    scores
-                    - logsumexp.view(
-                        -1,
-                    )
-                ).view(b, sz)
-                pad_mask = target_ids == 0
+                log_p = log_p.view(b, sz)
+                pad_mask = labels_re[i, :, :] == -100
                 good_log_p = log_p.masked_fill_(pad_mask, 0.0)
                 log_p = torch.sum(good_log_p, dim=1).squeeze()
                 p = torch.exp(log_p)
@@ -573,7 +566,6 @@ class REQA(object):
                 if torch.cuda.is_available():
                     torch.cuda.empty_cache()
                 gc.collect()
-
             good_p = torch.stack(good_ps, 0)
             re_p_answer = good_p.view(self.config.num_beams, b_sz)
             re_loss = -torch.mean(
@@ -588,7 +580,6 @@ class REQA(object):
                 ),
                 dim=0,
             )
-
             # Loss from the correct QA examples!
             input_ids = batch["question_input_ids"]
             input_mask = batch["question_attention_mask"]
@@ -610,7 +601,8 @@ class REQA(object):
             # mean loss from multiple GPUs
             qa_loss = output.loss.mean()
 
-            loss = question_lambda * qa_loss + re_loss
+            # loss = question_lambda * qa_loss + re_loss
+            loss = question_lambda * qa_loss
             loss_value = loss.item()
 
             # is loss nan? don't backpropagate!
