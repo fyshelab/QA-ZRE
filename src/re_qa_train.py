@@ -460,8 +460,6 @@ def run_train_epoch(model, train_dataloader, phase="answer") -> Generator:
             main_batch.update(answer_batch)
             loss_values = model.train(main_batch, phase="question")
             step += 1
-            if step == 2:
-                break
             yield step, loss_values["loss_value"]
 
 
