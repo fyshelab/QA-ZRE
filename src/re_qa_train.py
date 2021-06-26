@@ -541,7 +541,6 @@ def run_model(
                     )
                 if save_always:
                     model.save(str(epoch), which_model="question")
-            ''' 
             for answer_loop in range(answer_inner_loop):
                 total_loss = []
                 print("\rInfo: Answer Phase Training {0}\n".format(answer_loop))
@@ -567,7 +566,6 @@ def run_model(
                     )
                 if save_always:
                     model.save(str(epoch), which_model="answer")
-            '''
             msg = "\nEpoch training time:{} seconds\n".format(time.time() - start)
             print(msg)
             epoch += 1
