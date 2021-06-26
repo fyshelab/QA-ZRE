@@ -146,11 +146,11 @@ class REQA(object):
             self.model_path = os.path.join(cfg.model_path, "model")
 
             # Load the answer model from the checkpoint.
-            loaded_weights = torch.load(
-                self.model_path + cfg.answer_checkpoint,
-                map_location=lambda storage, loc: storage,
-            )
-            answer_model.load_state_dict(loaded_weights)
+            #loaded_weights = torch.load(
+            #    self.model_path + cfg.answer_checkpoint,
+            #    map_location=lambda storage, loc: storage,
+            #)
+            #answer_model.load_state_dict(loaded_weights)
 
         elif cfg.mode in ["test", "inference"]:
             self.model_path = os.path.join(cfg.model_path, "model")
@@ -537,38 +537,25 @@ class REQA(object):
             labels = labels.repeat(1, self.config.num_beams).view(-1, seq_len)
             target_mask = target_mask.repeat(1, self.config.num_beams).view(-1, seq_len)
 
-            # Reduce memory requirement.
-            good_ps = []
-            answer_input_ids_re = answer_input_ids.view(self.config.num_beams, b_sz, -1)
-            answer_input_mask_re = answer_input_mask.view(
-                self.config.num_beams, b_sz, -1
-            )
-            target_mask_re = target_mask.view(self.config.num_beams, b_sz, -1)
-            labels_re = labels.view(self.config.num_beams, b_sz, -1)
-            for i in range(self.config.num_beams):
-                output = self.answer_model(
-                    input_ids=answer_input_ids_re[i, :, :],
-                    attention_mask=answer_input_mask_re[i, :, :],
-                    decoder_attention_mask=target_mask_re[i, :, :],
-                    decoder_input_ids= self.answer_model.module._shift_right(labels_re[i, :, :]),
+            output = self.answer_model(
+                    input_ids=answer_input_ids,
+                    attention_mask=answer_input_mask,
+                    decoder_attention_mask=target_mask,
+                    decoder_input_ids=self.answer_model.module._shift_right(labels),
                     labels=None,
-                )
-                log_p = -loss_fct(
+            )
+
+            log_p = -loss_fct(
                     output.logits.view(-1, output.logits.size(-1)),
-                    labels_re[i, :, :].view(-1),
-                )
-                b, sz, v = output.logits.size()
-                log_p = log_p.view(b, sz)
-                pad_mask = labels_re[i, :, :] == -100
-                good_log_p = log_p.masked_fill_(pad_mask, 0.0)
-                log_p = torch.sum(good_log_p, dim=1).squeeze()
-                p = torch.exp(log_p)
-                good_ps.append(p)
-                if torch.cuda.is_available():
-                    torch.cuda.empty_cache()
-                gc.collect()
-            good_p = torch.stack(good_ps, 0)
-            re_p_answer = good_p.view(self.config.num_beams, b_sz)
+                    labels.view(-1),
+            )
+
+            b, sz, v = output.logits.size()
+            log_p = log_p.view(b, sz)
+            good_log_p = log_p.masked_fill_(labels == -100, 0.0)
+            log_p = torch.sum(good_log_p, dim=1).squeeze()
+            p = torch.exp(log_p)
+            re_p_answer = p.view(self.config.num_beams, b_sz)
             re_loss = -torch.mean(
                 torch.log(
                     torch.sum(
@@ -581,6 +568,9 @@ class REQA(object):
                 ),
                 dim=0,
             )
+            if torch.cuda.is_available():
+                torch.cuda.empty_cache()
+            gc.collect()
             # Loss from the correct QA examples!
             input_ids = batch["question_input_ids"]
             input_mask = batch["question_attention_mask"]
