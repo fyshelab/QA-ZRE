@@ -38,4 +38,4 @@ def test_model_prediction():
     assert round(answer_output["loss_value"], 4) == 13.3691
 
     question_output = model.train(batch, phase="question")
-    assert round(question_output["loss_value"], 4) == 33.8652
+    assert round(question_output["loss_value"], 4) == 33.8681
