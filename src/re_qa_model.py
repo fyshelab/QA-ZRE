@@ -146,11 +146,13 @@ class REQA(object):
             self.model_path = os.path.join(cfg.model_path, "model")
 
             # Load the answer model from the checkpoint.
+            """
             loaded_weights = torch.load(
                 self.model_path + cfg.answer_checkpoint,
                 map_location=lambda storage, loc: storage,
             )
             answer_model.load_state_dict(loaded_weights)
+            """
 
         elif cfg.mode in ["test", "inference"]:
             self.model_path = os.path.join(cfg.model_path, "model")
@@ -369,7 +371,7 @@ class REQA(object):
             self.answer_optimizer.zero_grad()
             self.question_model.train()
             self.answer_model.eval()
-            loss_fct = torch.nn.CrossEntropyLoss(ignore_index=-100, reduction='none')
+            loss_fct = torch.nn.CrossEntropyLoss(ignore_index=-100, reduction="none")
 
             # Loss from the entity relation examples!
             question_input_ids = batch["entity_relation_passage_input_ids"]
@@ -399,22 +401,12 @@ class REQA(object):
                 sampled_question_scores
             )
             l, n, v = sampled_question_scores.size()
-            sampled_logsumexp = torch.logsumexp(sampled_question_scores, dim=2)
-            sampled_question_predictions_flat = torch.reshape(
-                torch.transpose(sampled_question_predictions, 0, 1), (l * n, 1)
-            )
-            sampled_scores = torch.gather(
+            log_p = -loss_fct(
                 sampled_question_scores.view(-1, v),
-                1,
-                sampled_question_predictions_flat,
-            ).squeeze()
-            log_p = (
-                sampled_scores
-                - sampled_logsumexp.view(
-                    -1,
-                )
+                torch.reshape(
+                    torch.transpose(sampled_question_predictions, 0, 1), (l * n,)
+                ),
             ).view(l, n)
-
             pad_mask = torch.transpose(sampled_question_predictions, 0, 1) == 0
             good_log_p = log_p.masked_fill_(pad_mask, 0.0)
             log_p = torch.sum(good_log_p, dim=0).squeeze()
@@ -436,18 +428,11 @@ class REQA(object):
             beam_question_scores = beam_question_outputs.scores
             beam_question_scores = tuple_of_tensors_to_tensor(beam_question_scores)
             l, n, v = beam_question_scores.size()
-            beam_logsumexp = torch.logsumexp(beam_question_scores, dim=2)
-            beam_question_predictions_flat = torch.reshape(
-                torch.transpose(beam_question_predictions, 0, 1), (l * n, 1)
-            )
-            beam_scores = torch.gather(
-                beam_question_scores.view(-1, v), 1, beam_question_predictions_flat
-            ).squeeze()
-            log_p = (
-                beam_scores
-                - beam_logsumexp.view(
-                    -1,
-                )
+            log_p = -loss_fct(
+                beam_question_scores.view(-1, v),
+                torch.reshape(
+                    torch.transpose(beam_question_predictions, 0, 1), (l * n,)
+                ),
             ).view(l, n)
             pad_mask = torch.transpose(beam_question_predictions, 0, 1) == 0
             good_log_p = log_p.masked_fill_(pad_mask, 0.0)
@@ -538,16 +523,16 @@ class REQA(object):
             target_mask = target_mask.repeat(1, self.config.num_beams).view(-1, seq_len)
 
             output = self.answer_model(
-                    input_ids=answer_input_ids,
-                    attention_mask=answer_input_mask,
-                    decoder_attention_mask=target_mask,
-                    decoder_input_ids=self.answer_model.module._shift_right(labels),
-                    labels=None,
+                input_ids=answer_input_ids,
+                attention_mask=answer_input_mask,
+                decoder_attention_mask=target_mask,
+                decoder_input_ids=self.answer_model.module._shift_right(labels),
+                labels=None,
             )
 
             log_p = -loss_fct(
-                    output.logits.view(-1, output.logits.size(-1)),
-                    labels.view(-1),
+                output.logits.view(-1, output.logits.size(-1)),
+                labels.view(-1),
             )
 
             b, sz, v = output.logits.size()

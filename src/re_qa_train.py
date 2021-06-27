@@ -569,7 +569,7 @@ def run_model(
             msg = "\nEpoch training time:{} seconds\n".format(time.time() - start)
             print(msg)
             epoch += 1
-            
+
         save_config(config, model_path)
         msg = "\nTotal training time:{} seconds\n".format(time.time() - first_start)
         print(msg)
@@ -874,20 +874,20 @@ def run_reqa(args):
     )
     model = REQA(config)
     train_loaders, val_loaders = create_all_relation_qa_dataset(
-            answer_tokenizer=model.answer_tokenizer,
-            question_tokenizer=model.question_tokenizer,
-            batch_size=config.batch_size,
-            source_max_length=config.source_max_length,
-            decoder_max_length=config.decoder_max_length,
+        answer_tokenizer=model.answer_tokenizer,
+        question_tokenizer=model.question_tokenizer,
+        batch_size=config.batch_size,
+        source_max_length=config.source_max_length,
+        decoder_max_length=config.decoder_max_length,
     )
 
     run_model(
-            model,
-            config=config,
-            train_dataloader=train_loaders,
-            dev_dataloader=val_loaders,
-            test_dataloader=None,
-            save_always=True,
+        model,
+        config=config,
+        train_dataloader=train_loaders,
+        dev_dataloader=val_loaders,
+        test_dataloader=None,
+        save_always=True,
     )
 
 
