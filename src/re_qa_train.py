@@ -539,8 +539,17 @@ def run_model(
                             step, loss, mean_loss
                         )
                     )
+                    if save_always and (step % 200 == 0):
+                        model.save(
+                            str(epoch) + "_step_" + str(step), which_model="question"
+                        )
+
                 if save_always:
-                    model.save(str(epoch), which_model="question")
+                    model.save(
+                        str(epoch) + "_loop_" + str(question_loop),
+                        which_model="question",
+                    )
+
             for answer_loop in range(answer_inner_loop):
                 total_loss = []
                 print("\rInfo: Answer Phase Training {0}\n".format(answer_loop))
@@ -564,8 +573,16 @@ def run_model(
                             step, loss, mean_loss
                         )
                     )
+                    if save_always and (step % 200 == 0):
+                        model.save(
+                            str(epoch) + "_step_" + str(step), which_model="answer"
+                        )
+
                 if save_always:
-                    model.save(str(epoch), which_model="answer")
+                    model.save(
+                        str(epoch) + "_loop_" + str(answer_loop), which_model="answer"
+                    )
+
             msg = "\nEpoch training time:{} seconds\n".format(time.time() - start)
             print(msg)
             epoch += 1
