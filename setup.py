@@ -18,7 +18,6 @@ INSTALL_REQUIRES = [
     'pylint',
     'docformatter',
     'transformers',
-    'datasets'
 ]
 
 setup(
