@@ -1,13 +1,13 @@
 import torch
 
-from src.re_qa_model import REQA, HyperParameters
+from src.re_qa_model import REQA, HyperParameters, load_module
 
 
 def test_model_prediction():
     """Test the main constructor of the model."""
     config = HyperParameters(batch_size=2, model_path="./", mode="train", num_beams=16)
 
-    model = REQA(config)
+    model = REQA(config, load_answer=False)
 
     batch = {
         "passages": ["This is Saeed", "This is a test"],
