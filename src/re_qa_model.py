@@ -124,7 +124,7 @@ Q_MODEL_NAME = "iarfmoose/t5-base-question-generator"
 class REQA(object):
     """Wrapper class around the T5 Model."""
 
-    def __init__(self, cfg: HyperParameters):
+    def __init__(self, cfg: HyperParameters, load_answer=True):
         self.config = cfg
 
         set_random_seed(cfg.seed)
@@ -174,8 +174,9 @@ class REQA(object):
                 os.makedirs(cfg.model_path)
             self.model_path = os.path.join(cfg.model_path, "model")
 
-            # we have a pre-trained answer module.
-            load_module(answer_model, self.model_path, cfg.answer_checkpoint)
+            if load_answer:
+                # we have a pre-trained answer module.
+                load_module(answer_model, self.model_path, cfg.answer_checkpoint)
 
         elif cfg.mode in ["test", "inference"]:
             self.model_path = os.path.join(cfg.model_path, "model")
@@ -188,7 +189,7 @@ class REQA(object):
         self.question_tokenizer = question_tokenizer
 
     def question_greedy_predict(self, batch):
-        """Greedily generate the questions ans prepare inputs for the answer
+        """Greedily generate the questions and prepare inputs for the answer
         module."""
         question_input_ids = batch["entity_relation_passage_input_ids"]
         question_input_mask = batch["entity_relation_passage_attention_mask"]
@@ -352,7 +353,7 @@ class REQA(object):
             )
 
             # Use beam search to collect samples.
-            beam_question_outputs = self.question_model.module.generate(
+            beam_question_outputs = self.question_model.generate(
                 input_ids=question_input_ids,
                 attention_mask=question_input_mask,
                 no_repeat_ngram_size=self.config.no_repeat_ngram_size,
@@ -455,7 +456,7 @@ class REQA(object):
                 input_ids=answer_input_ids,
                 attention_mask=answer_input_mask,
                 decoder_attention_mask=target_mask,
-                decoder_input_ids=self.answer_model.module._shift_right(labels),
+                decoder_input_ids=self.answer_model._shift_right(labels),
                 labels=None,
             )
 
