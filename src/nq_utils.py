@@ -1,6 +1,7 @@
 import random
 import re
 
+import torch
 from datasets import load_dataset
 from torch.utils.data import DataLoader
 
@@ -10,7 +11,12 @@ def white_space_fix(text):
 
 
 def create_reverse_narrative_dataset(
-    tokenizer, batch_size, source_max_length, decoder_max_length
+    tokenizer,
+    batch_size,
+    source_max_length,
+    decoder_max_length,
+    distributed=False,
+    num_workers=0,
 ):
     """Function to create the narrative dataset."""
 
@@ -130,7 +136,20 @@ def create_reverse_narrative_dataset(
         ],
     )
 
-    train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
+    # Training
+    if distributed:
+        train_sampler = torch.utils.data.distributed.DistributedSampler(train_dataset)
+        train_loader = DataLoader(
+            train_dataset,
+            batch_size=batch_size,
+            shuffle=True,
+            num_workers=num_workers,
+            sampler=train_sampler,
+        )
+
+    if not distributed:
+        train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
+
     val_loader = DataLoader(dev_dataset, batch_size=batch_size, shuffle=False)
     test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False)
 
@@ -145,7 +164,12 @@ def create_reverse_narrative_dataset(
 
 
 def create_narrative_dataset(
-    tokenizer, batch_size, source_max_length, decoder_max_length
+    tokenizer,
+    batch_size,
+    source_max_length,
+    decoder_max_length,
+    distributed=False,
+    num_workers=0,
 ):
     """Function to create the narrative dataset."""
 
@@ -265,7 +289,20 @@ def create_narrative_dataset(
         ],
     )
 
-    train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
+    # Training
+    if distributed:
+        train_sampler = torch.utils.data.distributed.DistributedSampler(train_dataset)
+        train_loader = DataLoader(
+            train_dataset,
+            batch_size=batch_size,
+            shuffle=True,
+            num_workers=num_workers,
+            sampler=train_sampler,
+        )
+
+    if not distributed:
+        train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
+
     val_loader = DataLoader(dev_dataset, batch_size=batch_size, shuffle=False)
     test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False)
 

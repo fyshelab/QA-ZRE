@@ -70,6 +70,8 @@ def create_docred_dataset(
     batch_size,
     source_max_length,
     decoder_max_length,
+    distributed=False,
+    num_workers=0,
 ):
     """Function to create the docred dataset."""
     train_passages, train_contexts, train_answers = read_docred(
@@ -215,7 +217,20 @@ def create_docred_dataset(
     val_dataset = DocRedDataset(val_encodings)
     # test_dataset = SquadDataset(test_encodings)
 
-    train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
+    # Training
+    if distributed:
+        train_sampler = torch.utils.data.distributed.DistributedSampler(train_dataset)
+        train_loader = DataLoader(
+            train_dataset,
+            batch_size=batch_size,
+            shuffle=True,
+            num_workers=num_workers,
+            sampler=train_sampler,
+        )
+
+    if not distributed:
+        train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
+
     val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False)
     # test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False)
 
@@ -301,7 +316,14 @@ def read_reverse_squad(path):
     return contexts, answers
 
 
-def create_race_dataset(tokenizer, batch_size, source_max_length, decoder_max_length):
+def create_race_dataset(
+    tokenizer,
+    batch_size,
+    source_max_length,
+    decoder_max_length,
+    distributed=False,
+    num_workers=0,
+):
     """Function to create the race dataset."""
 
     def process_race_row(row):
@@ -423,7 +445,20 @@ def create_race_dataset(tokenizer, batch_size, source_max_length, decoder_max_le
         ],
     )
 
-    train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
+    # Training
+    if distributed:
+        train_sampler = torch.utils.data.distributed.DistributedSampler(train_dataset)
+        train_loader = DataLoader(
+            train_dataset,
+            batch_size=batch_size,
+            shuffle=True,
+            num_workers=num_workers,
+            sampler=train_sampler,
+        )
+
+    if not distributed:
+        train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
+
     val_loader = DataLoader(dev_dataset, batch_size=batch_size, shuffle=False)
     test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False)
 
@@ -599,7 +634,14 @@ def run_model(
         print(msg)
 
 
-def create_squad_dataset(tokenizer, batch_size, source_max_length, decoder_max_length):
+def create_squad_dataset(
+    tokenizer,
+    batch_size,
+    source_max_length,
+    decoder_max_length,
+    distributed=False,
+    num_workers=0,
+):
     """Function to create the squad dataset."""
     train_contexts, train_answers = read_squad("./squad/train-v2.0.json")
     val_contexts, val_answers = read_squad("./squad/dev-v2.0.json")
@@ -673,14 +715,32 @@ def create_squad_dataset(tokenizer, batch_size, source_max_length, decoder_max_l
     train_dataset = SquadDataset(train_encodings)
     val_dataset = SquadDataset(val_encodings)
 
-    train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
+    # Training
+    if distributed:
+        train_sampler = torch.utils.data.distributed.DistributedSampler(train_dataset)
+        train_loader = DataLoader(
+            train_dataset,
+            batch_size=batch_size,
+            shuffle=True,
+            num_workers=num_workers,
+            sampler=train_sampler,
+        )
+
+    if not distributed:
+        train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
+
     val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False)
 
     return train_loader, val_loader, train_dataset, val_dataset
 
 
 def create_rev_squad_dataset(
-    tokenizer, batch_size, source_max_length, decoder_max_length
+    tokenizer,
+    batch_size,
+    source_max_length,
+    decoder_max_length,
+    distributed=False,
+    num_workers=0,
 ):
     """Function to create the squad dataset."""
     train_contexts, train_answers = read_reverse_squad("./squad/train-v2.0.json")
@@ -763,7 +823,20 @@ def create_rev_squad_dataset(
     train_dataset = SquadDataset(train_encodings)
     val_dataset = SquadDataset(val_encodings)
 
-    train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
+    # Training
+    if distributed:
+        train_sampler = torch.utils.data.distributed.DistributedSampler(train_dataset)
+        train_loader = DataLoader(
+            train_dataset,
+            batch_size=batch_size,
+            shuffle=True,
+            num_workers=num_workers,
+            sampler=train_sampler,
+        )
+
+    if not distributed:
+        train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
+
     val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False)
 
     return train_loader, val_loader, train_dataset, val_dataset
@@ -775,6 +848,8 @@ def create_all_relation_qa_dataset(
     batch_size,
     source_max_length,
     decoder_max_length,
+    distributed=False,
+    num_workers=0,
 ):
     (
         squad_train_loader,
@@ -782,7 +857,12 @@ def create_all_relation_qa_dataset(
         squad_train_dataset,
         squad_val_dataset,
     ) = create_squad_dataset(
-        answer_tokenizer, batch_size, source_max_length, decoder_max_length
+        answer_tokenizer,
+        batch_size,
+        source_max_length,
+        decoder_max_length,
+        distributed,
+        num_workers,
     )
     (
         rev_squad_train_loader,
@@ -790,7 +870,12 @@ def create_all_relation_qa_dataset(
         rev_squad_train_dataset,
         rev_squad_val_dataset,
     ) = create_rev_squad_dataset(
-        question_tokenizer, batch_size, source_max_length, decoder_max_length
+        question_tokenizer,
+        batch_size,
+        source_max_length,
+        decoder_max_length,
+        distributed,
+        num_workers,
     )
     (
         nq_train_loader,
@@ -800,7 +885,12 @@ def create_all_relation_qa_dataset(
         nq_dev_dataset,
         nq_test_dataset,
     ) = create_narrative_dataset(
-        answer_tokenizer, batch_size, source_max_length, decoder_max_length
+        answer_tokenizer,
+        batch_size,
+        source_max_length,
+        decoder_max_length,
+        distributed,
+        num_workers,
     )
     (
         rev_nq_train_loader,
@@ -810,7 +900,12 @@ def create_all_relation_qa_dataset(
         rev_nq_dev_dataset,
         rev_nq_test_dataset,
     ) = create_reverse_narrative_dataset(
-        question_tokenizer, batch_size, source_max_length, decoder_max_length
+        question_tokenizer,
+        batch_size,
+        source_max_length,
+        decoder_max_length,
+        distributed,
+        num_workers,
     )
     (
         race_train_loader,
@@ -820,7 +915,12 @@ def create_all_relation_qa_dataset(
         race_dev_dataset,
         race_test_dataset,
     ) = create_race_dataset(
-        answer_tokenizer, batch_size, source_max_length, decoder_max_length
+        answer_tokenizer,
+        batch_size,
+        source_max_length,
+        decoder_max_length,
+        distributed,
+        num_workers,
     )
     (
         docred_train_loader,
@@ -835,6 +935,8 @@ def create_all_relation_qa_dataset(
         batch_size,
         source_max_length,
         decoder_max_length,
+        distributed,
+        num_workers,
     )
 
     answer_train_datasets = torch.utils.data.ConcatDataset(
@@ -851,16 +953,46 @@ def create_all_relation_qa_dataset(
         [rev_squad_val_dataset, rev_nq_dev_dataset]
     )
 
-    answer_train_loader = DataLoader(
-        answer_train_datasets, batch_size=batch_size, shuffle=True
-    )
+    # Training
+    if distributed:
+        answer_train_sampler = torch.utils.data.distributed.DistributedSampler(
+            answer_train_datasets
+        )
+        answer_train_loader = DataLoader(
+            answer_train_datasets,
+            batch_size=batch_size,
+            shuffle=True,
+            num_workers=num_workers,
+            sampler=answer_train_sampler,
+        )
+
+    if not distributed:
+        answer_train_loader = DataLoader(
+            answer_train_datasets, batch_size=batch_size, shuffle=True
+        )
+
     answer_eval_loader = DataLoader(
         answer_eval_datasets, batch_size=batch_size, shuffle=False
     )
 
-    question_train_loader = DataLoader(
-        question_train_datasets, batch_size=batch_size, shuffle=True
-    )
+    # Training
+    if distributed:
+        question_train_sampler = torch.utils.data.distributed.DistributedSampler(
+            question_train_datasets
+        )
+        question_train_loader = DataLoader(
+            question_train_datasets,
+            batch_size=batch_size,
+            shuffle=True,
+            num_workers=num_workers,
+            sampler=question_train_sampler,
+        )
+
+    if not distributed:
+        question_train_loader = DataLoader(
+            question_train_datasets, batch_size=batch_size, shuffle=True
+        )
+
     question_eval_loader = DataLoader(
         question_eval_datasets, batch_size=batch_size, shuffle=False
     )
