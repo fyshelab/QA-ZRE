@@ -324,6 +324,8 @@ class REQA(object):
             self.answer_model.eval()
 
             loss_fct = torch.nn.CrossEntropyLoss(ignore_index=-100, reduction="none")
+            if self.config.gpu:
+                loss_fct = loss_fct.cuda()
 
             # Loss from the entity relation examples!
             question_input_ids = batch["entity_relation_passage_input_ids"]
