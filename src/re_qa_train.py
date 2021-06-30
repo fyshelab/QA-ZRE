@@ -17,12 +17,14 @@ import datasets
 import numpy as np
 import pandas as pd
 import torch
+import torch.distributed as dist
+import torch.utils.data.distributed
 from datasets import load_dataset
 from torch.utils.data import DataLoader
 
 from src.nq_utils import (create_narrative_dataset,
                           create_reverse_narrative_dataset)
-from src.re_qa_model import REQA, HyperParameters
+from src.re_qa_model import REQA, HyperParameters, save
 
 
 def white_space_fix(text):
@@ -218,6 +220,7 @@ def create_docred_dataset(
     # test_dataset = SquadDataset(test_encodings)
 
     # Training
+    train_sampler = None
     if distributed:
         train_sampler = torch.utils.data.distributed.DistributedSampler(train_dataset)
         train_loader = DataLoader(
@@ -235,6 +238,7 @@ def create_docred_dataset(
     # test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False)
 
     return (
+        train_sampler,
         train_loader,
         val_loader,
         None,
@@ -536,6 +540,8 @@ def run_model(
     dev_dataloader=None,
     test_dataloader=None,
     save_always: Optional[bool] = False,
+    rank=0,
+    train_samplers=None,
 ) -> None:
     """Run the model on input data (for training or testing)"""
 
@@ -543,22 +549,31 @@ def run_model(
     max_epochs = config.max_epochs
     mode = config.mode
     if mode == "train":
-        print("\nINFO: ML training\n")
+        print("\nRank: {0} | INFO: ML training\n".format(rank))
         first_start = time.time()
         epoch = 0
         question_inner_loop = config.question_training_steps
         answer_inner_loop = config.answer_training_steps
         while epoch < max_epochs:
-            print("\nEpoch:{0}\n".format(epoch))
+            # let all processes sync up before starting with a new epoch of training
+            dist.barrier()
+
+            # make sure we get different orderings.
+            for sampler in train_samplers:
+                sampler.set_epoch(epoch)
+
+            print("\nRank: {0} | Epoch:{1}\n".format(rank, epoch))
             start = time.time()
             for question_loop in range(question_inner_loop):
                 total_loss = []
-                print("\rInfo: Question Phase Training {0}\n".format(question_loop))
+                print(
+                    "\rRank: {0} | Info: Question Phase Training {1}\n".format(
+                        rank, question_loop
+                    )
+                )
                 for step, loss in run_train_epoch(
                     model, train_dataloader, phase="question"
                 ):
-                    if math.isnan(loss):
-                        print("nan loss")
 
                     if loss:
                         total_loss.append(loss)
@@ -570,30 +585,40 @@ def run_model(
                         mean_loss = float("-inf")
 
                     print(
-                        "\rBatch:{0} | Loss:{1} | Mean Loss:{2}\n".format(
-                            step, loss, mean_loss
+                        "\rRank: {0} | Batch:{1} | Loss:{2} | Mean Loss:{3}\n".format(
+                            rank, step, loss, mean_loss
                         )
                     )
-                    if save_always and (step % 200 == 0):
-                        model.save(
-                            str(epoch) + "_step_" + str(step), which_model="question"
+                    if rank == 0 and save_always and (step % 200 == 0):
+                        save(
+                            model.question_model,
+                            model.model_path,
+                            str(epoch) + "_question_step_" + str(step),
                         )
 
-                if save_always:
-                    model.save(
-                        str(epoch) + "_loop_" + str(question_loop),
-                        which_model="question",
+                    if save_always and (step % 200 == 0):
+                        dist.barrier()
+
+                if rank == 0 and save_always:
+                    save(
+                        model.question_model,
+                        model.model_path,
+                        str(epoch) + "_question_loop_" + str(question_loop),
                     )
+                dist.barrier()
+
+            dist.barrier()
 
             for answer_loop in range(answer_inner_loop):
                 total_loss = []
-                print("\rInfo: Answer Phase Training {0}\n".format(answer_loop))
+                print(
+                    "\rRank: {0} | Info: Answer Phase Training {1}\n".format(
+                        rank, answer_loop
+                    )
+                )
                 for step, loss in run_train_epoch(
                     model, train_dataloader, phase="answer"
                 ):
-                    if math.isnan(loss):
-                        print("nan loss")
-
                     if loss:
                         total_loss.append(loss)
 
@@ -604,26 +629,39 @@ def run_model(
                         mean_loss = float("-inf")
 
                     print(
-                        "\rBatch:{0} | Loss:{1} | Mean Loss:{2}\n".format(
-                            step, loss, mean_loss
+                        "\rRank: {0} | Batch:{1} | Loss:{2} | Mean Loss:{3}\n".format(
+                            rank, step, loss, mean_loss
                         )
                     )
+                    if rank == 0 and save_always and (step % 200 == 0):
+                        save(
+                            model.answer_model,
+                            model.model_path,
+                            str(epoch) + "_answer_step_" + str(step),
+                        )
+
                     if save_always and (step % 200 == 0):
-                        model.save(
-                            str(epoch) + "_step_" + str(step), which_model="answer"
-                        )
+                        dist.barrier()
 
-                if save_always:
-                    model.save(
-                        str(epoch) + "_loop_" + str(answer_loop), which_model="answer"
+                if rank == 0 and save_always:
+                    save(
+                        model.answer_model,
+                        model.model_path,
+                        str(epoch) + "_answer_loop_" + str(answer_loop),
                     )
+                dist.barrier()
 
-            msg = "\nEpoch training time:{} seconds\n".format(time.time() - start)
+            msg = "\nRank: {0} | Epoch training time: {1} seconds\n".format(
+                rank, time.time() - start
+            )
             print(msg)
             epoch += 1
 
-        save_config(config, model_path)
-        msg = "\nTotal training time:{} seconds\n".format(time.time() - first_start)
+        if rank == 0:
+            save_config(config, model_path)
+        msg = "\nRank: {0} | Total training time: {1} seconds\n".format(
+            rank, time.time() - first_start
+        )
         print(msg)
 
     elif mode == "test":
@@ -923,6 +961,7 @@ def create_all_relation_qa_dataset(
         num_workers,
     )
     (
+        docred_train_sampler,
         docred_train_loader,
         docred_val_loader,
         docred_test_loader,
@@ -954,6 +993,7 @@ def create_all_relation_qa_dataset(
     )
 
     # Training
+    answer_train_sampler = None
     if distributed:
         answer_train_sampler = torch.utils.data.distributed.DistributedSampler(
             answer_train_datasets
@@ -976,6 +1016,7 @@ def create_all_relation_qa_dataset(
     )
 
     # Training
+    question_train_sampler = None
     if distributed:
         question_train_sampler = torch.utils.data.distributed.DistributedSampler(
             question_train_datasets
@@ -996,15 +1037,52 @@ def create_all_relation_qa_dataset(
     question_eval_loader = DataLoader(
         question_eval_datasets, batch_size=batch_size, shuffle=False
     )
-    return (answer_train_loader, question_train_loader, docred_train_loader), (
-        answer_eval_loader,
-        question_eval_loader,
-        docred_val_loader,
+    return (
+        (answer_train_sampler, question_train_sampler, docred_train_sampler),
+        (answer_train_loader, question_train_loader, docred_train_loader),
+        (
+            answer_eval_loader,
+            question_eval_loader,
+            docred_val_loader,
+        ),
     )
 
 
 def run_reqa(args):
     """Run the relation-extraction qa models."""
+
+    # distributed code coppied from the compute canada guidelines:
+    # https://docs.computecanada.ca/wiki/PyTorch
+
+    ngpus_per_node = torch.cuda.device_count()
+
+    """ This next line is the key to getting DistributedDataParallel working on SLURM:
+		SLURM_NODEID is 0 or 1 in this example, SLURM_LOCALID is the id of the 
+ 		current process inside a node and is also 0 or 1 in this example."""
+
+    local_rank = int(os.environ.get("SLURM_LOCALID"))
+    rank = int(os.environ.get("SLURM_NODEID")) * ngpus_per_node + local_rank
+
+    """ This next block parses CUDA_VISIBLE_DEVICES to find out which GPUs have been allocated to the job, then sets torch.device to the GPU corresponding       to the local rank (local rank 0 gets the first GPU, local rank 1 gets the second GPU etc) """
+
+    available_gpus = list(os.environ.get("CUDA_VISIBLE_DEVICES").replace(",", ""))
+
+    current_device = int(available_gpus[local_rank])
+
+    torch.cuda.set_device(current_device)
+
+    print("From Rank: {}, ==> Initializing Process Group...".format(rank))
+    # init the process group
+    dist.init_process_group(
+        backend=args.dist_backend,
+        init_method=args.init_method,
+        world_size=args.world_size,
+        rank=rank,
+    )
+    print("process group ready!")
+
+    print("From Rank: {}, ==> Making model..".format(rank))
+
     config = HyperParameters(
         model_path=args.model_path,
         batch_size=args.batch_size,
@@ -1022,12 +1100,21 @@ def run_reqa(args):
         num_beams=args.num_beams,
     )
     model = REQA(config)
-    train_loaders, val_loaders = create_all_relation_qa_dataset(
+    model.cuda()
+    model = torch.nn.parallel.DistributedDataParallel(
+        model, device_ids=[current_device]
+    )
+
+    print("From Rank: {}, ==> Preparing data..".format(rank))
+
+    train_samplers, train_loaders, val_loaders = create_all_relation_qa_dataset(
         answer_tokenizer=model.answer_tokenizer,
         question_tokenizer=model.question_tokenizer,
         batch_size=config.batch_size,
         source_max_length=config.source_max_length,
         decoder_max_length=config.decoder_max_length,
+        distributed=True,
+        num_workers=args.num_workers,
     )
 
     run_model(
@@ -1037,6 +1124,8 @@ def run_reqa(args):
         dev_dataloader=val_loaders,
         test_dataloader=None,
         save_always=True,
+        rank=rank,
+        train_samplers=train_samplers,
     )
 
 
@@ -1139,6 +1228,16 @@ def argument_parser():
         type=int,
         help="number of epochs to train the question model compared to the answer model.",
     )
+    parser.add_argument("--num_workers", type=int, default=0, help="Number of Workers")
+    parser.add_argument(
+        "--init_method",
+        default="tcp://127.0.0.1:3456",
+        type=str,
+        help="I guess the address of the master",
+    )
+    parser.add_argument("--dist-backend", default="gloo", type=str, help="")
+    parser.add_argument("--world_size", default=1, type=int, help="")
+    parser.add_argument("--distributed", action="store_true", help="")
     args, _ = parser.parse_known_args()
     return args
 
