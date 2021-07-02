@@ -71,6 +71,12 @@ def set_random_seed(seed: int) -> Any:
     torch.backends.cudnn.benchmark = False
 
 
+def remove_prefix(text, prefix):
+    if text.startswith(prefix):
+        return text[len(prefix):]
+    return text  # or whatever
+
+
 def torch_save(model: torch.nn.Module, path: str) -> None:
     """Save the model to task at the specified path."""
     torch.save(model.state_dict(), path)
@@ -87,7 +93,10 @@ def load_module(model, model_path, checkpoint_name):
         model_path + checkpoint_name,
         map_location=lambda storage, loc: storage,
     )
-    model.load_state_dict(loaded_weights)
+    new_weights = {}
+    for key, val in loaded_weights.items():
+        new_weights[remove_prefix(key, 'module.')] = val
+    model.load_state_dict(new_weights)
 
 
 def clear_cache():
