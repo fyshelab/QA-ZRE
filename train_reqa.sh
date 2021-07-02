@@ -12,7 +12,7 @@
 module load python/3.8
 module load StdEnv/2020  gcc/9.3.0 arrow/2.0.0
 
-source ~/env/bin/activate
+source env/bin/activate
 
 export NCCL_BLOCKING_WAIT=1  #Set this environment variable if you wish to use the NCCL backend for inter-GPU communication.
 
