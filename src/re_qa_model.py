@@ -243,7 +243,7 @@ class REQA(torch.nn.Module):
 
         return answer_input_ids, answer_input_mask
 
-    def predict(self, batch):
+    def predict_step(self, batch):
         # Free memory in GPU, very important!
         clear_cache()
         # disable dropout
@@ -266,7 +266,7 @@ class REQA(torch.nn.Module):
             }
             yield output_batch
 
-    def train(self, batch, phase="answer", answer_lambda=0.1, question_lambda=0.1):
+    def train_step(self, batch, phase="answer", answer_lambda=0.1, question_lambda=0.1):
         # Free memory in GPU, very important!
         clear_cache()
         # Turn on training mode which enables dropout.
