@@ -223,9 +223,7 @@ def create_docred_dataset(
     # Training
     train_sampler = None
     if distributed:
-        train_sampler = torch.utils.data.distributed.DistributedSampler(
-            train_dataset, num_replicas=num_workers, rank=rank
-        )
+        train_sampler = torch.utils.data.distributed.DistributedSampler(train_dataset)
         train_loader = DataLoader(
             train_dataset,
             batch_size=batch_size,
@@ -454,9 +452,7 @@ def create_race_dataset(
 
     # Training
     if distributed:
-        train_sampler = torch.utils.data.distributed.DistributedSampler(
-            train_dataset, num_replicas=num_workers, rank=rank
-        )
+        train_sampler = torch.utils.data.distributed.DistributedSampler(train_dataset)
         train_loader = DataLoader(
             train_dataset,
             batch_size=batch_size,
@@ -480,7 +476,9 @@ def create_race_dataset(
     )
 
 
-def run_train_epoch(model, train_dataloader, phase="answer") -> Generator:
+def run_train_epoch(
+    model, train_dataloader, current_device, phase="answer"
+) -> Generator:
     """Train the model and return the loss for 'num_steps' given the
     'batch_size' and the train_dataset.
 
@@ -493,7 +491,9 @@ def run_train_epoch(model, train_dataloader, phase="answer") -> Generator:
         for main_batch in docred_train_loader:
             answer_batch = next(answer_iter)
             main_batch.update(answer_batch)
-            loss_values = model.module.train_step(main_batch, phase="answer")
+            loss_values = model.module.train_step(
+                main_batch, current_device, phase="answer"
+            )
             step += 1
             yield step, loss_values["loss_value"]
     elif phase == "question":
@@ -501,7 +501,9 @@ def run_train_epoch(model, train_dataloader, phase="answer") -> Generator:
         for main_batch in docred_train_loader:
             answer_batch = next(question_iter)
             main_batch.update(answer_batch)
-            loss_values = model.module.train_step(main_batch, phase="question")
+            loss_values = model.module.train_step(
+                main_batch, current_device, phase="question"
+            )
             step += 1
             yield step, loss_values["loss_value"]
 
@@ -579,7 +581,7 @@ def run_model(
                     )
                 )
                 for step, loss in run_train_epoch(
-                    model, train_dataloader, phase="question"
+                    model, train_dataloader, current_device, phase="question"
                 ):
 
                     if loss:
@@ -630,7 +632,7 @@ def run_model(
                     )
                 )
                 for step, loss in run_train_epoch(
-                    model, train_dataloader, phase="answer"
+                    model, train_dataloader, current_device, phase="answer"
                 ):
                     if loss:
                         total_loss.append(loss)
@@ -773,9 +775,7 @@ def create_squad_dataset(
 
     # Training
     if distributed:
-        train_sampler = torch.utils.data.distributed.DistributedSampler(
-            train_dataset, num_replicas=num_workers, rank=rank
-        )
+        train_sampler = torch.utils.data.distributed.DistributedSampler(train_dataset)
         train_loader = DataLoader(
             train_dataset,
             batch_size=batch_size,
@@ -883,9 +883,7 @@ def create_rev_squad_dataset(
 
     # Training
     if distributed:
-        train_sampler = torch.utils.data.distributed.DistributedSampler(
-            train_dataset, num_replicas=num_workers, rank=rank
-        )
+        train_sampler = torch.utils.data.distributed.DistributedSampler(train_dataset)
         train_loader = DataLoader(
             train_dataset,
             batch_size=batch_size,
@@ -1024,7 +1022,7 @@ def create_all_relation_qa_dataset(
     answer_train_sampler = None
     if distributed:
         answer_train_sampler = torch.utils.data.distributed.DistributedSampler(
-            answer_train_datasets, num_replicas=num_workers, rank=rank
+            answer_train_datasets
         )
         answer_train_loader = DataLoader(
             answer_train_datasets,
@@ -1046,7 +1044,7 @@ def create_all_relation_qa_dataset(
     question_train_sampler = None
     if distributed:
         question_train_sampler = torch.utils.data.distributed.DistributedSampler(
-            question_train_datasets, num_replicas=num_workers, rank=rank
+            question_train_datasets
         )
         question_train_loader = DataLoader(
             question_train_datasets,
@@ -1126,7 +1124,7 @@ def run_reqa(args):
         num_beams=args.num_beams,
     )
     model = REQA(config)
-    model.cuda()
+    model = model.to(current_device)
     model = torch.nn.parallel.DistributedDataParallel(
         model, device_ids=[current_device]
     )
