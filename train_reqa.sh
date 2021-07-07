@@ -20,7 +20,6 @@ export MASTER_ADDR=$(hostname) #Store the master node’s IP address in the MAST
 
 echo "r$SLURM_NODEID master: $MASTER_ADDR"
 
-
 echo "r$SLURM_NODEID Launching python script"
 
 # The SLURM_NTASKS variable tells the script how many processes are available for this execution. “srun” executes the script <tasks-per-node * nodes> times
