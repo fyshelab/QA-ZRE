@@ -73,7 +73,7 @@ def set_random_seed(seed: int) -> Any:
 
 def remove_prefix(text, prefix):
     if text.startswith(prefix):
-        return text[len(prefix):]
+        return text[len(prefix) :]
     return text  # or whatever
 
 
@@ -95,7 +95,7 @@ def load_module(model, model_path, checkpoint_name):
     )
     new_weights = {}
     for key, val in loaded_weights.items():
-        new_weights[remove_prefix(key, 'module.')] = val
+        new_weights[remove_prefix(key, "module.")] = val
     model.load_state_dict(new_weights)
 
 

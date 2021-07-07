@@ -74,6 +74,7 @@ def create_docred_dataset(
     decoder_max_length,
     distributed=False,
     num_workers=0,
+    rank=0,
 ):
     """Function to create the docred dataset."""
     train_passages, train_contexts, train_answers = read_docred(
@@ -222,7 +223,9 @@ def create_docred_dataset(
     # Training
     train_sampler = None
     if distributed:
-        train_sampler = torch.utils.data.distributed.DistributedSampler(train_dataset)
+        train_sampler = torch.utils.data.distributed.DistributedSampler(
+            train_dataset, num_replicas=num_workers, rank=rank
+        )
         train_loader = DataLoader(
             train_dataset,
             batch_size=batch_size,
@@ -326,6 +329,7 @@ def create_race_dataset(
     decoder_max_length,
     distributed=False,
     num_workers=0,
+    rank=0,
 ):
     """Function to create the race dataset."""
 
@@ -450,7 +454,9 @@ def create_race_dataset(
 
     # Training
     if distributed:
-        train_sampler = torch.utils.data.distributed.DistributedSampler(train_dataset, num_replicas=num_workers, rank=rank)
+        train_sampler = torch.utils.data.distributed.DistributedSampler(
+            train_dataset, num_replicas=num_workers, rank=rank
+        )
         train_loader = DataLoader(
             train_dataset,
             batch_size=batch_size,
@@ -540,6 +546,7 @@ def run_model(
     save_always: Optional[bool] = False,
     rank=0,
     train_samplers=None,
+    current_device=0,
 ) -> None:
     """Run the model on input data (for training or testing)"""
 
@@ -565,8 +572,10 @@ def run_model(
             for question_loop in range(question_inner_loop):
                 total_loss = []
                 print(
-                    "\rRank: {0} | Info: Question Phase Training {1}\n".format(
-                        rank, question_loop
+                    "\rRank: {0} | Info: Question Phase Training {1} | GPU Usage: {2}\n".format(
+                        rank,
+                        question_loop,
+                        torch.cuda.memory_allocated(device=current_device),
                     )
                 )
                 for step, loss in run_train_epoch(
@@ -583,8 +592,12 @@ def run_model(
                         mean_loss = float("-inf")
 
                     print(
-                        "\rRank: {0} | Batch:{1} | Loss:{2} | Mean Loss:{3}\n".format(
-                            rank, step, loss, mean_loss
+                        "\rRank: {0} | Batch:{1} | Loss:{2} | Mean Loss:{3} | GPU Usage: {4}\n".format(
+                            rank,
+                            step,
+                            loss,
+                            mean_loss,
+                            torch.cuda.memory_allocated(device=current_device),
                         )
                     )
                     if rank == 0 and save_always and (step % 200 == 0):
@@ -610,8 +623,10 @@ def run_model(
             for answer_loop in range(answer_inner_loop):
                 total_loss = []
                 print(
-                    "\rRank: {0} | Info: Answer Phase Training {1}\n".format(
-                        rank, answer_loop
+                    "\rRank: {0} | Info: Answer Phase Training {1} | GPU Usage: {2}\n".format(
+                        rank,
+                        answer_loop,
+                        torch.cuda.memory_allocated(device=current_device),
                     )
                 )
                 for step, loss in run_train_epoch(
@@ -627,8 +642,12 @@ def run_model(
                         mean_loss = float("-inf")
 
                     print(
-                        "\rRank: {0} | Batch:{1} | Loss:{2} | Mean Loss:{3}\n".format(
-                            rank, step, loss, mean_loss
+                        "\rRank: {0} | Batch:{1} | Loss:{2} | Mean Loss:{3} | GPU Usage: {4}\n".format(
+                            rank,
+                            step,
+                            loss,
+                            mean_loss,
+                            torch.cuda.memory_allocated(device=current_device),
                         )
                     )
                     if rank == 0 and save_always and (step % 200 == 0):
@@ -677,7 +696,7 @@ def create_squad_dataset(
     decoder_max_length,
     distributed=False,
     num_workers=0,
-    rank=0
+    rank=0,
 ):
     """Function to create the squad dataset."""
     train_contexts, train_answers = read_squad("./squad/train-v2.0.json")
@@ -754,7 +773,9 @@ def create_squad_dataset(
 
     # Training
     if distributed:
-        train_sampler = torch.utils.data.distributed.DistributedSampler(train_dataset, num_replicas=num_workers, rank=rank)
+        train_sampler = torch.utils.data.distributed.DistributedSampler(
+            train_dataset, num_replicas=num_workers, rank=rank
+        )
         train_loader = DataLoader(
             train_dataset,
             batch_size=batch_size,
@@ -862,7 +883,9 @@ def create_rev_squad_dataset(
 
     # Training
     if distributed:
-        train_sampler = torch.utils.data.distributed.DistributedSampler(train_dataset, num_replicas=num_workers, rank=rank)
+        train_sampler = torch.utils.data.distributed.DistributedSampler(
+            train_dataset, num_replicas=num_workers, rank=rank
+        )
         train_loader = DataLoader(
             train_dataset,
             batch_size=batch_size,
@@ -886,7 +909,7 @@ def create_all_relation_qa_dataset(
     decoder_max_length,
     distributed=False,
     num_workers=0,
-    rank=0
+    rank=0,
 ):
     (
         squad_train_loader,
@@ -900,7 +923,7 @@ def create_all_relation_qa_dataset(
         decoder_max_length,
         distributed,
         num_workers,
-        rank
+        rank,
     )
     (
         rev_squad_train_loader,
@@ -914,7 +937,7 @@ def create_all_relation_qa_dataset(
         decoder_max_length,
         distributed,
         num_workers,
-        rank
+        rank,
     )
     (
         nq_train_loader,
@@ -930,7 +953,7 @@ def create_all_relation_qa_dataset(
         decoder_max_length,
         distributed,
         num_workers,
-        rank
+        rank,
     )
     (
         rev_nq_train_loader,
@@ -946,7 +969,7 @@ def create_all_relation_qa_dataset(
         decoder_max_length,
         distributed,
         num_workers,
-        rank
+        rank,
     )
     (
         race_train_loader,
@@ -980,7 +1003,7 @@ def create_all_relation_qa_dataset(
         decoder_max_length,
         distributed,
         num_workers,
-        rank
+        rank,
     )
 
     answer_train_datasets = torch.utils.data.ConcatDataset(
@@ -1118,6 +1141,7 @@ def run_reqa(args):
         decoder_max_length=config.decoder_max_length,
         distributed=True,
         num_workers=args.num_workers,
+        rank=rank,
     )
 
     run_model(
@@ -1129,6 +1153,7 @@ def run_reqa(args):
         save_always=True,
         rank=rank,
         train_samplers=train_samplers,
+        current_device=current_device,
     )
 
 
