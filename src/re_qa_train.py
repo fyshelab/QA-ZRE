@@ -1138,7 +1138,7 @@ def run_reqa(args):
         source_max_length=config.source_max_length,
         decoder_max_length=config.decoder_max_length,
         distributed=True,
-        num_workers=args.num_workers,
+        num_workers=args.world_size,
         rank=rank,
     )
 
@@ -1254,7 +1254,6 @@ def argument_parser():
         type=int,
         help="number of epochs to train the question model compared to the answer model.",
     )
-    parser.add_argument("--num_workers", type=int, default=0, help="Number of Workers")
     parser.add_argument(
         "--init_method",
         default="tcp://127.0.0.1:3456",
