@@ -226,7 +226,6 @@ def create_docred_dataset(
         train_loader = DataLoader(
             train_dataset,
             batch_size=batch_size,
-            shuffle=True,
             num_workers=num_workers,
             sampler=train_sampler,
         )
@@ -455,7 +454,6 @@ def create_race_dataset(
         train_loader = DataLoader(
             train_dataset,
             batch_size=batch_size,
-            shuffle=True,
             num_workers=num_workers,
             sampler=train_sampler,
         )
@@ -489,7 +487,7 @@ def run_train_epoch(model, train_dataloader, phase="answer") -> Generator:
         for main_batch in docred_train_loader:
             answer_batch = next(answer_iter)
             main_batch.update(answer_batch)
-            loss_values = model.train(main_batch, phase="answer")
+            loss_values = model.module.train_step(main_batch, phase="answer")
             step += 1
             yield step, loss_values["loss_value"]
     elif phase == "question":
@@ -497,7 +495,7 @@ def run_train_epoch(model, train_dataloader, phase="answer") -> Generator:
         for main_batch in docred_train_loader:
             answer_batch = next(question_iter)
             main_batch.update(answer_batch)
-            loss_values = model.train(main_batch, phase="question")
+            loss_values = model.module.train_step(main_batch, phase="question")
             step += 1
             yield step, loss_values["loss_value"]
 
@@ -510,7 +508,7 @@ def run_predict(model, dev_dataloader, prediction_file: str) -> None:
         writer = csv.writer(out_fp, **writerparams)
         header_written = False
         for batch in dev_dataloader:
-            for ret_row in model.predict(batch):
+            for ret_row in model.module.predict_step(batch):
                 if not header_written:
                     headers = ret_row.keys()
                     writer.writerow(headers)
@@ -760,7 +758,6 @@ def create_squad_dataset(
         train_loader = DataLoader(
             train_dataset,
             batch_size=batch_size,
-            shuffle=True,
             num_workers=num_workers,
             sampler=train_sampler,
         )
@@ -869,7 +866,6 @@ def create_rev_squad_dataset(
         train_loader = DataLoader(
             train_dataset,
             batch_size=batch_size,
-            shuffle=True,
             num_workers=num_workers,
             sampler=train_sampler,
         )
@@ -1010,7 +1006,6 @@ def create_all_relation_qa_dataset(
         answer_train_loader = DataLoader(
             answer_train_datasets,
             batch_size=batch_size,
-            shuffle=True,
             num_workers=num_workers,
             sampler=answer_train_sampler,
         )
@@ -1033,7 +1028,6 @@ def create_all_relation_qa_dataset(
         question_train_loader = DataLoader(
             question_train_datasets,
             batch_size=batch_size,
-            shuffle=True,
             num_workers=num_workers,
             sampler=question_train_sampler,
         )
@@ -1117,8 +1111,8 @@ def run_reqa(args):
     print("From Rank: {}, ==> Preparing data..".format(rank))
 
     train_samplers, train_loaders, val_loaders = create_all_relation_qa_dataset(
-        answer_tokenizer=model.answer_tokenizer,
-        question_tokenizer=model.question_tokenizer,
+        answer_tokenizer=model.module.answer_tokenizer,
+        question_tokenizer=model.module.question_tokenizer,
         batch_size=config.batch_size,
         source_max_length=config.source_max_length,
         decoder_max_length=config.decoder_max_length,

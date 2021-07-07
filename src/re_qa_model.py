@@ -130,10 +130,11 @@ MODEL_NAME = "t5-base"
 Q_MODEL_NAME = "iarfmoose/t5-base-question-generator"
 
 
-class REQA(object):
+class REQA(torch.nn.Module):
     """Wrapper class around the T5 Model."""
 
     def __init__(self, cfg: HyperParameters, load_answer=True):
+        super(REQA, self).__init__()
         self.config = cfg
 
         set_random_seed(cfg.seed)
@@ -242,7 +243,7 @@ class REQA(object):
 
         return answer_input_ids, answer_input_mask
 
-    def predict(self, batch):
+    def predict_step(self, batch):
         # Free memory in GPU, very important!
         clear_cache()
         # disable dropout
@@ -265,7 +266,7 @@ class REQA(object):
             }
             yield output_batch
 
-    def train(self, batch, phase="answer", answer_lambda=0.1, question_lambda=0.1):
+    def train_step(self, batch, phase="answer", answer_lambda=0.1, question_lambda=0.1):
         # Free memory in GPU, very important!
         clear_cache()
         # Turn on training mode which enables dropout.
@@ -340,8 +341,8 @@ class REQA(object):
             question_input_ids = batch["entity_relation_passage_input_ids"]
             question_input_mask = batch["entity_relation_passage_attention_mask"]
             if self.config.gpu:
-                question_input_ids = question_input_ids.to(self.device)
-                question_input_mask = question_input_mask.to(self.device)
+                question_input_ids = question_input_ids.cuda()
+                question_input_mask = question_input_mask.cuda()
 
             b_sz, _ = question_input_ids.size()
 

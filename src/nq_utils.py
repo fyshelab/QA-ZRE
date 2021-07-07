@@ -142,7 +142,6 @@ def create_reverse_narrative_dataset(
         train_loader = DataLoader(
             train_dataset,
             batch_size=batch_size,
-            shuffle=True,
             num_workers=num_workers,
             sampler=train_sampler,
         )
@@ -295,7 +294,6 @@ def create_narrative_dataset(
         train_loader = DataLoader(
             train_dataset,
             batch_size=batch_size,
-            shuffle=True,
             num_workers=num_workers,
             sampler=train_sampler,
         )
