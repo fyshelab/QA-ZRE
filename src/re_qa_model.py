@@ -198,14 +198,14 @@ class REQA(torch.nn.Module):
         self.question_model = question_model
         self.question_tokenizer = question_tokenizer
 
-    def question_greedy_predict(self, batch):
+    def question_greedy_predict(self, current_device, batch):
         """Greedily generate the questions and prepare inputs for the answer
         module."""
         question_input_ids = batch["entity_relation_passage_input_ids"]
         question_input_mask = batch["entity_relation_passage_attention_mask"]
         if self.config.gpu:
-            question_input_ids = question_input_ids.cuda()
-            question_input_mask = question_input_mask.cuda()
+            question_input_ids = question_input_ids.to(current_device)
+            question_input_mask = question_input_mask.to(current_device)
 
         question_predictions = self.question_model.generate(
             input_ids=question_input_ids,
@@ -238,8 +238,8 @@ class REQA(torch.nn.Module):
         answer_input_ids = answer_inputs.input_ids
         answer_input_mask = answer_inputs.attention_mask
         if self.config.gpu:
-            answer_input_ids = answer_input_ids.cuda()
-            answer_input_mask = answer_input_mask.cuda()
+            answer_input_ids = answer_input_ids.to(current_device)
+            answer_input_mask = answer_input_mask.to(current_device)
 
         return answer_input_ids, answer_input_mask
 
@@ -266,7 +266,14 @@ class REQA(torch.nn.Module):
             }
             yield output_batch
 
-    def train_step(self, batch, phase="answer", answer_lambda=0.1, question_lambda=0.1):
+    def train_step(
+        self,
+        batch,
+        current_device,
+        phase="answer",
+        answer_lambda=0.1,
+        question_lambda=0.1,
+    ):
         # Free memory in GPU, very important!
         clear_cache()
         # Turn on training mode which enables dropout.
@@ -274,7 +281,9 @@ class REQA(torch.nn.Module):
             self.question_model.eval()
             self.question_optimizer.zero_grad()
 
-            answer_input_ids, answer_input_mask = self.question_greedy_predict(batch)
+            answer_input_ids, answer_input_mask = self.question_greedy_predict(
+                batch, current_device
+            )
 
             self.answer_model.train()
             self.answer_optimizer.zero_grad()
@@ -282,8 +291,8 @@ class REQA(torch.nn.Module):
             target_mask = batch["second_entity_attention_mask"]
             labels = batch["second_entity_labels"]
             if self.config.gpu:
-                target_mask = target_mask.cuda()
-                labels = labels.cuda()
+                target_mask = target_mask.to(current_device)
+                labels = labels.to(current_device)
 
             output = self.answer_model(
                 input_ids=answer_input_ids,
@@ -302,10 +311,10 @@ class REQA(torch.nn.Module):
             target_mask = batch["target_attention_mask"]
             labels = batch["labels"]
             if self.config.gpu:
-                input_ids = input_ids.cuda()
-                input_mask = input_mask.cuda()
-                target_mask = target_mask.cuda()
-                labels = labels.cuda()
+                input_ids = input_ids.to(current_device)
+                input_mask = input_mask.to(current_device)
+                target_mask = target_mask.to(current_device)
+                labels = labels.to(current_device)
 
             output = self.answer_model(
                 input_ids=input_ids,
@@ -335,14 +344,14 @@ class REQA(torch.nn.Module):
 
             loss_fct = torch.nn.CrossEntropyLoss(ignore_index=-100, reduction="none")
             if self.config.gpu:
-                loss_fct = loss_fct.cuda()
+                loss_fct = loss_fct.to(current_device)
 
             # Loss from the entity relation examples!
             question_input_ids = batch["entity_relation_passage_input_ids"]
             question_input_mask = batch["entity_relation_passage_attention_mask"]
             if self.config.gpu:
-                question_input_ids = question_input_ids.cuda()
-                question_input_mask = question_input_mask.cuda()
+                question_input_ids = question_input_ids.to(current_device)
+                question_input_mask = question_input_mask.to(current_device)
 
             b_sz, _ = question_input_ids.size()
 
@@ -451,14 +460,14 @@ class REQA(torch.nn.Module):
             answer_input_ids = answer_inputs.input_ids
             answer_input_mask = answer_inputs.attention_mask
             if self.config.gpu:
-                answer_input_ids = answer_input_ids.cuda()
-                answer_input_mask = answer_input_mask.cuda()
+                answer_input_ids = answer_input_ids.to(current_device)
+                answer_input_mask = answer_input_mask.to(current_device)
 
             target_mask = batch["second_entity_attention_mask"]
             labels = batch["second_entity_labels"]
             if self.config.gpu:
-                target_mask = target_mask.cuda()
-                labels = labels.cuda()
+                target_mask = target_mask.to(current_device)
+                labels = labels.to(current_device)
 
             b_sz, seq_len = labels.size()
             labels = labels.repeat(1, self.config.num_beams).view(-1, seq_len)
@@ -504,10 +513,10 @@ class REQA(torch.nn.Module):
             target_mask = batch["question_target_attention_mask"]
             labels = batch["question_labels"]
             if self.config.gpu:
-                input_ids = input_ids.cuda()
-                input_mask = input_mask.cuda()
-                target_mask = target_mask.cuda()
-                labels = labels.cuda()
+                input_ids = input_ids.to(current_device)
+                input_mask = input_mask.to(current_device)
+                target_mask = target_mask.to(current_device)
+                labels = labels.to(current_device)
 
             output = self.question_model(
                 input_ids=input_ids,

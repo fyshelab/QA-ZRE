@@ -139,9 +139,7 @@ def create_reverse_narrative_dataset(
 
     # Training
     if distributed:
-        train_sampler = torch.utils.data.distributed.DistributedSampler(
-            train_dataset, num_replicas=num_workers, rank=rank
-        )
+        train_sampler = torch.utils.data.distributed.DistributedSampler(train_dataset)
         train_loader = DataLoader(
             train_dataset,
             batch_size=batch_size,
@@ -294,9 +292,7 @@ def create_narrative_dataset(
 
     # Training
     if distributed:
-        train_sampler = torch.utils.data.distributed.DistributedSampler(
-            train_dataset, num_replicas=num_workers, rank=rank
-        )
+        train_sampler = torch.utils.data.distributed.DistributedSampler(train_dataset)
         train_loader = DataLoader(
             train_dataset,
             batch_size=batch_size,
