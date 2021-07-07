@@ -130,10 +130,11 @@ MODEL_NAME = "t5-base"
 Q_MODEL_NAME = "iarfmoose/t5-base-question-generator"
 
 
-class REQA(object):
+class REQA(torch.nn.Module):
     """Wrapper class around the T5 Model."""
 
     def __init__(self, cfg: HyperParameters, load_answer=True):
+        super(REQA, self).__init__()
         self.config = cfg
 
         set_random_seed(cfg.seed)

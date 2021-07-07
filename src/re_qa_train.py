@@ -226,7 +226,6 @@ def create_docred_dataset(
         train_loader = DataLoader(
             train_dataset,
             batch_size=batch_size,
-            shuffle=True,
             num_workers=num_workers,
             sampler=train_sampler,
         )
@@ -455,7 +454,6 @@ def create_race_dataset(
         train_loader = DataLoader(
             train_dataset,
             batch_size=batch_size,
-            shuffle=True,
             num_workers=num_workers,
             sampler=train_sampler,
         )
@@ -759,7 +757,6 @@ def create_squad_dataset(
         train_loader = DataLoader(
             train_dataset,
             batch_size=batch_size,
-            shuffle=True,
             num_workers=num_workers,
             sampler=train_sampler,
         )
@@ -867,7 +864,6 @@ def create_rev_squad_dataset(
         train_loader = DataLoader(
             train_dataset,
             batch_size=batch_size,
-            shuffle=True,
             num_workers=num_workers,
             sampler=train_sampler,
         )
@@ -1001,7 +997,6 @@ def create_all_relation_qa_dataset(
         answer_train_loader = DataLoader(
             answer_train_datasets,
             batch_size=batch_size,
-            shuffle=True,
             num_workers=num_workers,
             sampler=answer_train_sampler,
         )
@@ -1024,7 +1019,6 @@ def create_all_relation_qa_dataset(
         question_train_loader = DataLoader(
             question_train_datasets,
             batch_size=batch_size,
-            shuffle=True,
             num_workers=num_workers,
             sampler=question_train_sampler,
         )
@@ -1108,8 +1102,8 @@ def run_reqa(args):
     print("From Rank: {}, ==> Preparing data..".format(rank))
 
     train_samplers, train_loaders, val_loaders = create_all_relation_qa_dataset(
-        answer_tokenizer=model.answer_tokenizer,
-        question_tokenizer=model.question_tokenizer,
+        answer_tokenizer=model.module.answer_tokenizer,
+        question_tokenizer=model.module.question_tokenizer,
         batch_size=config.batch_size,
         source_max_length=config.source_max_length,
         decoder_max_length=config.decoder_max_length,
