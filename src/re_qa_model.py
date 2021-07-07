@@ -341,8 +341,8 @@ class REQA(torch.nn.Module):
             question_input_ids = batch["entity_relation_passage_input_ids"]
             question_input_mask = batch["entity_relation_passage_attention_mask"]
             if self.config.gpu:
-                question_input_ids = question_input_ids.to(self.device)
-                question_input_mask = question_input_mask.to(self.device)
+                question_input_ids = question_input_ids.cuda()
+                question_input_mask = question_input_mask.cuda()
 
             b_sz, _ = question_input_ids.size()
 
