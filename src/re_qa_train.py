@@ -604,8 +604,8 @@ def run_model(
                     )
                     if rank == 0 and save_always and (step % 200 == 0):
                         save(
-                            model.question_model,
-                            model.model_path,
+                            model.module.question_model,
+                            model.module.model_path,
                             str(epoch) + "_question_step_" + str(step),
                         )
 
@@ -614,8 +614,8 @@ def run_model(
 
                 if rank == 0 and save_always:
                     save(
-                        model.question_model,
-                        model.model_path,
+                        model.module.question_model,
+                        model.module.model_path,
                         str(epoch) + "_question_loop_" + str(question_loop),
                     )
                 dist.barrier()
@@ -654,8 +654,8 @@ def run_model(
                     )
                     if rank == 0 and save_always and (step % 200 == 0):
                         save(
-                            model.answer_model,
-                            model.model_path,
+                            model.module.answer_model,
+                            model.module.model_path,
                             str(epoch) + "_answer_step_" + str(step),
                         )
 
@@ -664,8 +664,8 @@ def run_model(
 
                 if rank == 0 and save_always:
                     save(
-                        model.answer_model,
-                        model.model_path,
+                        model.module.answer_model,
+                        model.module.model_path,
                         str(epoch) + "_answer_loop_" + str(answer_loop),
                     )
                 dist.barrier()
@@ -1134,11 +1134,11 @@ def run_reqa(args):
     train_samplers, train_loaders, val_loaders = create_all_relation_qa_dataset(
         answer_tokenizer=model.module.answer_tokenizer,
         question_tokenizer=model.module.question_tokenizer,
-        batch_size=config.batch_size,
+        batch_size=config.batch_size // args.world_size,
         source_max_length=config.source_max_length,
         decoder_max_length=config.decoder_max_length,
         distributed=True,
-        num_workers=args.world_size,
+        num_workers=args.num_workers,
         rank=rank,
     )
 
@@ -1262,6 +1262,12 @@ def argument_parser():
     )
     parser.add_argument("--dist-backend", default="gloo", type=str, help="")
     parser.add_argument("--world_size", default=1, type=int, help="")
+    parser.add_argument(
+        "--num_workers",
+        default=1,
+        type=int,
+        help="number of sub processes per main process of gpu to load data",
+    )
     parser.add_argument("--distributed", action="store_true", help="")
     args, _ = parser.parse_known_args()
     return args
