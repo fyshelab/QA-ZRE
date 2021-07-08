@@ -1122,6 +1122,8 @@ def run_reqa(args):
         question_training_steps=args.question_training_steps,
         answer_training_steps=args.answer_training_steps,
         num_beams=args.num_beams,
+        num_beam_groups=args.num_beam_groups,
+        beam_diversity_penalty=args.beam_diversity_penalty,
     )
     model = REQA(config)
     model = model.to(current_device)
@@ -1219,6 +1221,18 @@ def argument_parser():
         "--max_epochs", type=int, default=25, help="max number of training iterations"
     )
     parser.add_argument("--num_beams", type=int, default=32, help="Number of beam size")
+    parser.add_argument(
+        "--num_beam_groups",
+        type=int,
+        default=4,
+        help="Number of beam groups for diverse beam.",
+    )
+    parser.add_argument(
+        "--beam_diversity_penalty",
+        type=float,
+        default=0.5,
+        help="Diversity penalty in diverse beam.",
+    )
 
     parser.add_argument("--gpu_device", type=int, default=0, help="gpu device to use")
 
