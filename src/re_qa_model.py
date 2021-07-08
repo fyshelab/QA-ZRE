@@ -46,6 +46,8 @@ class HyperParameters:
     # Related to beam search decoding.
     beam_decoding: Optional[bool] = False
     num_beams: Optional[int] = 5
+    num_beam_groups: Optional[int] = 4
+    beam_diversity_penalty: Optional[float] = 0.5
     no_repeat_ngram_size: Optional[int] = 2
     early_stopping: Optional[bool] = True
     question_training_steps: Optional[int] = 5
@@ -373,7 +375,7 @@ class REQA(torch.nn.Module):
                 loss_fct, sampled_question_outputs
             )
 
-            # Use beam search to collect samples.
+            # Use diverse beam search to collect samples.
             beam_question_outputs = self.question_model.generate(
                 input_ids=question_input_ids,
                 attention_mask=question_input_mask,
@@ -382,6 +384,8 @@ class REQA(torch.nn.Module):
                 max_length=self.config.decoder_max_length,
                 num_return_sequences=self.config.num_beams // 2,
                 num_beams=self.config.num_beams // 2,
+                num_beam_groups=self.config.num_beam_groups,
+                diversity_penalty=self.config.beam_diversity_penalty,
                 output_scores=True,
                 return_dict_in_generate=True,
             )
