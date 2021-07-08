@@ -12,6 +12,7 @@ from collections import Counter
 from configparser import ConfigParser
 from pathlib import Path
 from typing import Generator, Optional
+
 import datasets
 import numpy as np
 import pandas as pd
@@ -19,18 +20,13 @@ import torch
 from datasets import load_dataset
 from torch.utils.data import DataLoader
 
-from src.albert_model import T5QA, HyperParameters
+from src.nq_utils import create_narrative_dataset
+from src.t5_model import T5QA, HyperParameters
 
 
 def white_space_fix(text):
     return " ".join(text.split())
 
-
-def normalize_text(text):
-    """Lowercase and remove quotes from a TensorFlow string."""
-    text = tf.strings.lower(text)
-    text = tf.strings.regex_replace(text, "'(.*)'", r"\1")
-    return text
 
 def read_dream_data(file):
     df = pd.read_csv(file)
@@ -45,11 +41,11 @@ def read_dream_data(file):
         question = white_space_fix(questions_df[i])
         article = white_space_fix(articles_df[i])
         answer = answers_df[i]
-        #contexts.append("question: " + question + " context: " + article + " </s>")
-        context = question + " \n " + article
-        ctx = context.lower()
-        ctx = re.sub("'(.*)'", r"\1", ctx)
-        contexts.append(ctx)
+        contexts.append("question: " + question + " context: " + article + " </s>")
+        # context = question + " \n " + article
+        # ctx = context.lower()
+        # ctx = re.sub("'(.*)'", r"\1", ctx)
+        # contexts.append(ctx)
         answers.append(answer)
 
     return contexts, answers
@@ -123,141 +119,6 @@ def read_squad_refs(path):
                     all_refs.append(temp)
 
     return all_refs
-
-
-def create_narrative_dataset(
-    tokenizer, batch_size, source_max_length, decoder_max_length
-):
-    """Function to create the narrative dataset."""
-
-    def process_narrative_row(row):
-        """Helper function."""
-        answer = random.choice(row["answers"])["text"]
-        answer = " ".join(answer.split())
-
-        question = row["question"]["text"]
-        question = " ".join(question.split())
-
-        article = row["document"]["summary"]["text"]
-        article = " ".join(article.split())
-
-        context = question + " \n " + article
-        ctx = context.lower()
-        ctx = re.sub("'(.*)'", r"\1", ctx)
-        return {
-            #"article": "question: " + question + " context: " + article + " </s>",
-            "article": ctx,
-            "answer": answer + " </s>",
-        }
-
-    def process_data_to_model_inputs(batch):
-        # tokenize the inputs and labels
-        inputs = tokenizer(
-            batch["article"],
-            truncation=True,
-            padding="max_length",
-            max_length=source_max_length,
-            add_special_tokens=False,
-        )
-        outputs = tokenizer(
-            batch["answer"],
-            truncation=True,
-            padding="max_length",
-            max_length=decoder_max_length,
-            add_special_tokens=False,
-        )
-
-        batch["input_ids"] = inputs.input_ids
-        batch["attention_mask"] = inputs.attention_mask
-
-        batch["target_ids"] = outputs.input_ids
-        batch["target_attention_mask"] = outputs.attention_mask
-
-        batch["labels"] = outputs.input_ids.copy()
-
-        # because BERT automatically shifts the labels, the labels correspond exactly to `target_ids`.
-        # We have to make sure that the PAD token is ignored
-
-        labels = [
-            [-100 if token == tokenizer.pad_token_id else token for token in labels]
-            for labels in batch["labels"]
-        ]
-        batch["labels"] = labels
-
-        return batch
-
-    train_dataset = load_dataset("narrativeqa", "all", split="train")
-    dev_dataset = load_dataset("narrativeqa", "all", split="validation")
-    test_dataset = load_dataset("narrativeqa", "all", split="test")
-
-    train_dataset = train_dataset.map(
-        process_narrative_row,
-        remove_columns=["document", "answers"],
-    )
-    train_dataset = train_dataset.map(
-        process_data_to_model_inputs,
-        batched=True,
-        batch_size=batch_size,
-        remove_columns=["answer", "article"],
-    )
-    train_dataset.set_format(
-        type="torch",
-        columns=[
-            "input_ids",
-            "attention_mask",
-            "target_ids",
-            "target_attention_mask",
-            "labels",
-        ],
-    )
-
-    dev_dataset = dev_dataset.map(
-        process_narrative_row,
-        remove_columns=["document", "answers"],
-    )
-    dev_dataset = dev_dataset.map(
-        process_data_to_model_inputs,
-        batched=True,
-        batch_size=batch_size,
-        remove_columns=["answer", "article"],
-    )
-
-    dev_dataset.set_format(
-        type="torch",
-        columns=[
-            "input_ids",
-            "attention_mask",
-            "target_ids",
-            "target_attention_mask",
-            "labels",
-        ],
-    )
-    test_dataset = test_dataset.map(
-        process_narrative_row,
-        remove_columns=["document", "answers"],
-    )
-    test_dataset = test_dataset.map(
-        process_data_to_model_inputs,
-        batched=True,
-        batch_size=batch_size,
-        remove_columns=["answer", "article"],
-    )
-    test_dataset.set_format(
-        type="torch",
-        columns=[
-            "input_ids",
-            "attention_mask",
-            "target_ids",
-            "target_attention_mask",
-            "labels",
-        ],
-    )
-
-    train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
-    val_loader = DataLoader(dev_dataset, batch_size=batch_size, shuffle=False)
-    test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False)
-
-    return train_dataset, val_loader, test_loader
 
 
 def create_race_dataset(tokenizer, batch_size, source_max_length, decoder_max_length):
@@ -446,7 +307,6 @@ def save_config(config: HyperParameters, path: str) -> None:
 def run_model(
     model,
     config,
-    evaluator,
     train_dataloader=None,
     dev_dataloader=None,
     test_dataloader=None,
@@ -456,13 +316,12 @@ def run_model(
 
     model_path = config.model_path
     max_epochs = config.max_epochs
-    batch_size = config.batch_size
     mode = config.mode
     if mode == "train":
         print("\nINFO: ML training\n")
         # Used to save dev set predictions.
-        prediction_file = os.path.join(model_path, "temp.predicted")
-        best_val_cost = float("inf")
+        # prediction_file = os.path.join(model_path, "temp.predicted")
+        # best_val_cost = float("inf")
         first_start = time.time()
         epoch = 0
         while epoch < max_epochs:
@@ -505,7 +364,7 @@ def run_model(
         msg = "\nTotal training time:{} seconds\n".format(time.time() - first_start)
         print(msg)
         # Remove the temp output file
-        os.remove(prediction_file)
+        # os.remove(prediction_file)
 
     elif mode == "test":
         print("Predicting...")
@@ -776,16 +635,15 @@ def run_narrative(args):
         source_max_length=512,
         decoder_max_length=128,
         gpu=args.gpu,
-        gpu_device=args.gpu_device,
         learning_rate=args.learning_rate,
         max_epochs=args.max_epochs,
         mode=mode,
-        num_train_steps=args.num_train_steps,
         prediction_file=args.prediction_file,
+        checkpoint=args.checkpoint,
     )
     model = T5QA(config)
 
-    train_loader, val_loader, test_loader = create_narrative_dataset(
+    train_loader, val_loader, test_loader, _, _, _ = create_narrative_dataset(
         tokenizer=model.tokenizer,
         batch_size=config.batch_size,
         source_max_length=config.source_max_length,
@@ -794,10 +652,9 @@ def run_narrative(args):
     run_model(
         model,
         config=config,
-        evaluator=compute_rouge,
         train_dataloader=train_loader,
         dev_dataloader=val_loader,
-        test_dataloader=val_loader,
+        test_dataloader=test_loader,
         save_always=True,
     )
 
@@ -864,15 +721,14 @@ def run_dream(args):
     config = HyperParameters(
         model_path=args.model_path,
         batch_size=args.batch_size,
-        source_max_length=512,
+        source_max_length=256,
         decoder_max_length=128,
         gpu=args.gpu,
-        gpu_device=args.gpu_device,
         learning_rate=args.learning_rate,
         max_epochs=args.max_epochs,
         mode=mode,
-        num_train_steps=args.num_train_steps,
         prediction_file=args.prediction_file,
+        checkpoint=args.checkpoint,
     )
     model = T5QA(config)
 
@@ -886,7 +742,6 @@ def run_dream(args):
     run_model(
         model,
         config=config,
-        evaluator=compute_rouge,
         train_dataloader=None,
         dev_dataloader=None,
         test_dataloader=val_loader,
@@ -980,6 +835,9 @@ def argument_parser():
 
     parser.add_argument(
         "--dream_path", type=str, help="path for reading dream scape data!"
+    )
+    parser.add_argument(
+        "--checkpoint", type=str, help="checkpoint of the trained model."
     )
     args, _ = parser.parse_known_args()
     return args
