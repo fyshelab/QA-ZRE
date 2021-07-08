@@ -34,8 +34,7 @@ def filter_data(args):
     ]
 
 
-    questions_out_df = questions_out_df[questions_out_df.skillId == 3]
-    questions_out_df = questions_out_df[questions_out_df.questionTypeId == 1]
+    questions_out_df = questions_out_df[(questions_out_df.skillId == 3) & (questions_out_df.questionTypeId == 1) & (questions_out_df.QuestionType == "Inferential")]
     questions_out_df[
         [
             "id",
@@ -45,7 +44,7 @@ def filter_data(args):
             "question",
             "potentialAnswers",
             "correctAnswers",
-            "Question Type",
+            "QuestionType",
         ]
     ].to_csv(
         output_dir / "questions-cleaned.csv", encoding="utf8", index=False
@@ -60,13 +59,13 @@ def filter_data(args):
             "question",
             "potentialAnswers",
             "correctAnswers",
-            "Question Type",
+            "QuestionType",
         ]
     ], left_on="id", right_on="passageId"
     )
 
     join_df.to_csv(
-        output_dir / "summary-passages-questions-cleaned.csv", encoding="utf8", index=False
+        output_dir / "summary-passages-questions-cleaned.inferentials.csv", encoding="utf8", index=False
     )
 
 
