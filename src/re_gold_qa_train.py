@@ -38,6 +38,53 @@ def run_re_gold_qa(args):
         decoder_max_length=config.decoder_max_length,
         train_file=args.train,
         dev_file=args.dev,
+        concat=False,
+    )
+
+    run_model(
+        model,
+        config=config,
+        train_dataloader=train_loaders,
+        dev_dataloader=val_loaders,
+        test_dataloader=None,
+        save_always=True,
+    )
+
+
+def run_re_concat_qa(args):
+    """Run the relation-extraction qa models using the concat of head entity
+    and the relation."""
+    if args.mode == "re_concat_qa_train":
+        mode = "train"
+    elif args.mode == "re_concat_qa_test":
+        mode = "test"
+    config = HyperParameters(
+        model_path=args.model_path,
+        batch_size=args.batch_size,
+        source_max_length=256,
+        decoder_max_length=32,
+        gpu=args.gpu,
+        learning_rate=args.learning_rate,
+        max_epochs=args.max_epochs,
+        mode=mode,
+        prediction_file=args.prediction_file,
+        checkpoint=args.checkpoint,
+    )
+    model = T5QA(config)
+
+    (
+        train_loaders,
+        val_loaders,
+        train_dataset,
+        val_dataset,
+    ) = create_zero_re_gold_qa_dataset(
+        tokenizer=model.tokenizer,
+        batch_size=config.batch_size,
+        source_max_length=config.source_max_length,
+        decoder_max_length=config.decoder_max_length,
+        train_file=args.train,
+        dev_file=args.dev,
+        concat=True,
     )
 
     run_model(
@@ -54,6 +101,8 @@ def run_main(args):
     """Decides what to do in the code."""
     if args.mode in ["re_gold_qa_train", "re_gold_qa_test"]:
         run_re_gold_qa(args)
+    if args.mode in ["re_concat_qa_train", "re_concat_qa_test"]:
+        run_re_concat_qa(args)
 
 
 def argument_parser():
@@ -63,7 +112,7 @@ def argument_parser():
         "--mode",
         type=str,
         required=True,
-        help="re_gold_qa_train | re_gold_qa_test",
+        help="re_gold_qa_train | re_gold_qa_test | re_concat_qa_train | re_concat_qa_test",
     )
     parser.add_argument(
         "--model_path",

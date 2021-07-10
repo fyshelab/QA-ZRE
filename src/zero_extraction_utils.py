@@ -6,7 +6,7 @@ from torch.utils.data import DataLoader
 from src.nq_utils import white_space_fix
 
 
-def read_zero_re_gold_qa(path):
+def read_zero_re_gold_qa(path, concat=False):
     path = Path(path)
     with open(path, "r") as fd:
         contexts = []
@@ -14,7 +14,10 @@ def read_zero_re_gold_qa(path):
         for line in fd:
             line = line.strip()
             line_arr = line.split("\t")
-            gold_question = line_arr[1].replace("XXX", " " + line_arr[2] + " ")
+            if concat:
+                gold_question = line_arr[2] + " " + line_arr[0]
+            else:
+                gold_question = line_arr[1].replace("XXX", " " + line_arr[2] + " ")
             passage = line_arr[3]
             if len(line_arr) > 4:
                 gold_answers = line_arr[4:]
@@ -38,14 +41,11 @@ def create_zero_re_gold_qa_dataset(
     decoder_max_length,
     train_file="./zero-shot-extraction/relation_splits/train.0",
     dev_file="./zero-shot-extraction/relation_splits/dev.0",
+    concat=False,
 ):
     """Function to create the zero re gold qa dataset."""
-    train_contexts, train_answers = read_zero_re_gold_qa(
-        train_file,
-    )
-    val_contexts, val_answers = read_zero_re_gold_qa(
-        dev_file,
-    )
+    train_contexts, train_answers = read_zero_re_gold_qa(train_file, concat=concat)
+    val_contexts, val_answers = read_zero_re_gold_qa(dev_file, concat=concat)
 
     val_encodings = tokenizer(
         val_contexts,
