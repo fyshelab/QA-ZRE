@@ -485,22 +485,15 @@ def run_train_epoch(
     Randomly pick a batch from the train_dataset.
     """
     step = 0
-    answer_train_loader, question_train_loader, docred_train_loader = train_dataloader
     if phase == "answer":
-        answer_iter = iter(answer_train_loader)
-        for main_batch in docred_train_loader:
-            answer_batch = next(answer_iter)
-            main_batch.update(answer_batch)
+        for main_batch in train_dataloader:
             loss_values = model.module.train_step(
                 main_batch, current_device, phase="answer"
             )
             step += 1
             yield step, loss_values["loss_value"]
     elif phase == "question":
-        question_iter = iter(question_train_loader)
-        for main_batch in docred_train_loader:
-            answer_batch = next(question_iter)
-            main_batch.update(answer_batch)
+        for main_batch in train_dataloader:
             loss_values = model.module.train_step(
                 main_batch, current_device, phase="question"
             )
