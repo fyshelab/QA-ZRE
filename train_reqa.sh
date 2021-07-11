@@ -5,7 +5,7 @@
 #SBATCH --tasks-per-node=4
 #SBATCH --gres=gpu:v100l:4
 #SBATCH --mem=0
-#SBATCH --time=0-12:00
+#SBATCH --time=0-06:00
 #SBATCH --cpus-per-task=6
 #SBATCH --output=%N-%j.out
 
@@ -26,4 +26,4 @@ echo "All the allocated nodes: $SLURM_JOB_NODELIST"
 
 # The SLURM_NTASKS variable tells the script how many processes are available for this execution. “srun” executes the script <tasks-per-node * nodes> times
 
-srun python src/re_qa_train.py --init_method tcp://$MASTER_ADDR:3456 --world_size $SLURM_NTASKS --mode reqa_train --model_path $HOME/reqa_models/ --answer_checkpoint _3_model --question_checkpoint _3_model --answer_training_steps 1 --question_training_steps 3 --learning_rate 0.001 --max_epochs 4 --num_beams 16 --batch_size 16  --gpu True --num_workers 6 --num_beam_groups 8 --beam_diversity_penalty 0.5
+srun python src/re_qa_train.py --init_method tcp://$MASTER_ADDR:3456 --world_size $SLURM_NTASKS --mode reqa_train --model_path $HOME/reqa_models/ --answer_checkpoint _3_model --question_checkpoint _0_question_loop_1 --answer_training_steps 1 --question_training_steps 0 --learning_rate 0.001 --max_epochs 4 --num_beams 16 --batch_size 128  --gpu True --num_workers 6 --num_beam_groups 8 --beam_diversity_penalty 0.5
