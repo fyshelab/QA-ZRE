@@ -1,13 +1,7 @@
-"""Implementation of the T5 Model for Response Generation.
-
-Some parts are from huggingface Library.
-https://github.com/huggingface/transformers/tree/master/src/transformers/models/t5
-https://arxiv.org/pdf/1910.10683.pdf
-https://arxiv.org/abs/1804.04235
-"""
+"""Implementation of the T5 Model for Response Generation and Question
+Generation Used for relation extraction."""
 
 import gc
-import math
 import os
 import random
 from dataclasses import dataclass
@@ -191,13 +185,6 @@ class REQA(torch.nn.Module):
                 # we have a pre-trained answer module.
                 load_module(answer_model, self.model_path, cfg.answer_checkpoint)
 
-            # TEMP Code to train on CC:
-            loaded_weights = torch.load(
-                self.model_path + cfg.question_checkpoint,
-                map_location=lambda storage, loc: storage,
-            )
-            question_model.load_state_dict(loaded_weights)
-
         elif cfg.mode in ["test", "inference"]:
             self.model_path = os.path.join(cfg.model_path, "model")
             load_module(answer_model, self.model_path, cfg.answer_checkpoint)
@@ -281,8 +268,6 @@ class REQA(torch.nn.Module):
         batch,
         current_device,
         phase="answer",
-        answer_lambda=0.1,
-        question_lambda=0.1,
     ):
         # Free memory in GPU, very important!
         clear_cache()
@@ -312,30 +297,7 @@ class REQA(torch.nn.Module):
             )
 
             re_loss = output.loss
-
-            clear_cache()
-
-            # Loss from the correct QA examples!
-            input_ids = batch["input_ids"]
-            input_mask = batch["attention_mask"]
-            target_mask = batch["target_attention_mask"]
-            labels = batch["labels"]
-            if self.config.gpu:
-                input_ids = input_ids.to(current_device)
-                input_mask = input_mask.to(current_device)
-                target_mask = target_mask.to(current_device)
-                labels = labels.to(current_device)
-
-            output = self.answer_model(
-                input_ids=input_ids,
-                attention_mask=input_mask,
-                decoder_attention_mask=target_mask,
-                labels=labels,
-            )
-
-            qa_loss = output.loss
-
-            loss = answer_lambda * qa_loss + re_loss
+            loss = re_loss
             loss_value = loss.item()
 
             # BackProp
@@ -365,24 +327,6 @@ class REQA(torch.nn.Module):
 
             b_sz, _ = question_input_ids.size()
 
-            # Use top-p sampling to collect random samples.
-            sampled_question_outputs = self.question_model.generate(
-                input_ids=question_input_ids,
-                attention_mask=question_input_mask,
-                do_sample=True,
-                no_repeat_ngram_size=self.config.no_repeat_ngram_size,
-                early_stopping=self.config.early_stopping,
-                max_length=self.config.decoder_max_length,
-                num_return_sequences=self.config.num_beams // 2,
-                top_p=0.95,
-                output_scores=True,
-                return_dict_in_generate=True,
-            )
-
-            top_p_questions, sampled_p = prob_of_sampled_predictions(
-                loss_fct, sampled_question_outputs
-            )
-
             # Use diverse beam search to collect samples.
             beam_question_outputs = self.question_model.generate(
                 input_ids=question_input_ids,
@@ -390,8 +334,8 @@ class REQA(torch.nn.Module):
                 no_repeat_ngram_size=self.config.no_repeat_ngram_size,
                 early_stopping=self.config.early_stopping,
                 max_length=self.config.decoder_max_length,
-                num_return_sequences=self.config.num_beams // 2,
-                num_beams=self.config.num_beams // 2,
+                num_return_sequences=self.config.num_beams,
+                num_beams=self.config.num_beams,
                 num_beam_groups=self.config.num_beam_groups,
                 diversity_penalty=self.config.beam_diversity_penalty,
                 output_scores=True,
@@ -402,29 +346,7 @@ class REQA(torch.nn.Module):
                 loss_fct, beam_question_outputs
             )
 
-            p = torch.cat(
-                (
-                    sampled_p.view(self.config.num_beams // 2, b_sz),
-                    beam_p.view(self.config.num_beams // 2, b_sz),
-                ),
-                dim=0,
-            )
-            re_p_question = p.view(self.config.num_beams * b_sz).view(
-                self.config.num_beams, b_sz
-            )
-
-            sampled_question_predictions_str = self.question_tokenizer.batch_decode(
-                top_p_questions, skip_special_tokens=True
-            )
-
-            sampled_question_predictions_str_reshaped = [
-                sampled_question_predictions_str[
-                    i
-                    * (self.config.num_beams // 2) : (i + 1)
-                    * (self.config.num_beams // 2)
-                ]
-                for i in range(b_sz)
-            ]
+            re_p_question = beam_p.view(self.config.num_beams, b_sz)
 
             beam_question_predictions_str = self.question_tokenizer.batch_decode(
                 beam_questions, skip_special_tokens=True
@@ -432,25 +354,14 @@ class REQA(torch.nn.Module):
 
             beam_question_predictions_str_reshaped = [
                 beam_question_predictions_str[
-                    i
-                    * (self.config.num_beams // 2) : (i + 1)
-                    * (self.config.num_beams // 2)
+                    i * (self.config.num_beams) : (i + 1) * (self.config.num_beams)
                 ]
                 for i in range(b_sz)
             ]
 
             new_articles = []
             for i in range(b_sz):
-                for j in range(self.config.num_beams // 2):
-                    new_article = (
-                        "question: "
-                        + sampled_question_predictions_str_reshaped[i][j]
-                        + " context: "
-                        + batch["passages"][i]
-                        + " </s>"
-                    )
-                    new_articles.append(new_article)
-                for j in range(self.config.num_beams // 2):
+                for j in range(self.config.num_beams):
                     new_article = (
                         "question: "
                         + beam_question_predictions_str_reshaped[i][j]
@@ -517,29 +428,7 @@ class REQA(torch.nn.Module):
                 dim=0,
             )
 
-            clear_cache()
-
-            # Loss from the correct QA examples!
-            input_ids = batch["question_input_ids"]
-            input_mask = batch["question_attention_mask"]
-            target_mask = batch["question_target_attention_mask"]
-            labels = batch["question_labels"]
-            if self.config.gpu:
-                input_ids = input_ids.to(current_device)
-                input_mask = input_mask.to(current_device)
-                target_mask = target_mask.to(current_device)
-                labels = labels.to(current_device)
-
-            output = self.question_model(
-                input_ids=input_ids,
-                attention_mask=input_mask,
-                decoder_attention_mask=target_mask,
-                labels=labels,
-            )
-
-            qa_loss = output.loss
-
-            loss = question_lambda * qa_loss + re_loss
+            loss = re_loss
             loss_value = loss.item()
 
             # BackProp
