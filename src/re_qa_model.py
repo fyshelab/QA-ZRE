@@ -42,6 +42,7 @@ class HyperParameters:
     dev: Optional[str] = None
     answer_checkpoint: Optional[str] = "_3_model"
     question_checkpoint: Optional[str] = "_3_model"
+    checkpoint: Optional[str] = "_3_model"
 
     # Related to beam search decoding.
     beam_decoding: Optional[bool] = False
