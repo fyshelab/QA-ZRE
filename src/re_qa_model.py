@@ -190,6 +190,13 @@ class REQA(torch.nn.Module):
                 # we have a pre-trained answer module.
                 load_module(answer_model, self.model_path, cfg.answer_checkpoint)
 
+            # TEMP Code to train on CC:
+            loaded_weights = torch.load(
+                self.model_path + cfg.question_checkpoint,
+                map_location=lambda storage, loc: storage,
+            )
+            question_model.load_state_dict(loaded_weights)
+
         elif cfg.mode in ["test", "inference"]:
             self.model_path = os.path.join(cfg.model_path, "model")
             load_module(answer_model, self.model_path, cfg.answer_checkpoint)
@@ -200,7 +207,7 @@ class REQA(torch.nn.Module):
         self.question_model = question_model
         self.question_tokenizer = question_tokenizer
 
-    def question_greedy_predict(self, current_device, batch):
+    def question_greedy_predict(self, batch, current_device):
         """Greedily generate the questions and prepare inputs for the answer
         module."""
         question_input_ids = batch["entity_relation_passage_input_ids"]
