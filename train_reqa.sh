@@ -26,4 +26,4 @@ echo "All the allocated nodes: $SLURM_JOB_NODELIST"
 
 # The SLURM_NTASKS variable tells the script how many processes are available for this execution. “srun” executes the script <tasks-per-node * nodes> times
 
-srun python src/re_gold_qa_train.py --init_method tcp://$MASTER_ADDR:3456 --world_size $SLURM_NTASKS --mode re_diverse_beam_qa_train --model_path $HOME/re_diverse_beam_qa_models/ --answer_checkpoint _3_model --question_checkpoint _3_model --answer_training_steps 1 --question_training_steps 3 --learning_rate 0.001 --max_epochs 4 --num_beams 16 --batch_size 32  --gpu True --num_workers 6 --num_beam_groups 16 --beam_diversity_penalty 0.4
+srun python src/re_gold_qa_train.py --init_method tcp://$MASTER_ADDR:3456 --world_size $SLURM_NTASKS --mode re_diverse_beam_qa_train --model_path $HOME/re_diverse_beam_qa_models/ --answer_checkpoint _3_model --question_checkpoint _3_model --answer_training_steps 1 --question_training_steps 1 --learning_rate 0.001 --max_epochs 1 --num_beams 16 --batch_size 32  --gpu True --num_workers 6 --num_beam_groups 16 --beam_diversity_penalty 0.4

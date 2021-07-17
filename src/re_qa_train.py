@@ -595,14 +595,14 @@ def run_model(
                             torch.cuda.memory_allocated(device=current_device),
                         )
                     )
-                    if rank == 0 and save_always and (step % 200 == 0):
+                    if rank == 0 and save_always and (step % 2000 == 0):
                         save(
                             model.module.question_model,
                             model.module.model_path,
                             str(epoch) + "_question_step_" + str(step),
                         )
 
-                    if save_always and (step % 200 == 0):
+                    if save_always and (step % 2000 == 0):
                         dist.barrier()
 
                 if rank == 0 and save_always:
@@ -645,14 +645,14 @@ def run_model(
                             torch.cuda.memory_allocated(device=current_device),
                         )
                     )
-                    if rank == 0 and save_always and (step % 200 == 0):
+                    if rank == 0 and save_always and (step % 2000 == 0):
                         save(
                             model.module.answer_model,
                             model.module.model_path,
                             str(epoch) + "_answer_step_" + str(step),
                         )
 
-                    if save_always and (step % 200 == 0):
+                    if save_always and (step % 2000 == 0):
                         dist.barrier()
 
                 if rank == 0 and save_always:
