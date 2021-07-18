@@ -404,6 +404,9 @@ class REQA(torch.nn.Module):
         log_p = log_p.view(b, sz)
         good_log_p = log_p.masked_fill_(labels == -100, 0.0)
         answer_log_p = torch.sum(good_log_p, dim=1).squeeze()
+        answer_log_p = answer_log_p.view(self.config.num_beams, b_sz)
+
+        # Psuedo loss for the policy gradient.
         re_loss = -torch.mean(
             torch.mean(
                 torch.mul(
