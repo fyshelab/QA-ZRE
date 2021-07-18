@@ -182,7 +182,7 @@ def create_zero_re_qa_dataset(
     if not distributed:
         train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
         val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False)
-        return train_loader, val_loader, train_dataset, val_dataset
+        return train_loader, val_loader, train_dataset, val_dataset, None
 
 
 def create_zero_re_gold_qa_dataset(
