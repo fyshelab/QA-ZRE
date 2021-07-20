@@ -8,7 +8,7 @@ import torch.utils.data.distributed
 from src.re_qa_model import REQA, HyperParameters
 from src.re_qa_train import run_model as qa_run_model
 from src.t5_model import T5QA
-from src.train import run_model
+# from src.train import run_model
 from src.zero_extraction_utils import (create_zero_re_gold_qa_dataset,
                                        create_zero_re_qa_dataset)
 
@@ -112,25 +112,22 @@ def run_re_diverse_beam_qa(args):
     elif args.mode == "re_diverse_beam_qa_test":
         mode = "test"
 
-    # ngpus_per_node = torch.cuda.device_count()
+    ngpus_per_node = torch.cuda.device_count()
 
     """ This next line is the key to getting DistributedDataParallel working on SLURM:
 		SLURM_NODEID is 0 or 1 in this example, SLURM_LOCALID is the id of the 
  		current process inside a node and is also 0 or 1 in this example."""
 
-    # local_rank = int(os.environ.get("SLURM_LOCALID"))
-    # rank = int(os.environ.get("SLURM_NODEID")) * ngpus_per_node + local_rank
+    local_rank = int(os.environ.get("SLURM_LOCALID"))
+    rank = int(os.environ.get("SLURM_NODEID")) * ngpus_per_node + local_rank
 
     """ This next block parses CUDA_VISIBLE_DEVICES to find out which GPUs have been allocated to the job, then sets torch.device to the GPU corresponding to the local rank (local rank 0 gets the first GPU, local rank 1 gets the second GPU etc) """
 
-    # available_gpus = list(os.environ.get("CUDA_VISIBLE_DEVICES").replace(",", ""))
+    available_gpus = list(os.environ.get("CUDA_VISIBLE_DEVICES").replace(",", ""))
 
-    # local_rank = 0
-    # current_device = int(available_gpus[local_rank])
-    current_device = 0
+    current_device = int(available_gpus[local_rank])
     torch.cuda.set_device(current_device)
 
-    """
     print("From Rank: {}, ==> Initializing Process Group...".format(rank))
     # init the process group
     dist.init_process_group(
@@ -142,7 +139,7 @@ def run_re_diverse_beam_qa(args):
     print("process group ready!")
 
     print("From Rank: {}, ==> Making model..".format(rank))
-    """
+
     config = HyperParameters(
         model_path=args.model_path,
         batch_size=args.batch_size,
@@ -163,11 +160,11 @@ def run_re_diverse_beam_qa(args):
     )
     model = REQA(config)
     model = model.to(current_device)
-    # model = torch.nn.parallel.DistributedDataParallel(
-    #    model, device_ids=[current_device]
-    # )
+    model = torch.nn.parallel.DistributedDataParallel(
+        model, device_ids=[current_device]
+    )
 
-    # print("From Rank: {}, ==> Preparing data..".format(rank))
+    print("From Rank: {}, ==> Preparing data..".format(rank))
 
     (
         train_loaders,
@@ -176,15 +173,15 @@ def run_re_diverse_beam_qa(args):
         val_dataset,
         train_sampler,
     ) = create_zero_re_qa_dataset(
-        question_tokenizer=model.question_tokenizer,
-        answer_tokenizer=model.answer_tokenizer,
+        question_tokenizer=model.module.question_tokenizer,
+        answer_tokenizer=model.module.answer_tokenizer,
         batch_size=config.batch_size // args.world_size,
         source_max_length=config.source_max_length,
         decoder_max_length=config.decoder_max_length,
         train_file=args.train,
         dev_file=args.dev,
-        distributed=False,
-        # num_workers=args.num_workers,
+        distributed=True,
+        num_workers=args.num_workers,
     )
 
     qa_run_model(
@@ -194,7 +191,7 @@ def run_re_diverse_beam_qa(args):
         dev_dataloader=val_loaders,
         test_dataloader=None,
         save_always=True,
-        rank=0,
+        rank=rank,
         train_samplers=[train_sampler],
         current_device=current_device,
     )

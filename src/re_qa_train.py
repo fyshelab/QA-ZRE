@@ -487,12 +487,16 @@ def run_train_epoch(
     step = 0
     if phase == "answer":
         for main_batch in train_dataloader:
-            loss_values = model.train_step(main_batch, current_device, phase="answer")
+            loss_values = model.module.train_step(
+                main_batch, current_device, phase="answer"
+            )
             step += 1
             yield step, loss_values["loss_value"]
     elif phase == "question":
         for main_batch in train_dataloader:
-            loss_values = model.train_step(main_batch, current_device, phase="question")
+            loss_values = model.module.train_step(
+                main_batch, current_device, phase="question"
+            )
             step += 1
             yield step, loss_values["loss_value"]
 
@@ -505,7 +509,7 @@ def run_predict(model, dev_dataloader, prediction_file: str) -> None:
         writer = csv.writer(out_fp, **writerparams)
         header_written = False
         for batch in dev_dataloader:
-            for ret_row in model.predict_step(batch):
+            for ret_row in model.module.predict_step(batch):
                 if not header_written:
                     headers = ret_row.keys()
                     writer.writerow(headers)
@@ -552,11 +556,11 @@ def run_model(
         answer_inner_loop = config.answer_training_steps
         while epoch < max_epochs:
             # let all processes sync up before starting with a new epoch of training
-            # dist.barrier()
+            dist.barrier()
 
             # make sure we get different orderings.
-            # for sampler in train_samplers:
-            #    sampler.set_epoch(epoch)
+            for sampler in train_samplers:
+                sampler.set_epoch(epoch)
 
             print("\nRank: {0} | Epoch:{1}\n".format(rank, epoch))
             start = time.time()
@@ -593,23 +597,23 @@ def run_model(
                     )
                     if rank == 0 and save_always and (step % 2000 == 0):
                         save(
-                            model.question_model,
-                            model.model_path,
+                            model.module.question_model,
+                            model.module.model_path,
                             str(epoch) + "_question_step_" + str(step),
                         )
 
-                    # if save_always and (step % 2000 == 0):
-                    #    dist.barrier()
+                    if save_always and (step % 2000 == 0):
+                        dist.barrier()
 
                 if rank == 0 and save_always:
                     save(
-                        model.question_model,
-                        model.model_path,
+                        model.module.question_model,
+                        model.module.model_path,
                         str(epoch) + "_question_loop_" + str(question_loop),
                     )
-                # dist.barrier()
+                dist.barrier()
 
-            # dist.barrier()
+            dist.barrier()
 
             for answer_loop in range(answer_inner_loop):
                 total_loss = []
@@ -643,21 +647,21 @@ def run_model(
                     )
                     if rank == 0 and save_always and (step % 2000 == 0):
                         save(
-                            model.answer_model,
-                            model.model_path,
+                            model.module.answer_model,
+                            model.module.model_path,
                             str(epoch) + "_answer_step_" + str(step),
                         )
 
-                    # if save_always and (step % 2000 == 0):
-                    #    dist.barrier()
+                    if save_always and (step % 2000 == 0):
+                        dist.barrier()
 
                 if rank == 0 and save_always:
                     save(
-                        model.answer_model,
-                        model.model_path,
+                        model.module.answer_model,
+                        model.module.model_path,
                         str(epoch) + "_answer_loop_" + str(answer_loop),
                     )
-                # dist.barrier()
+                dist.barrier()
 
             msg = "\nRank: {0} | Epoch training time: {1} seconds\n".format(
                 rank, time.time() - start

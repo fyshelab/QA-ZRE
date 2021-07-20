@@ -2,6 +2,7 @@
 Generation Used for relation extraction."""
 
 import gc
+import math
 import os
 import random
 from dataclasses import dataclass
@@ -291,6 +292,9 @@ class REQA(torch.nn.Module):
         loss = re_loss
         loss_value = loss.item()
 
+        if math.isnan(loss):
+            return {"loss_value": loss_value}
+
         # BackProp
         loss.backward()
 
@@ -420,6 +424,9 @@ class REQA(torch.nn.Module):
 
         loss = re_loss
         loss_value = loss.item()
+
+        if math.isnan(loss):
+            return {"loss_value": loss_value}
 
         # BackProp
         loss.backward()
