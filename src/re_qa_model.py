@@ -436,6 +436,141 @@ class REQA(torch.nn.Module):
 
         return {"loss_value": loss_value}
 
+    def mml_question_training(self, batch, current_device):
+        self.question_optimizer.zero_grad()
+        self.answer_optimizer.zero_grad()
+        self.question_model.train()
+        self.answer_model.eval()
+
+        loss_fct = torch.nn.CrossEntropyLoss(ignore_index=-100, reduction="none")
+        if self.config.gpu:
+            loss_fct = loss_fct.to(current_device)
+
+        # Loss from the entity relation examples!
+        question_input_ids = batch["entity_relation_passage_input_ids"]
+        question_input_mask = batch["entity_relation_passage_attention_mask"]
+        if self.config.gpu:
+            question_input_ids = question_input_ids.to(current_device)
+            question_input_mask = question_input_mask.to(current_device)
+
+        b_sz, _ = question_input_ids.size()
+
+        # Use diverse beam search to collect samples.
+        beam_question_outputs = self.question_model.generate(
+            input_ids=question_input_ids,
+            attention_mask=question_input_mask,
+            no_repeat_ngram_size=self.config.no_repeat_ngram_size,
+            early_stopping=self.config.early_stopping,
+            max_length=self.config.decoder_max_length,
+            num_return_sequences=self.config.num_beams,
+            num_beams=self.config.num_beams,
+            num_beam_groups=self.config.num_beam_groups,
+            diversity_penalty=self.config.beam_diversity_penalty,
+            output_scores=True,
+            return_dict_in_generate=True,
+        )
+
+        beam_questions, beam_log_p = prob_of_sampled_predictions(
+            loss_fct, beam_question_outputs
+        )
+
+        re_log_p_question = beam_log_p.view(self.config.num_beams, b_sz)
+
+        beam_question_predictions_str = self.question_tokenizer.batch_decode(
+            beam_questions, skip_special_tokens=True
+        )
+
+        beam_question_predictions_str_reshaped = [
+            beam_question_predictions_str[
+                i * (self.config.num_beams) : (i + 1) * (self.config.num_beams)
+            ]
+            for i in range(b_sz)
+        ]
+
+        new_articles = []
+        for i in range(b_sz):
+            for j in range(self.config.num_beams):
+                new_article = (
+                    "question: "
+                    + beam_question_predictions_str_reshaped[i][j]
+                    + " context: "
+                    + batch["passages"][i]
+                    + " </s>"
+                )
+                new_articles.append(new_article)
+
+        answer_inputs = self.answer_tokenizer(
+            new_articles,
+            truncation=True,
+            padding="max_length",
+            max_length=self.config.source_max_length,
+            add_special_tokens=False,
+            return_tensors="pt",
+        )
+
+        answer_input_ids = answer_inputs.input_ids
+        answer_input_mask = answer_inputs.attention_mask
+        if self.config.gpu:
+            answer_input_ids = answer_input_ids.to(current_device)
+            answer_input_mask = answer_input_mask.to(current_device)
+
+        target_mask = batch["second_entity_attention_mask"]
+        labels = batch["second_entity_labels"]
+        if self.config.gpu:
+            target_mask = target_mask.to(current_device)
+            labels = labels.to(current_device)
+
+        b_sz, seq_len = labels.size()
+        labels = labels.repeat(1, self.config.num_beams).view(-1, seq_len)
+        target_mask = target_mask.repeat(1, self.config.num_beams).view(-1, seq_len)
+
+        output = self.answer_model(
+            input_ids=answer_input_ids,
+            attention_mask=answer_input_mask,
+            decoder_attention_mask=target_mask,
+            decoder_input_ids=self.answer_model._shift_right(labels),
+            labels=None,
+        )
+
+        log_p = -loss_fct(
+            output.logits.view(-1, output.logits.size(-1)),
+            labels.view(-1),
+        )
+
+        b, sz, v = output.logits.size()
+        log_p = log_p.view(b, sz)
+        good_log_p = log_p.masked_fill_(labels == -100, 0.0)
+        answer_log_p = torch.sum(good_log_p, dim=1).squeeze()
+        answer_log_p = answer_log_p.view(self.config.num_beams, b_sz)
+
+        # Psuedo loss for the policy gradient.
+        re_loss = -torch.mean(
+            torch.log(
+                torch.sum(
+                    torch.mul(
+                        torch.transpose(torch.exp(answer_log_p.detach()), 0, 1),
+                        torch.transpose(torch.exp(re_log_p_question), 0, 1),
+                    ),
+                    dim=1,
+                )
+            ),
+            dim=0,
+        )
+
+        loss = re_loss
+        loss_value = loss.item()
+
+        if math.isnan(loss):
+            return {"loss_value": loss_value}
+
+        # BackProp
+        loss.backward()
+
+        # Optimize
+        self.question_optimizer.step()
+
+        return {"loss_value": loss_value}
+
     def train_step(
         self,
         batch,
@@ -449,4 +584,5 @@ class REQA(torch.nn.Module):
             return self.pgg_answer_training(batch, current_device)
 
         elif phase == "question":
-            return self.pg_question_training(batch, current_device)
+            # return self.pg_question_training(batch, current_device)
+            return self.mml_question_training(batch, current_device)
