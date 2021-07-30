@@ -14,17 +14,38 @@ from pathlib import Path
 from typing import Generator, Optional
 
 import datasets
+import gensim
+import gensim.corpora as corpora
 import numpy as np
 import pandas as pd
+import spacy
 import torch
 import torch.distributed as dist
 import torch.utils.data.distributed
 from datasets import load_dataset
+from spacy.lang.en.stop_words import STOP_WORDS
 from torch.utils.data import DataLoader
 
 from src.nq_utils import (create_narrative_dataset,
                           create_reverse_narrative_dataset)
 from src.re_qa_model import REQA, HyperParameters, save
+
+
+def question_read_squad(path):
+    path = Path(path)
+    with open(path, "rb") as f:
+        squad_dict = json.load(f)
+
+    contexts = []
+    questions = []
+    for group in squad_dict["data"]:
+        for passage in group["paragraphs"]:
+            context = passage["context"]
+            for qa in passage["qas"]:
+                question = qa["question"]
+                questions.append(question)
+                contexts.append(context)
+    return contexts, questions
 
 
 def white_space_fix(text):
@@ -689,6 +710,89 @@ def run_model(
         run_predict(model, test_dataloader, config.prediction_file)
         msg = "\nTotal prediction time:{} seconds\n".format(time.time() - start)
         print(msg)
+
+
+def read_squad_for_question_generation():
+    train_contexts, train_questions = question_read_squad("./squad/train-v2.0.json")
+    nlp = spacy.load("en_core_web_sm")
+    # Add these interrogative words into the stop lists.
+    stop_list = [
+        "what",
+        "for",
+        "when",
+        "what for",
+        "where",
+        "which",
+        "who",
+        "whom",
+        "whose",
+        "why",
+        "why don't",
+        "how",
+        "how far",
+        "how long",
+        "how much",
+        "how many",
+        "how old",
+        "how come",
+    ]
+
+    STOP_WORDS.extend(stop_list)
+
+    for word in STOP_WORDS:
+        lexeme = nlp.vocab[word]
+        lexeme.is_stop = True
+
+    good_qs = []
+    for index, q in enumerate(train_questions):
+        q_doc = nlp(q)
+        new_q_doc = [token.lemma_ for token in q_doc if token.lemma_ != "-PRON-"]
+        new_q = u" ".join(new_q_doc)
+        doc_to_remove_stop = nlp.make_doc(new_q)
+        final_doc = [
+            token.text
+            for token in doc_to_remove_stop
+            if token.is_stop != True and token.is_punct != True
+        ]
+        q_ents = [(e.text, e.label_) for e in q_doc.ents]
+        # to collect high precision data.
+        if len(q_ents) == 1:
+            new_final_doc = []
+            for token in final_doc:
+                if token not in q_ents[0][0]:
+                    new_final_doc.append(token)
+            if new_final_doc:
+                good_qs.append(
+                    (train_contexts[index], q, " ".join(new_final_doc), q_ents[0][0])
+                )
+
+    contexts = []
+    questions = []
+    for row in good_qs:
+        context = row[0]
+        question = row[1]
+        tokens = row[2].split(" ")
+        if len(tokens) > 0 and len(tokens) < 4:
+            relation_signal = " ".join(tokens)
+
+        if len(tokens) >= 4:
+            token_num = random.randint(1, 3)
+            sampled_tokens = random.sample(tokens, token_num)
+            relation_signal = " ".join(sampled_tokens)
+        else:
+            continue
+        contexts.append(
+            "answer: "
+            + white_space_fix(row[3])
+            + " <SEP> "
+            + white_space_fix(relation_signal)
+            + " context: "
+            + white_space_fix(context)
+            + " </s>"
+        )
+        questions.append(white_space_fix(question) + " </s>")
+
+    return contexts, questions
 
 
 def create_squad_dataset(
