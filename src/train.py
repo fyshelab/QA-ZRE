@@ -346,6 +346,8 @@ def run_model(
                         step, loss, mean_loss
                     )
                 )
+                if save_always and step > 0 and (step % 1000 == 0):
+                    model.save(str(epoch) + "_step_" + str(step))
             # print("\nValidation:\n")
             # run_predict(model, dev_dataloader, prediction_file)
             # val_cost = evaluator(prediction_file)

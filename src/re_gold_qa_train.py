@@ -45,7 +45,7 @@ def run_re_gold_qa(args):
         config=config,
         train_dataloader=train_loaders,
         dev_dataloader=val_loaders,
-        test_dataloader=None,
+        test_dataloader=val_loaders,
         save_always=True,
     )
 
