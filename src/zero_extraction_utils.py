@@ -19,7 +19,8 @@ def read_zero_re_gold_qa(path):
             if len(line_arr) > 4:
                 gold_answers = line_arr[4:]
             else:
-                gold_answers = ["no_answer"]
+                continue
+                # gold_answers = ["no_answer"]
             contexts.append(
                 "question: "
                 + white_space_fix(gold_question)
