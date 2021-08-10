@@ -6,7 +6,7 @@ import torch.distributed as dist
 import torch.utils.data.distributed
 
 from src.re_qa_model import REQA, HyperParameters
-from src.re_qa_train import run_model as qa_run_model
+from src.re_qa_train import sim_run_model as qa_run_model
 from src.t5_model import T5QA
 # from src.train import run_model
 from src.zero_extraction_utils import (create_zero_re_gold_qa_dataset,
@@ -104,12 +104,12 @@ def run_re_concat_qa(args):
     )
 
 
-def run_re_diverse_beam_qa(args):
+def run_re_qa(args):
     """Run the relation-extraction qa models using the question generator and
     the response generator explored with the diverse beam search algorithm."""
-    if args.mode == "re_diverse_beam_qa_train":
+    if args.mode == "re_qa_train":
         mode = "train"
-    elif args.mode == "re_diverse_beam_qa_test":
+    elif args.mode == "re_qa_test":
         mode = "test"
 
     ngpus_per_node = torch.cuda.device_count()
@@ -129,6 +129,7 @@ def run_re_diverse_beam_qa(args):
     torch.cuda.set_device(current_device)
 
     print("From Rank: {}, ==> Initializing Process Group...".format(rank))
+
     # init the process group
     dist.init_process_group(
         backend=args.dist_backend,
@@ -189,7 +190,7 @@ def run_re_diverse_beam_qa(args):
         config=config,
         train_dataloader=train_loaders,
         dev_dataloader=val_loaders,
-        test_dataloader=None,
+        test_dataloader=val_loaders,
         save_always=True,
         rank=rank,
         train_samplers=[train_sampler],
@@ -203,8 +204,8 @@ def run_main(args):
         run_re_gold_qa(args)
     if args.mode in ["re_concat_qa_train", "re_concat_qa_test"]:
         run_re_concat_qa(args)
-    if args.mode in ["re_diverse_beam_qa_train", "re_diverse_beam_qa_test"]:
-        run_re_diverse_beam_qa(args)
+    if args.mode in ["re_qa_train", "re_qa_test"]:
+        run_re_qa(args)
 
 
 def argument_parser():
@@ -214,7 +215,7 @@ def argument_parser():
         "--mode",
         type=str,
         required=True,
-        help="re_gold_qa_train | re_gold_qa_test | re_concat_qa_train | re_concat_qa_test | re_diverse_beam_qa_train | re_diverse_beam_qa_test",
+        help="re_gold_qa_train | re_gold_qa_test | re_concat_qa_train | re_concat_qa_test | re_qa_train | re_qa_test",
     )
     parser.add_argument(
         "--model_path",
