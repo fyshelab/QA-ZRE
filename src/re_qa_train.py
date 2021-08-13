@@ -509,7 +509,7 @@ def sim_run_train_epoch(model, train_dataloader, current_device) -> Generator:
     """
     step = 0
     for main_batch in train_dataloader:
-        loss_values = model.sim_train(main_batch, current_device)
+        loss_values = model.module.sim_train(main_batch, current_device)
         step += 1
         yield step, loss_values["answer_loss_value"], loss_values["question_loss_value"]
 
@@ -606,13 +606,13 @@ def sim_run_model(
                 )
                 if rank == 0 and save_always and step > 0 and (step % 1000 == 0):
                     save(
-                        model.question_model,
-                        model.model_path,
+                        model.module.question_model,
+                        model.module.model_path,
                         str(epoch) + "_question_step_" + str(step),
                     )
                     save(
-                        model.answer_model,
-                        model.model_path,
+                        model.module.answer_model,
+                        model.module.model_path,
                         str(epoch) + "_answer_step_" + str(step),
                     )
 
@@ -621,13 +621,13 @@ def sim_run_model(
 
             if rank == 0 and save_always:
                 save(
-                    model.question_model,
-                    model.model_path,
+                    model.module.question_model,
+                    model.module.model_path,
                     str(epoch) + "_question_full",
                 )
                 save(
-                    model.answer_model,
-                    model.model_path,
+                    model.module.answer_model,
+                    model.module.model_path,
                     str(epoch) + "_answer_full",
                 )
 
