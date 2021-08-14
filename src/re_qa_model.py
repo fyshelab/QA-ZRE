@@ -517,10 +517,11 @@ class REQA(torch.nn.Module):
 
         answer_loss, answer_loss_value = self.pgg_answer_training(batch, current_device)
         clear_cache()
+        '''
         question_loss, question_loss_value = self.mml_question_training(
             batch, current_device
         )
-
+        '''
         output = {}
         if not math.isnan(answer_loss_value):
             # BackProp
@@ -530,12 +531,14 @@ class REQA(torch.nn.Module):
 
         output["answer_loss_value"] = answer_loss_value
 
+        '''
         if not math.isnan(question_loss_value):
             # BackProp
             question_loss.backward()
             # Optimize
             self.question_optimizer.step()
-
-        output["question_loss_value"] = question_loss_value
+        '''
+        #output["question_loss_value"] = question_loss_value
+        output["question_loss_value"] = 100
 
         return output
