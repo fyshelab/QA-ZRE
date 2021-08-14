@@ -47,7 +47,8 @@ def read_zero_re_qa(path):
             if len(line_arr) > 4:
                 gold_answers = line_arr[4:]
             else:
-                gold_answers = ["no_answer"]
+                continue
+                #gold_answers = ["no_answer"]
             passages.append(passage)
             contexts.append(
                 "answer: "
