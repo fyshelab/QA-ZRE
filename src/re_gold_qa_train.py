@@ -297,7 +297,7 @@ def argument_parser():
         type=str,
         help="I guess the address of the master",
     )
-    parser.add_argument("--dist-backend", default="gloo", type=str, help="")
+    parser.add_argument("--dist-backend", default="nccl", type=str, help="")
     parser.add_argument("--world_size", default=1, type=int, help="")
     parser.add_argument(
         "--num_workers",

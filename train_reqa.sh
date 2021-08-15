@@ -1,11 +1,11 @@
 #!/bin/bash
-#SBATCH --job-name=reqa_mml_pgg_bs_train
+#SBATCH --job-name=reqa_mml_mml_bs_train
 #SBATCH --account=rrg-afyshe
 #SBATCH --nodes=4
 #SBATCH --tasks-per-node=4
 #SBATCH --gres=gpu:v100l:4
 #SBATCH --mem=0
-#SBATCH --time=0-03:00
+#SBATCH --time=0-18:00
 #SBATCH --cpus-per-task=6
 #SBATCH --output=%N-%j.out
 
@@ -30,7 +30,7 @@ srun python src/re_gold_qa_train.py \
     --init_method tcp://$MASTER_ADDR:3456 \
     --world_size $SLURM_NTASKS \
     --mode re_qa_train \
-    --model_path $SCRATCH/re_mml_pgg_bs_qa_models/ \
+    --model_path $SCRATCH/re_mml_mml_bs_qa_models/ \
     --answer_checkpoint _answer_pretrained_model \
     --question_checkpoint _question_pretrained_model \
     --answer_training_steps 1 \

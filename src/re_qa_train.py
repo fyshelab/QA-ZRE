@@ -604,7 +604,7 @@ def sim_run_model(
                         torch.cuda.memory_allocated(device=current_device),
                     )
                 )
-                if rank == 0 and save_always and step > 0 and (step % 1000 == 0):
+                if rank == 0 and save_always and step > 0 and (step % 100 == 0):
                     save(
                         model.module.question_model,
                         model.module.model_path,
@@ -616,7 +616,7 @@ def sim_run_model(
                         str(epoch) + "_answer_step_" + str(step),
                     )
 
-                if save_always and step > 0 and (step % 1000 == 0):
+                if save_always and step > 0 and (step % 100 == 0):
                     dist.barrier()
 
             if rank == 0 and save_always:
