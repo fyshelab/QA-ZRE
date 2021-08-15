@@ -1,7 +1,7 @@
 #!/bin/bash
 #SBATCH --job-name=reqa_mml_pgg_bs_train
 #SBATCH --account=rrg-afyshe
-#SBATCH --nodes=1
+#SBATCH --nodes=4
 #SBATCH --tasks-per-node=4
 #SBATCH --gres=gpu:v100l:4
 #SBATCH --mem=0
