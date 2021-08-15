@@ -300,7 +300,7 @@ class REQA(torch.nn.Module):
 
         return loss, loss_value
 
-    def mml_question_training(self, batch, current_device):
+    def mml_answer_question_training(self, batch, current_device):
         loss_fct = torch.nn.CrossEntropyLoss(ignore_index=-100, reduction="none")
         if self.config.gpu:
             loss_fct = loss_fct.to(current_device)
@@ -315,7 +315,7 @@ class REQA(torch.nn.Module):
         b_sz, _ = question_input_ids.size()
 
         with torch.no_grad():
-            # Use diverse beam search to collect samples.
+            # Use beam search to collect samples.
             beam_question_outputs = self.question_model.generate(
                 input_ids=question_input_ids,
                 attention_mask=question_input_mask,
@@ -388,14 +388,13 @@ class REQA(torch.nn.Module):
         labels = labels.repeat(1, self.config.num_beams).view(-1, seq_len)
         target_mask = target_mask.repeat(1, self.config.num_beams).view(-1, seq_len)
 
-        with torch.no_grad():
-            output = self.answer_model(
-                input_ids=answer_input_ids,
-                attention_mask=answer_input_mask,
-                decoder_attention_mask=target_mask,
-                decoder_input_ids=self.answer_model._shift_right(labels),
-                labels=None,
-            )
+        output = self.answer_model(
+            input_ids=answer_input_ids,
+            attention_mask=answer_input_mask,
+            decoder_attention_mask=target_mask,
+            decoder_input_ids=self.answer_model._shift_right(labels),
+            labels=None,
+        )
 
         log_p = -loss_fct(
             output.logits.view(-1, output.logits.size(-1)),
@@ -452,8 +451,6 @@ class REQA(torch.nn.Module):
             question_target_mask = question_target_mask.to(current_device)
             question_labels = question_labels.to(current_device)
 
-        clear_cache()
-
         question_output = self.question_model(
             input_ids=question_input_ids,
             attention_mask=question_input_mask,
@@ -492,22 +489,6 @@ class REQA(torch.nn.Module):
 
         return loss, loss_value
 
-    def train_step(
-        self,
-        batch,
-        current_device,
-        phase="answer",
-    ):
-        # Free memory in GPU, very important!
-        clear_cache()
-        # Turn on training mode which enables dropout.
-        if phase == "answer":
-            return self.pgg_answer_training(batch, current_device)
-
-        elif phase == "question":
-            # return self.pg_question_training(batch, current_device)
-            return self.mml_question_training(batch, current_device)
-
     def sim_train(self, batch, current_device):
         clear_cache()
         self.question_optimizer.zero_grad()
@@ -515,30 +496,16 @@ class REQA(torch.nn.Module):
         self.question_model.train()
         self.answer_model.train()
 
-        answer_loss, answer_loss_value = self.pgg_answer_training(batch, current_device)
-        clear_cache()
-        '''
-        question_loss, question_loss_value = self.mml_question_training(
-            batch, current_device
-        )
-        '''
+        loss, loss_value = self.mml_answer_question_training(batch, current_device)
         output = {}
-        if not math.isnan(answer_loss_value):
+        if not math.isnan(loss_value):
             # BackProp
-            answer_loss.backward()
+            loss.backward()
             # Optimize
             self.answer_optimizer.step()
-
-        output["answer_loss_value"] = answer_loss_value
-
-        '''
-        if not math.isnan(question_loss_value):
-            # BackProp
-            question_loss.backward()
-            # Optimize
             self.question_optimizer.step()
-        '''
-        #output["question_loss_value"] = question_loss_value
-        output["question_loss_value"] = 100
+
+        output["answer_loss_value"] = loss_value
+        output["question_loss_value"] = loss_value
 
         return output
