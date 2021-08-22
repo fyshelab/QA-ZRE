@@ -1,11 +1,11 @@
 #!/bin/bash
-#SBATCH --job-name=reqa_mml_mml_bs_train
+#SBATCH --job-name=reqa_top_p_train
 #SBATCH --account=rrg-afyshe
 #SBATCH --nodes=4
 #SBATCH --tasks-per-node=4
 #SBATCH --gres=gpu:v100l:4
 #SBATCH --mem=0
-#SBATCH --time=0-02:00
+#SBATCH --time=0-03:00
 #SBATCH --cpus-per-task=6
 #SBATCH --output=%N-%j.out
 
@@ -30,18 +30,17 @@ srun python src/re_gold_qa_train.py \
     --init_method tcp://$MASTER_ADDR:3456 \
     --world_size $SLURM_NTASKS \
     --mode re_qa_train \
-    --model_path $SCRATCH/re_mml_mml_bs_qa_models/ \
+    --model_path $SCRATCH/re_top_p_qa_models/ \
     --answer_checkpoint _answer_pretrained_model \
     --question_checkpoint _question_pretrained_model \
-    --answer_training_steps 1 \
-    --question_training_steps 1 \
+    --partition_checkpoint _0_step_100_model \
+    --answer_training_steps 1000 \
+    --question_training_steps 1000 \
     --learning_rate 0.001 \
     --max_epochs 1 \
-    --num_beams 8 \
+    --num_search_samples 8 \
     --batch_size 64  \
     --gpu True \
     --num_workers 6 \
-    --num_beam_groups 8 \
-    --beam_diversity_penalty 0.4 \
     --dev zero-shot-extraction/relation_splits/dev.0 \
     --train zero-shot-extraction/relation_splits/train.0

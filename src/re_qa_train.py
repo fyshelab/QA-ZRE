@@ -25,7 +25,7 @@ from torch.utils.data import DataLoader
 from src.nq_utils import (create_narrative_dataset,
                           create_reverse_narrative_dataset)
 from src.re_qa_model import REQA, HyperParameters, load_module, save
-from src.zero_extraction_utils import zere_re_eval
+from src.zero_extraction_utils import zero_re_eval
 
 
 def white_space_fix(text):
@@ -623,7 +623,7 @@ def iterative_run_model(
                         header=True,
                         index=False,
                     )
-                    scores = zere_re_eval(
+                    scores = zero_re_eval(
                         gold_eval_file, config.prediction_output_file + ".v2"
                     )
                     f1 = scores.split()[-1]
@@ -655,7 +655,7 @@ def iterative_run_model(
                     header=True,
                     index=False,
                 )
-                scores = zere_re_eval(
+                scores = zero_re_eval(
                     gold_eval_file, config.prediction_output_file + ".v2"
                 )
                 f1 = scores.split()[-1]
@@ -718,7 +718,7 @@ def iterative_run_model(
                         header=True,
                         index=False,
                     )
-                    scores = zere_re_eval(
+                    scores = zero_re_eval(
                         gold_eval_file, config.prediction_output_file + ".v2"
                     )
                     f1 = scores.split()[-1]
@@ -750,7 +750,7 @@ def iterative_run_model(
                     header=True,
                     index=False,
                 )
-                scores = zere_re_eval(
+                scores = zero_re_eval(
                     gold_eval_file, config.prediction_output_file + ".v2"
                 )
                 f1 = scores.split()[-1]
