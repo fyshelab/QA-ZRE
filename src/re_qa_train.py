@@ -24,7 +24,8 @@ from torch.utils.data import DataLoader
 
 from src.nq_utils import (create_narrative_dataset,
                           create_reverse_narrative_dataset)
-from src.re_qa_model import REQA, HyperParameters, save
+from src.re_qa_model import REQA, HyperParameters, load_module, save
+from src.zero_extraction_utils import zere_re_eval
 
 
 def white_space_fix(text):
@@ -501,7 +502,9 @@ def run_train_epoch(
             yield step, loss_values["loss_value"]
 
 
-def sim_run_train_epoch(model, train_dataloader, current_device) -> Generator:
+def iterative_run_train_epoch(
+    model, train_dataloader, current_device, phase=None
+) -> Generator:
     """Train the model and return the loss for 'num_steps' given the
     'batch_size' and the train_dataset.
 
@@ -509,9 +512,11 @@ def sim_run_train_epoch(model, train_dataloader, current_device) -> Generator:
     """
     step = 0
     for main_batch in train_dataloader:
-        loss_values = model.module.sim_train(main_batch, current_device)
+        loss_values = model.module.iterative_train(
+            main_batch, current_device, phase=phase
+        )
         step += 1
-        yield step, loss_values["answer_loss_value"], loss_values["question_loss_value"]
+        yield step, loss_values["loss_value"]
 
 
 def run_predict(model, dev_dataloader, prediction_file: str) -> None:
@@ -545,7 +550,7 @@ def save_config(config: HyperParameters, path: str) -> None:
         parser.write(configfile)
 
 
-def sim_run_model(
+def iterative_run_model(
     model,
     config,
     train_dataloader=None,
@@ -555,6 +560,7 @@ def sim_run_model(
     rank=0,
     train_samplers=None,
     current_device=0,
+    gold_eval_file="./zero-shot-extraction/relation_splits/dev.0",
 ) -> None:
     """Run the model on input data (for training or testing)"""
 
@@ -576,31 +582,28 @@ def sim_run_model(
             print("\nRank: {0} | Epoch:{1}\n".format(rank, epoch))
             start = time.time()
 
+            # Question Train Phase
+            max_question_score = -1
             question_total_loss = []
-            answer_total_loss = []
-            for step, answer_loss, question_loss in sim_run_train_epoch(
-                model, train_dataloader, current_device
+            for step, question_loss in iterative_run_train_epoch(
+                model, train_dataloader, current_device, phase="question"
             ):
+
+                if step >= config.question_training_steps:
+                    break
+
                 if question_loss:
                     question_total_loss.append(question_loss)
-
-                if answer_loss:
-                    answer_total_loss.append(answer_loss)
 
                 if question_total_loss:
                     question_mean_loss = np.mean(question_total_loss)
 
-                if answer_total_loss:
-                    answer_mean_loss = np.mean(answer_total_loss)
-
                 print(
-                    "\rRank:{0} | Batch:{1} | Question Loss:{2} | Question Mean Loss:{3} | Answer Loss:{4} | Answer Mean Loss:{5} | GPU Usage:{6}\n".format(
+                    "\rRank:{0} | Batch:{1} | Question Loss:{2} | Question Mean Loss:{3} | GPU Usage:{4}\n".format(
                         rank,
                         step,
                         question_loss,
                         question_mean_loss,
-                        answer_loss,
-                        answer_mean_loss,
                         torch.cuda.memory_allocated(device=current_device),
                     )
                 )
@@ -610,11 +613,28 @@ def sim_run_model(
                         model.module.model_path,
                         str(epoch) + "_question_step_" + str(step),
                     )
-                    save(
-                        model.module.answer_model,
-                        model.module.model_path,
-                        str(epoch) + "_answer_step_" + str(step),
+                    print("Rank 0 Predicting...")
+                    run_predict(model, dev_dataloader, config.prediction_output_file)
+                    print("Rank 0 Evaluating...")
+                    df = pd.read_csv(config.prediction_output_file, sep=",")
+                    df["predictions_str"].to_csv(
+                        config.prediction_output_file + ".v2",
+                        sep="\t",
+                        header=True,
+                        index=False,
                     )
+                    scores = zere_re_eval(
+                        gold_eval_file, config.prediction_output_file + ".v2"
+                    )
+                    f1 = scores.split()[-1]
+                    f1_value = float(f1[:-1])  # remove the percent sign
+                    if f1_value >= max_question_score:
+                        max_question_score = f1_value
+                        save(
+                            model.module.question_model,
+                            model.module.model_path,
+                            str(epoch) + "_question_best",
+                        )
 
                 if save_always and step > 0 and (step % 100 == 0):
                     dist.barrier()
@@ -625,11 +645,129 @@ def sim_run_model(
                     model.module.model_path,
                     str(epoch) + "_question_full",
                 )
+                print("Rank 0 Predicting...")
+                run_predict(model, dev_dataloader, config.prediction_output_file)
+                print("Rank 0 Evaluating...")
+                df = pd.read_csv(config.prediction_output_file, sep=",")
+                df["predictions_str"].to_csv(
+                    config.prediction_output_file + ".v2",
+                    sep="\t",
+                    header=True,
+                    index=False,
+                )
+                scores = zere_re_eval(
+                    gold_eval_file, config.prediction_output_file + ".v2"
+                )
+                f1 = scores.split()[-1]
+                f1_value = float(f1[:-1])  # remove the percent sign
+                if f1_value >= max_question_score:
+                    max_question_score = f1_value
+                    save(
+                        model.module.question_model,
+                        model.module.model_path,
+                        str(epoch) + "_question_best",
+                    )
+
+            dist.barrier()
+
+            # Load the best question model
+            load_module(
+                model.module.question_model,
+                model.module.model_path,
+                str(epoch) + "_question_best",
+            )
+
+            # Answer Train Phase
+            max_answer_score = -1
+            answer_total_loss = []
+            for step, answer_loss in iterative_run_train_epoch(
+                model, train_dataloader, current_device, phase="answer"
+            ):
+
+                if step >= config.answer_training_steps:
+                    break
+
+                if answer_loss:
+                    answer_total_loss.append(answer_loss)
+
+                if answer_total_loss:
+                    answer_mean_loss = np.mean(answer_total_loss)
+
+                print(
+                    "\rRank:{0} | Batch:{1} | Answer Loss:{2} | Answer Mean Loss:{3} | GPU Usage:{4}\n".format(
+                        rank,
+                        step,
+                        answer_loss,
+                        answer_mean_loss,
+                        torch.cuda.memory_allocated(device=current_device),
+                    )
+                )
+                if rank == 0 and save_always and step > 0 and (step % 100 == 0):
+                    save(
+                        model.module.answer_model,
+                        model.module.model_path,
+                        str(epoch) + "_answer_step_" + str(step),
+                    )
+                    print("Rank 0 Predicting...")
+                    run_predict(model, dev_dataloader, config.prediction_output_file)
+                    print("Rank 0 Evaluating...")
+                    df = pd.read_csv(config.prediction_output_file, sep=",")
+                    df["predictions_str"].to_csv(
+                        config.prediction_output_file + ".v2",
+                        sep="\t",
+                        header=True,
+                        index=False,
+                    )
+                    scores = zere_re_eval(
+                        gold_eval_file, config.prediction_output_file + ".v2"
+                    )
+                    f1 = scores.split()[-1]
+                    f1_value = float(f1[:-1])  # remove the percent sign
+                    if f1_value >= max_answer_score:
+                        max_answer_score = f1_value
+                        save(
+                            model.module.answer_model,
+                            model.module.model_path,
+                            str(epoch) + "_answer_best",
+                        )
+
+                if save_always and step > 0 and (step % 100 == 0):
+                    dist.barrier()
+
+            if rank == 0 and save_always:
                 save(
                     model.module.answer_model,
                     model.module.model_path,
                     str(epoch) + "_answer_full",
                 )
+                print("Rank 0 Predicting...")
+                run_predict(model, dev_dataloader, config.prediction_output_file)
+                print("Rank 0 Evaluating...")
+                df = pd.read_csv(config.prediction_output_file, sep=",")
+                df["predictions_str"].to_csv(
+                    config.prediction_output_file + ".v2",
+                    sep="\t",
+                    header=True,
+                    index=False,
+                )
+                scores = zere_re_eval(
+                    gold_eval_file, config.prediction_output_file + ".v2"
+                )
+                f1 = scores.split()[-1]
+                f1_value = float(f1[:-1])  # remove the percent sign
+                if f1_value >= max_answer_score:
+                    max_answer_score = f1_value
+                    save(
+                        model.module.answer_model,
+                        model.module.model_path,
+                        str(epoch) + "_answer_best",
+                    )
+            # Load the best answer model
+            load_module(
+                model.module.answer_model,
+                model.module.model_path,
+                str(epoch) + "_answer_best",
+            )
 
             msg = "\nRank: {0} | Epoch training time: {1} seconds\n".format(
                 rank, time.time() - start
@@ -647,7 +785,7 @@ def sim_run_model(
     elif mode == "test":
         print("Predicting...")
         start = time.time()
-        run_predict(model, test_dataloader, config.prediction_file)
+        run_predict(model, test_dataloader, config.prediction_output_file)
         msg = "\nTotal prediction time:{} seconds\n".format(time.time() - start)
         print(msg)
 

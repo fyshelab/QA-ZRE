@@ -6,9 +6,8 @@ import torch.distributed as dist
 import torch.utils.data.distributed
 
 from src.re_qa_model import REQA, HyperParameters
-from src.re_qa_train import sim_run_model as qa_run_model
+from src.re_qa_train import iterative_run_model as qa_run_model
 from src.t5_model import T5QA
-# from src.train import run_model
 from src.zero_extraction_utils import (create_zero_re_gold_qa_dataset,
                                        create_zero_re_qa_dataset)
 
@@ -106,7 +105,7 @@ def run_re_concat_qa(args):
 
 def run_re_qa(args):
     """Run the relation-extraction qa models using the question generator and
-    the response generator explored with the diverse beam search algorithm."""
+    the response generator explored with some search algorithm."""
     if args.mode == "re_qa_train":
         mode = "train"
     elif args.mode == "re_qa_test":
@@ -119,9 +118,12 @@ def run_re_qa(args):
  		current process inside a node and is also 0 or 1 in this example."""
 
     local_rank = int(os.environ.get("SLURM_LOCALID"))
+
     rank = int(os.environ.get("SLURM_NODEID")) * ngpus_per_node + local_rank
 
-    """ This next block parses CUDA_VISIBLE_DEVICES to find out which GPUs have been allocated to the job, then sets torch.device to the GPU corresponding to the local rank (local rank 0 gets the first GPU, local rank 1 gets the second GPU etc) """
+    """ This next block parses CUDA_VISIBLE_DEVICES to find out which GPUs 
+    have been allocated to the job, then sets torch.device to the GPU corresponding
+    to the local rank (local rank 0 gets the first GPU, local rank 1 gets the second GPU etc) """
 
     available_gpus = list(os.environ.get("CUDA_VISIBLE_DEVICES").replace(",", ""))
 
@@ -150,14 +152,13 @@ def run_re_qa(args):
         learning_rate=args.learning_rate,
         max_epochs=args.max_epochs,
         mode=mode,
-        prediction_file=args.prediction_file,
-        answer_checkpoint=args.answer_checkpoint,
-        question_checkpoint=args.question_checkpoint,
+        prediction_output_file=args.prediction_output_file,
         question_training_steps=args.question_training_steps,
         answer_training_steps=args.answer_training_steps,
-        num_beams=args.num_beams,
-        num_beam_groups=args.num_beam_groups,
-        beam_diversity_penalty=args.beam_diversity_penalty,
+        posterior_checkpoint=args.partition_checkpoint,
+        answer_checkpoint=args.answer_checkpoint,
+        question_checkpoint=args.question_checkpoint,
+        num_search_samples=args.num_search_samples,
     )
     model = REQA(config)
     model = model.to(current_device)
@@ -180,7 +181,7 @@ def run_re_qa(args):
         source_max_length=config.source_max_length,
         decoder_max_length=config.decoder_max_length,
         train_file=args.train,
-        dev_file=args.dev,
+        dev_file=args.prediction_input_file,
         distributed=True,
         num_workers=args.num_workers,
     )
@@ -195,6 +196,7 @@ def run_re_qa(args):
         rank=rank,
         train_samplers=[train_sampler],
         current_device=current_device,
+        gold_eval_file=args.prediction_input_file,
     )
 
 
@@ -227,13 +229,15 @@ def argument_parser():
     # Train specific
     parser.add_argument("--train", type=str, help="file for train data.")
 
-    parser.add_argument("--dev", type=str, help="file for validation data.")
+    parser.add_argument(
+        "--prediction_input_file", type=str, help="file for validation data."
+    )
 
     # Test specific
     parser.add_argument("--test", type=str, help="file for test data.")
 
     parser.add_argument(
-        "--prediction_file", type=str, help="file for saving predictions"
+        "--prediction_output_file", type=str, help="file for saving predictions"
     )
 
     parser.add_argument("--input_file_name", type=str, help="input file name")
@@ -282,14 +286,19 @@ def argument_parser():
         help="checkpoint of the trained question model.",
     )
     parser.add_argument(
+        "--partition_checkpoint",
+        type=str,
+        help="checkpoint of the trained partition model.",
+    )
+    parser.add_argument(
         "--answer_training_steps",
         type=int,
-        help="number of epochs to train the answer model compared to the question model.",
+        help="number of training steps over the train data for the answer model.",
     )
     parser.add_argument(
         "--question_training_steps",
         type=int,
-        help="number of epochs to train the question model compared to the answer model.",
+        help="number of training steps over the train data for the question model.",
     )
     parser.add_argument(
         "--init_method",
