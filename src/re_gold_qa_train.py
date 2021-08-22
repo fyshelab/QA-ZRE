@@ -155,7 +155,7 @@ def run_re_qa(args):
         prediction_output_file=args.prediction_output_file,
         question_training_steps=args.question_training_steps,
         answer_training_steps=args.answer_training_steps,
-        posterior_checkpoint=args.partition_checkpoint,
+        partition_checkpoint=args.partition_checkpoint,
         answer_checkpoint=args.answer_checkpoint,
         question_checkpoint=args.question_checkpoint,
         num_search_samples=args.num_search_samples,
@@ -265,6 +265,9 @@ def argument_parser():
         "--checkpoint", type=str, help="checkpoint of the trained model."
     )
     parser.add_argument("--num_beams", type=int, default=32, help="Number of beam size")
+    parser.add_argument(
+        "--num_search_samples", type=int, default=8, help="Number of search samples"
+    )
     parser.add_argument(
         "--num_beam_groups",
         type=int,

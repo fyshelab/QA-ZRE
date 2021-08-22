@@ -14,7 +14,7 @@ from torch.utils.data import DataLoader
 from src.nq_utils import white_space_fix
 
 
-def zere_re_eval(test_file, answer_file):
+def zero_re_eval(test_file, answer_file):
     q_aprf = read_results(test_file, answer_file)
     return pretify(q_aprf)
 
