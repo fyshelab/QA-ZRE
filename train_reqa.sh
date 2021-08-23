@@ -33,7 +33,7 @@ srun python src/re_gold_qa_train.py \
     --model_path $SCRATCH/re_top_p_qa_models/ \
     --answer_checkpoint _answer_pretrained_model \
     --question_checkpoint _question_pretrained_model \
-    --partition_checkpoint _0_step_100_model \
+    --partition_checkpoint _partition_best_model \
     --answer_training_steps 1000 \
     --question_training_steps 1000 \
     --learning_rate 0.001 \
