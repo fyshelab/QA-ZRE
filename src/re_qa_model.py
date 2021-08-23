@@ -502,6 +502,7 @@ class REQA(torch.nn.Module):
             question_target_mask = question_target_mask.to(current_device)
             question_labels = question_labels.to(current_device)
 
+        self.question_model.train()
         question_output = self.question_model(
             input_ids=question_input_ids,
             attention_mask=question_input_mask,
