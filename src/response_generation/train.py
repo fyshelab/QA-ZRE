@@ -147,11 +147,9 @@ def run_all(args):
         source_max_length=512,
         decoder_max_length=128,
         gpu=args.gpu,
-        gpu_device=args.gpu_device,
         learning_rate=args.learning_rate,
         max_epochs=args.max_epochs,
         mode="train",
-        num_train_steps=args.num_train_steps,
         prediction_file=args.prediction_file,
     )
 

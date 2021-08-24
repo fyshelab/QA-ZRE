@@ -138,8 +138,6 @@ def read_drop_dataset():
     train_dataset = train_dataset.map(
         process_drop_row,
         remove_columns=[
-            "section_id",
-            "query_id",
             "passage",
             "question",
             "answers_spans",
@@ -149,8 +147,6 @@ def read_drop_dataset():
     dev_dataset = dev_dataset.map(
         process_drop_row,
         remove_columns=[
-            "section_id",
-            "query_id",
             "passage",
             "question",
             "answers_spans",
@@ -193,11 +189,100 @@ def create_response_dataset(
 ):
     """Function to mix and create the train/dev dataset for pytorch model."""
 
+    def dataset_to_pytorch(train_dataset, dev_dataset, test_dataset):
+        def process_data_to_model_inputs(batch):
+            """Tokenize the inputs and labels."""
+            inputs = tokenizer(
+                batch["article"],
+                truncation=True,
+                padding="max_length",
+                max_length=source_max_length,
+                add_special_tokens=False,
+            )
+            outputs = tokenizer(
+                batch["answer"],
+                truncation=True,
+                padding="max_length",
+                max_length=decoder_max_length,
+                add_special_tokens=False,
+            )
+
+            batch["input_ids"] = inputs.input_ids
+            batch["attention_mask"] = inputs.attention_mask
+            batch["target_attention_mask"] = outputs.attention_mask
+            batch["labels"] = outputs.input_ids
+
+            # We have to make sure that the PAD token is ignored, -100 is being ignored in the loss function.
+
+            labels = [
+                [-100 if token == tokenizer.pad_token_id else token for token in labels]
+                for labels in batch["labels"]
+            ]
+            batch["labels"] = labels
+
+            return batch
+
+        train_dataset = train_dataset.map(
+            process_data_to_model_inputs,
+            batched=True,
+            batch_size=batch_size,
+            remove_columns=["answer", "article"],
+        )
+        train_dataset.set_format(
+            type="torch",
+            columns=[
+                "input_ids",
+                "attention_mask",
+                "target_attention_mask",
+                "labels",
+            ],
+        )
+
+        dev_dataset = dev_dataset.map(
+            process_data_to_model_inputs,
+            batched=True,
+            batch_size=batch_size,
+            remove_columns=["answer", "article"],
+        )
+
+        dev_dataset.set_format(
+            type="torch",
+            columns=[
+                "input_ids",
+                "attention_mask",
+                "target_attention_mask",
+                "labels",
+            ],
+        )
+
+        test_dataset = test_dataset.map(
+            process_data_to_model_inputs,
+            batched=True,
+            batch_size=batch_size,
+            remove_columns=["answer", "article"],
+        )
+        test_dataset.set_format(
+            type="torch",
+            columns=[
+                "input_ids",
+                "attention_mask",
+                "target_attention_mask",
+                "labels",
+            ],
+        )
+        return train_dataset, dev_dataset, test_dataset
+
     bq_train_dataset, bq_dev_dataset, bq_test_dataset = read_boolq_dataset()
     drp_train_dataset, drp_dev_dataset, drp_test_dataset = read_drop_dataset()
     rc_train_dataset, rc_dev_dataset, rc_test_dataset = read_race_dataset()
     nq_train_dataset, nq_dev_dataset, nq_test_dataset = read_narrative_dataset()
     sq_train_dataset, sq_dev_dataset, sq_test_dataset = read_squad_dataset()
+
+    bq_train_dataset, bq_dev_dataset, bq_test_dataset = dataset_to_pytorch(bq_train_dataset, bq_dev_dataset, bq_test_dataset)
+    drp_train_dataset, drp_dev_dataset, drp_test_dataset = dataset_to_pytorch(drp_train_dataset, drp_dev_dataset, drp_test_dataset)
+    rc_train_dataset, rc_dev_dataset, rc_test_dataset = dataset_to_pytorch(rc_train_dataset, rc_dev_dataset, rc_test_dataset)
+    nq_train_dataset, nq_dev_dataset, nq_test_dataset = dataset_to_pytorch(nq_train_dataset, nq_dev_dataset, nq_test_dataset)
+    sq_train_dataset, sq_dev_dataset, sq_test_dataset = dataset_to_pytorch(sq_train_dataset, sq_dev_dataset, sq_test_dataset)
 
     train_dataset = torch.utils.data.ConcatDataset(
         [
@@ -225,87 +310,6 @@ def create_response_dataset(
             nq_test_dataset,
             sq_test_dataset,
         ]
-    )
-
-    def process_data_to_model_inputs(batch):
-        """Tokenize the inputs and labels."""
-        inputs = tokenizer(
-            batch["article"],
-            truncation=True,
-            padding="max_length",
-            max_length=source_max_length,
-            add_special_tokens=False,
-        )
-        outputs = tokenizer(
-            batch["answer"],
-            truncation=True,
-            padding="max_length",
-            max_length=decoder_max_length,
-            add_special_tokens=False,
-        )
-
-        batch["input_ids"] = inputs.input_ids
-        batch["attention_mask"] = inputs.attention_mask
-        batch["target_attention_mask"] = outputs.attention_mask
-        batch["labels"] = outputs.input_ids
-
-        # We have to make sure that the PAD token is ignored, -100 is being ignored in the loss function.
-
-        labels = [
-            [-100 if token == tokenizer.pad_token_id else token for token in labels]
-            for labels in batch["labels"]
-        ]
-        batch["labels"] = labels
-
-        return batch
-
-    train_dataset = train_dataset.map(
-        process_data_to_model_inputs,
-        batched=True,
-        batch_size=batch_size,
-        remove_columns=["answer", "article"],
-    )
-    train_dataset.set_format(
-        type="torch",
-        columns=[
-            "input_ids",
-            "attention_mask",
-            "target_attention_mask",
-            "labels",
-        ],
-    )
-
-    dev_dataset = dev_dataset.map(
-        process_data_to_model_inputs,
-        batched=True,
-        batch_size=batch_size,
-        remove_columns=["answer", "article"],
-    )
-
-    dev_dataset.set_format(
-        type="torch",
-        columns=[
-            "input_ids",
-            "attention_mask",
-            "target_attention_mask",
-            "labels",
-        ],
-    )
-
-    test_dataset = test_dataset.map(
-        process_data_to_model_inputs,
-        batched=True,
-        batch_size=batch_size,
-        remove_columns=["answer", "article"],
-    )
-    test_dataset.set_format(
-        type="torch",
-        columns=[
-            "input_ids",
-            "attention_mask",
-            "target_attention_mask",
-            "labels",
-        ],
     )
 
     # Training
