@@ -11,8 +11,10 @@ from typing import Generator, Optional
 
 import numpy as np
 
-from src.question_response_generation.response_utils import (
-    create_question_dataset, create_response_dataset)
+from src.question_response_generation.question_utils import \
+    create_question_dataset
+from src.question_response_generation.response_utils import \
+    create_response_dataset
 from src.question_response_generation.t5_model import T5QA, HyperParameters
 
 
