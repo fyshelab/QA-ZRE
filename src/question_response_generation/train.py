@@ -11,8 +11,9 @@ from typing import Generator, Optional
 
 import numpy as np
 
-from src.response_generation.response_utils import create_response_dataset
-from src.response_generation.t5_model import T5QA, HyperParameters
+from src.question_response_generation.response_utils import (
+    create_question_dataset, create_response_dataset)
+from src.question_response_generation.t5_model import T5QA, HyperParameters
 
 
 def read_squad_refs(path):
@@ -155,20 +156,36 @@ def run_all(args):
 
     model = T5QA(config)
 
-    (
-        train_loader,
-        val_loader,
-        test_loader,
-        train_dataset,
-        dev_dataset,
-        test_dataset,
-        train_sampler,
-    ) = create_response_dataset(
-        tokenizer=model.tokenizer,
-        batch_size=config.batch_size,
-        source_max_length=config.source_max_length,
-        decoder_max_length=config.decoder_max_length,
-    )
+    if args.question_training:
+        (
+            train_loader,
+            val_loader,
+            test_loader,
+            train_dataset,
+            dev_dataset,
+            test_dataset,
+            train_sampler,
+        ) = create_question_dataset(
+            tokenizer=model.tokenizer,
+            batch_size=config.batch_size,
+            source_max_length=config.source_max_length,
+            decoder_max_length=config.decoder_max_length,
+        )
+    else:
+        (
+            train_loader,
+            val_loader,
+            test_loader,
+            train_dataset,
+            dev_dataset,
+            test_dataset,
+            train_sampler,
+        ) = create_response_dataset(
+            tokenizer=model.tokenizer,
+            batch_size=config.batch_size,
+            source_max_length=config.source_max_length,
+            decoder_max_length=config.decoder_max_length,
+        )
 
     run_model(
         model,
@@ -250,6 +267,13 @@ def argument_parser():
 
     parser.add_argument(
         "--config_file", type=str, default="config.ini", help="config.ini file"
+    )
+
+    parser.add_argument(
+        "--question_training",
+        type=bool,
+        default=False,
+        help="for question generation or not? True or False",
     )
 
     # GPU or CPU
