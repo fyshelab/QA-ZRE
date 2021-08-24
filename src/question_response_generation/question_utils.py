@@ -9,8 +9,8 @@ def white_space_fix(text):
     return " ".join(text.split())
 
 
-def read_narrative_dataset():
-    """Read the narrative qa dataset."""
+def q_read_narrative_dataset():
+    """Read the narrative qa dataset for question generation"""
 
     def process_narrative_row(row):
         """Helper functions for NarrativeQA Dataset."""
@@ -20,11 +20,11 @@ def read_narrative_dataset():
 
         article = row["document"]["summary"]["text"]
 
-        context = "question: " + question + " context: " + article + " </s>"
+        context = "answer: " + answer + " context: " + article + " </s>"
 
         return {
             "article": white_space_fix(context),
-            "answer": white_space_fix(answer + " </s>"),
+            "answer": white_space_fix(question + " </s>"),
         }
 
     train_dataset = load_dataset("narrativeqa", split="train")
@@ -48,63 +48,18 @@ def read_narrative_dataset():
     return train_dataset, dev_dataset, test_dataset
 
 
-def read_race_dataset():
-    """Function to create the race dataset."""
-
-    def process_race_row(row):
-        """Helper function."""
-        option_code = row["answer"]
-        if option_code == "A":
-            option_idx = 0
-        elif option_code == "B":
-            option_idx = 1
-        elif option_code == "C":
-            option_idx = 2
-        elif option_code == "D":
-            option_idx = 3
-
-        answer = row["options"][option_idx]
-        question = row["question"]
-        article = row["article"]
-        return {
-            "article": white_space_fix(
-                "question: " + question + " context: " + article + " </s>"
-            ),
-            "answer": white_space_fix(answer + " </s>"),
-        }
-
-    train_dataset = load_dataset("race", "all", split="train")
-    train_dataset = train_dataset.map(
-        process_race_row,
-        remove_columns=["options", "example_id", "question"],
-    )
-    dev_dataset = load_dataset("race", "all", split="validation")
-    dev_dataset = dev_dataset.map(
-        process_race_row,
-        remove_columns=["options", "example_id", "question"],
-    )
-    test_dataset = load_dataset("race", "all", split="test")
-    test_dataset = test_dataset.map(
-        process_race_row,
-        remove_columns=["options", "example_id", "question"],
-    )
-    return train_dataset, dev_dataset, test_dataset
-
-
-def read_squad_dataset():
+def q_read_squad_dataset():
     def process_squad_row(row):
         context = row["context"]
         question = row["question"]
         if row["answers"]["text"]:
             answ = random.choice(row["answers"]["text"])
-        else:
-            answ = "no_answer"
-        return {
-            "article": white_space_fix(
-                "question: " + question + " context: " + context + " </s>"
-            ),
-            "answer": white_space_fix(answ + " </s>"),
-        }
+            return {
+                "article": white_space_fix(
+                    "answer: " + answ + " context: " + context + " </s>"
+                ),
+                "answer": white_space_fix(question + " </s>"),
+            }
 
     train_dataset = load_dataset("squad_v2", split="train")
     train_dataset = train_dataset.map(
@@ -119,20 +74,18 @@ def read_squad_dataset():
     return train_dataset, dev_dataset, dev_dataset
 
 
-def read_drop_dataset():
+def q_read_drop_dataset():
     def process_drop_row(row):
         context = row["passage"]
         question = row["question"]
         if row["answers_spans"]["spans"]:
             answ = random.choice(row["answers_spans"]["spans"])
-        else:
-            answ = "no_answer"
-        return {
-            "article": white_space_fix(
-                "question: " + question + " context: " + context + " </s>"
-            ),
-            "answer": white_space_fix(answ + " </s>"),
-        }
+            return {
+                "article": white_space_fix(
+                    "answer: " + answ + " context: " + context + " </s>"
+                ),
+                "answer": white_space_fix(question + " </s>"),
+            }
 
     train_dataset = load_dataset("drop", split="train")
     train_dataset = train_dataset.map(
@@ -155,31 +108,7 @@ def read_drop_dataset():
     return train_dataset, dev_dataset, dev_dataset
 
 
-def read_boolq_dataset():
-    def process_boolq_row(row):
-        context = row["passage"]
-        question = row["question"]
-        return {
-            "article": white_space_fix(
-                "question: " + question + " context: " + context + " </s>"
-            ),
-            "answer": white_space_fix(str(row["answer"]) + " </s>"),
-        }
-
-    train_dataset = load_dataset("boolq", split="train")
-    train_dataset = train_dataset.map(
-        process_boolq_row,
-        remove_columns=["passage", "question"],
-    )
-    dev_dataset = load_dataset("boolq", split="validation")
-    dev_dataset = dev_dataset.map(
-        process_boolq_row,
-        remove_columns=["passage", "question"],
-    )
-    return train_dataset, dev_dataset, dev_dataset
-
-
-def create_response_dataset(
+def create_question_dataset(
     tokenizer,
     batch_size,
     source_max_length,
@@ -272,41 +201,37 @@ def create_response_dataset(
         )
         return train_dataset, dev_dataset, test_dataset
 
-    bq_train_dataset, bq_dev_dataset, bq_test_dataset = read_boolq_dataset()
-    drp_train_dataset, drp_dev_dataset, drp_test_dataset = read_drop_dataset()
-    rc_train_dataset, rc_dev_dataset, rc_test_dataset = read_race_dataset()
-    nq_train_dataset, nq_dev_dataset, nq_test_dataset = read_narrative_dataset()
-    sq_train_dataset, sq_dev_dataset, sq_test_dataset = read_squad_dataset()
+    drp_train_dataset, drp_dev_dataset, drp_test_dataset = q_read_drop_dataset()
+    nq_train_dataset, nq_dev_dataset, nq_test_dataset = q_read_narrative_dataset()
+    sq_train_dataset, sq_dev_dataset, sq_test_dataset = q_read_squad_dataset()
 
-    bq_train_dataset, bq_dev_dataset, bq_test_dataset = dataset_to_pytorch(bq_train_dataset, bq_dev_dataset, bq_test_dataset)
-    drp_train_dataset, drp_dev_dataset, drp_test_dataset = dataset_to_pytorch(drp_train_dataset, drp_dev_dataset, drp_test_dataset)
-    rc_train_dataset, rc_dev_dataset, rc_test_dataset = dataset_to_pytorch(rc_train_dataset, rc_dev_dataset, rc_test_dataset)
-    nq_train_dataset, nq_dev_dataset, nq_test_dataset = dataset_to_pytorch(nq_train_dataset, nq_dev_dataset, nq_test_dataset)
-    sq_train_dataset, sq_dev_dataset, sq_test_dataset = dataset_to_pytorch(sq_train_dataset, sq_dev_dataset, sq_test_dataset)
+    drp_train_dataset, drp_dev_dataset, drp_test_dataset = dataset_to_pytorch(
+        drp_train_dataset, drp_dev_dataset, drp_test_dataset
+    )
+    nq_train_dataset, nq_dev_dataset, nq_test_dataset = dataset_to_pytorch(
+        nq_train_dataset, nq_dev_dataset, nq_test_dataset
+    )
+    sq_train_dataset, sq_dev_dataset, sq_test_dataset = dataset_to_pytorch(
+        sq_train_dataset, sq_dev_dataset, sq_test_dataset
+    )
 
     train_dataset = torch.utils.data.ConcatDataset(
         [
-            bq_train_dataset,
             drp_train_dataset,
-            rc_train_dataset,
             nq_train_dataset,
             sq_train_dataset,
         ]
     )
     dev_dataset = torch.utils.data.ConcatDataset(
         [
-            bq_dev_dataset,
             drp_dev_dataset,
-            rc_dev_dataset,
             nq_dev_dataset,
             sq_dev_dataset,
         ]
     )
     test_dataset = torch.utils.data.ConcatDataset(
         [
-            bq_test_dataset,
             drp_test_dataset,
-            rc_test_dataset,
             nq_test_dataset,
             sq_test_dataset,
         ]
