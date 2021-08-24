@@ -1,7 +1,7 @@
 #!/bin/bash
-#SBATCH --job-name=reqa_train
-#SBATCH --account=def-afyshe-ab
-#SBATCH --nodes=4
+#SBATCH --job-name=reqa_response_generation_pretrain
+#SBATCH --account=rrg-afyshe
+#SBATCH --nodes=1
 #SBATCH --tasks-per-node=4
 #SBATCH --gres=gpu:v100l:4
 #SBATCH --mem=0
@@ -24,6 +24,4 @@ echo "r$SLURM_NODEID Launching python script"
 
 echo "All the allocated nodes: $SLURM_JOB_NODELIST"
 
-# The SLURM_NTASKS variable tells the script how many processes are available for this execution. “srun” executes the script <tasks-per-node * nodes> times
-
-srun python src/re_qa_train.py --init_method tcp://$MASTER_ADDR:3456 --world_size $SLURM_NTASKS --mode reqa_train --model_path $HOME/reqa_models/ --answer_checkpoint _3_model --question_checkpoint _3_model --answer_training_steps 1 --question_training_steps 3 --learning_rate 0.001 --max_epochs 4 --num_beams 32 --batch_size 16  --gpu True --num_workers 6
+python src/response_generation/train.py --mode all_train --model_path $SCRATCH/re_response_generation_model/ --learning_rate 0.001 --max_epochs 6 --batch_size 64 --gpu True --gpu_device 0
