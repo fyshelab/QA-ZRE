@@ -61,7 +61,10 @@ def q_read_squad_dataset():
                 "answer": white_space_fix(question + " </s>"),
             }
         else:
-            return { "article": "NONE", "answer": "NONE", }
+            return {
+                "article": "NONE",
+                "answer": "NONE",
+            }
 
     train_dataset = load_dataset("squad_v2", split="train")
     train_dataset = train_dataset.map(
@@ -89,7 +92,10 @@ def q_read_drop_dataset():
                 "answer": white_space_fix(question + " </s>"),
             }
         else:
-            return {"article": "NONE", "answer": "NONE",}
+            return {
+                "article": "NONE",
+                "answer": "NONE",
+            }
 
     train_dataset = load_dataset("drop", split="train")
     train_dataset = train_dataset.map(
@@ -99,7 +105,6 @@ def q_read_drop_dataset():
             "question",
             "answers_spans",
         ],
-    
     ).filter(lambda row: row["article"] != "NONE")
     dev_dataset = load_dataset("drop", split="validation")
     dev_dataset = dev_dataset.map(
@@ -120,6 +125,7 @@ def create_question_dataset(
     decoder_max_length,
     distributed=False,
     num_workers=0,
+    dataset="all",
 ):
     """Function to mix and create the train/dev dataset for pytorch model."""
 
@@ -206,41 +212,50 @@ def create_question_dataset(
         )
         return train_dataset, dev_dataset, test_dataset
 
-    drp_train_dataset, drp_dev_dataset, drp_test_dataset = q_read_drop_dataset()
-    nq_train_dataset, nq_dev_dataset, nq_test_dataset = q_read_narrative_dataset()
-    sq_train_dataset, sq_dev_dataset, sq_test_dataset = q_read_squad_dataset()
+    if dataset == "all":
+        drp_train_dataset, drp_dev_dataset, drp_test_dataset = q_read_drop_dataset()
+        nq_train_dataset, nq_dev_dataset, nq_test_dataset = q_read_narrative_dataset()
+        sq_train_dataset, sq_dev_dataset, sq_test_dataset = q_read_squad_dataset()
 
-    drp_train_dataset, drp_dev_dataset, drp_test_dataset = dataset_to_pytorch(
-        drp_train_dataset, drp_dev_dataset, drp_test_dataset
-    )
-    nq_train_dataset, nq_dev_dataset, nq_test_dataset = dataset_to_pytorch(
-        nq_train_dataset, nq_dev_dataset, nq_test_dataset
-    )
-    sq_train_dataset, sq_dev_dataset, sq_test_dataset = dataset_to_pytorch(
-        sq_train_dataset, sq_dev_dataset, sq_test_dataset
-    )
+        drp_train_dataset, drp_dev_dataset, drp_test_dataset = dataset_to_pytorch(
+            drp_train_dataset, drp_dev_dataset, drp_test_dataset
+        )
+        nq_train_dataset, nq_dev_dataset, nq_test_dataset = dataset_to_pytorch(
+            nq_train_dataset, nq_dev_dataset, nq_test_dataset
+        )
+        sq_train_dataset, sq_dev_dataset, sq_test_dataset = dataset_to_pytorch(
+            sq_train_dataset, sq_dev_dataset, sq_test_dataset
+        )
 
-    train_dataset = torch.utils.data.ConcatDataset(
-        [
-            drp_train_dataset,
-            nq_train_dataset,
-            sq_train_dataset,
-        ]
-    )
-    dev_dataset = torch.utils.data.ConcatDataset(
-        [
-            drp_dev_dataset,
-            nq_dev_dataset,
-            sq_dev_dataset,
-        ]
-    )
-    test_dataset = torch.utils.data.ConcatDataset(
-        [
-            drp_test_dataset,
-            nq_test_dataset,
-            sq_test_dataset,
-        ]
-    )
+        train_dataset = torch.utils.data.ConcatDataset(
+            [
+                drp_train_dataset,
+                nq_train_dataset,
+                sq_train_dataset,
+            ]
+        )
+        dev_dataset = torch.utils.data.ConcatDataset(
+            [
+                drp_dev_dataset,
+                nq_dev_dataset,
+                sq_dev_dataset,
+            ]
+        )
+        test_dataset = torch.utils.data.ConcatDataset(
+            [
+                drp_test_dataset,
+                nq_test_dataset,
+                sq_test_dataset,
+            ]
+        )
+    elif dataset == "squad_v2":
+        train_dataset, dev_dataset, test_dataset = q_read_squad_dataset()
+    elif dataset == "narrativeqa":
+        train_dataset, dev_dataset, test_dataset = q_read_narrative_dataset()
+    elif dataset == "drop":
+        train_dataset, dev_dataset, test_dataset = q_read_drop_dataset()
+    else:
+        raise ("Unknown dataset {0}".format(dataset))
 
     # Training
     train_sampler = None
