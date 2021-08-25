@@ -211,6 +211,7 @@ def run_squad_test(args):
         max_epochs=args.max_epochs,
         mode="test",
         prediction_file=args.prediction_file,
+        checkpoint=args.checkpoint,
     )
 
     model = T5QA(config)
