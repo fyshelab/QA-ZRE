@@ -60,17 +60,19 @@ def q_read_squad_dataset():
                 ),
                 "answer": white_space_fix(question + " </s>"),
             }
+        else:
+            return { "article": "NONE", "answer": "NONE", }
 
     train_dataset = load_dataset("squad_v2", split="train")
     train_dataset = train_dataset.map(
         process_squad_row,
         remove_columns=["id", "title", "context", "question", "answers"],
-    )
+    ).filter(lambda row: row["article"] != "NONE")
     dev_dataset = load_dataset("squad_v2", split="validation")
     dev_dataset = dev_dataset.map(
         process_squad_row,
         remove_columns=["id", "title", "context", "question", "answers"],
-    )
+    ).filter(lambda row: row["article"] != "NONE")
     return train_dataset, dev_dataset, dev_dataset
 
 
@@ -86,6 +88,8 @@ def q_read_drop_dataset():
                 ),
                 "answer": white_space_fix(question + " </s>"),
             }
+        else:
+            return {"article": "NONE", "answer": "NONE",}
 
     train_dataset = load_dataset("drop", split="train")
     train_dataset = train_dataset.map(
@@ -95,7 +99,8 @@ def q_read_drop_dataset():
             "question",
             "answers_spans",
         ],
-    )
+    
+    ).filter(lambda row: row["article"] != "NONE")
     dev_dataset = load_dataset("drop", split="validation")
     dev_dataset = dev_dataset.map(
         process_drop_row,
@@ -104,7 +109,7 @@ def q_read_drop_dataset():
             "question",
             "answers_spans",
         ],
-    )
+    ).filter(lambda row: row["article"] != "NONE")
     return train_dataset, dev_dataset, dev_dataset
 
 
@@ -253,7 +258,6 @@ def create_question_dataset(
 
     val_loader = DataLoader(dev_dataset, batch_size=batch_size, shuffle=False)
     test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False)
-
     return (
         train_loader,
         val_loader,
