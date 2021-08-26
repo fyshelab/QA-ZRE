@@ -230,7 +230,7 @@ def run_squad_test(args):
             batch_size=config.batch_size,
             source_max_length=config.source_max_length,
             decoder_max_length=config.decoder_max_length,
-            dataset="squad_v2",
+            dataset="drop",
         )
     else:
         (

@@ -115,6 +115,7 @@ def q_read_drop_dataset():
             "answers_spans",
         ],
     ).filter(lambda row: row["article"] != "NONE")
+    print(len(dev_dataset))
     return train_dataset, dev_dataset, dev_dataset
 
 
@@ -250,10 +251,15 @@ def create_question_dataset(
         )
     elif dataset == "squad_v2":
         train_dataset, dev_dataset, test_dataset = q_read_squad_dataset()
+        train_dataset, dev_dataset, test_dataset = dataset_to_pytorch(train_dataset, dev_dataset, test_dataset)
     elif dataset == "narrativeqa":
         train_dataset, dev_dataset, test_dataset = q_read_narrative_dataset()
+        train_dataset, dev_dataset, test_dataset = dataset_to_pytorch(train_dataset, dev_dataset, test_dataset)
     elif dataset == "drop":
+        print("saeed")
         train_dataset, dev_dataset, test_dataset = q_read_drop_dataset()
+        print(len(dev_dataset))
+        train_dataset, dev_dataset, test_dataset = dataset_to_pytorch(train_dataset, dev_dataset, test_dataset)
     else:
         raise ("Unknown dataset {0}".format(dataset))
 
