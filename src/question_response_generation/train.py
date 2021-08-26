@@ -230,6 +230,65 @@ def run_squad_test(args):
             batch_size=config.batch_size,
             source_max_length=config.source_max_length,
             decoder_max_length=config.decoder_max_length,
+            dataset="squad_v2",
+        )
+    else:
+        (
+            train_loader,
+            val_loader,
+            test_loader,
+            train_dataset,
+            dev_dataset,
+            test_dataset,
+            train_sampler,
+        ) = create_response_dataset(
+            tokenizer=model.tokenizer,
+            batch_size=config.batch_size,
+            source_max_length=config.source_max_length,
+            decoder_max_length=config.decoder_max_length,
+        )
+
+    run_model(
+        model,
+        config=config,
+        train_dataloader=train_loader,
+        dev_dataloader=val_loader,
+        test_dataloader=val_loader,
+        save_always=True,
+    )
+
+
+def run_drop_test(args):
+    """Test the T5 on drop dev data."""
+    config = HyperParameters(
+        model_path=args.model_path,
+        batch_size=args.batch_size,
+        source_max_length=512,
+        decoder_max_length=128,
+        gpu=args.gpu,
+        learning_rate=args.learning_rate,
+        max_epochs=args.max_epochs,
+        mode="test",
+        prediction_file=args.prediction_file,
+        checkpoint=args.checkpoint,
+    )
+
+    model = T5QA(config)
+
+    if args.question_training:
+        (
+            train_loader,
+            val_loader,
+            test_loader,
+            train_dataset,
+            dev_dataset,
+            test_dataset,
+            train_sampler,
+        ) = create_question_dataset(
+            tokenizer=model.tokenizer,
+            batch_size=config.batch_size,
+            source_max_length=config.source_max_length,
+            decoder_max_length=config.decoder_max_length,
             dataset="drop",
         )
     else:
@@ -264,6 +323,8 @@ def run_main(args):
         run_all(args)
     if args.mode in ["squad_test"]:
         run_squad_test(args)
+    if args.mode in ["drop_test"]:
+        run_drop_test(args)
 
 
 def argument_parser():
