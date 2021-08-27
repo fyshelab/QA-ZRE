@@ -117,7 +117,7 @@ def run_model(
                         step, loss, mean_loss
                     )
                 )
-                if step > 0 and save_always and (step % 10000 == 0):
+                if step > 0 and save_always and (step % 1000 == 0):
                     model.save(str(epoch) + "_step_" + str(step))
 
             if save_always:
@@ -180,10 +180,55 @@ def run_all(args):
     )
 
 
+def run_narrativeqa_test(args):
+    """Test the trained T5 on narrative qa dataset."""
+    config = HyperParameters(
+        model_path=args.model_path,
+        batch_size=args.batch_size,
+        source_max_length=512,
+        decoder_max_length=128,
+        gpu=args.gpu,
+        learning_rate=args.learning_rate,
+        max_epochs=args.max_epochs,
+        mode="test",
+        prediction_file=args.prediction_file,
+        checkpoint=args.checkpoint,
+    )
+
+    model = T5QA(config)
+
+    (
+        train_loader,
+        val_loader,
+        test_loader,
+        train_dataset,
+        dev_dataset,
+        test_dataset,
+        train_sampler,
+    ) = create_response_dataset(
+        tokenizer=model.tokenizer,
+        batch_size=config.batch_size,
+        source_max_length=config.source_max_length,
+        decoder_max_length=config.decoder_max_length,
+        dataset="narrativeqa",
+    )
+
+    run_model(
+        model,
+        config=config,
+        train_dataloader=train_loader,
+        dev_dataloader=val_loader,
+        test_dataloader=val_loader,
+        save_always=True,
+    )
+
+
 def run_main(args):
     """Decides what to do in the code."""
     if args.mode in ["all_train"]:
         run_all(args)
+    if args.mode in ["narrativeqa_test"]:
+        run_narrativeqa_test(args)
 
 
 def argument_parser():
