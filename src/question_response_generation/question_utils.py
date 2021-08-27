@@ -115,7 +115,6 @@ def q_read_drop_dataset():
             "answers_spans",
         ],
     ).filter(lambda row: row["article"] != "NONE")
-    print(len(dev_dataset))
     return train_dataset, dev_dataset, dev_dataset
 
 
@@ -260,9 +259,7 @@ def create_question_dataset(
             train_dataset, dev_dataset, test_dataset
         )
     elif dataset == "drop":
-        print("saeed")
         train_dataset, dev_dataset, test_dataset = q_read_drop_dataset()
-        print(len(dev_dataset))
         train_dataset, dev_dataset, test_dataset = dataset_to_pytorch(
             train_dataset, dev_dataset, test_dataset
         )
