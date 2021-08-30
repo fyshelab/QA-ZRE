@@ -261,8 +261,7 @@ def run_train_epoch(
     model,
     train_dataloader,
 ) -> Generator:
-    """Train the model and return the loss for 'num_steps' given the
-    'batch_size' and the train_dataset.
+    """Train the model and return the loss for each step.
 
     Randomly pick a batch from the train_dataset.
     """
@@ -319,9 +318,6 @@ def run_model(
     mode = config.mode
     if mode == "train":
         print("\nINFO: ML training\n")
-        # Used to save dev set predictions.
-        # prediction_file = os.path.join(model_path, "temp.predicted")
-        # best_val_cost = float("inf")
         first_start = time.time()
         epoch = 0
         while epoch < max_epochs:
@@ -329,6 +325,9 @@ def run_model(
             start = time.time()
             total_loss = []
             for step, loss in run_train_epoch(model, train_dataloader):
+                if step >= config.answer_training_steps:
+                    break
+
                 if math.isnan(loss):
                     print("nan loss")
 
@@ -346,16 +345,12 @@ def run_model(
                         step, loss, mean_loss
                     )
                 )
-            # print("\nValidation:\n")
-            # run_predict(model, dev_dataloader, prediction_file)
-            # val_cost = evaluator(prediction_file)
+                if step > 0 and save_always and (step % 100 == 0):
+                    model.save(str(epoch) + "_step_" + str(step))
 
-            # print("\nValidation cost:{0}\n".format(val_cost))
-            # if val_cost < best_val_cost:
-            #    best_val_cost = val_cost
-            #    model.save("best")
             if save_always:
                 model.save(str(epoch))
+
             msg = "\nEpoch training time:{} seconds\n".format(time.time() - start)
             print(msg)
             epoch += 1
@@ -363,8 +358,6 @@ def run_model(
         save_config(config, model_path)
         msg = "\nTotal training time:{} seconds\n".format(time.time() - first_start)
         print(msg)
-        # Remove the temp output file
-        # os.remove(prediction_file)
 
     elif mode == "test":
         print("Predicting...")
