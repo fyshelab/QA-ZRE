@@ -13,8 +13,8 @@ do
        --batch_size 16  --gpu True \
        --answer_training_steps 4000 \
        --ignore_unknowns False \
-       --train zero-shot-extraction/relation_splits/train.0 \
-       --dev zero-shot-extraction/relation_splits/dev.0 \
+       --train zero-shot-extraction/relation_splits/train.$i \
+       --dev zero-shot-extraction/relation_splits/dev.$i \
        --gpu_device 0
 done
 
