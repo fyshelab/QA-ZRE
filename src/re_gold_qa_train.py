@@ -6,7 +6,6 @@ import torch.distributed as dist
 import torch.utils.data.distributed
 
 from src.re_qa_model import REQA, HyperParameters
-#from src.re_qa_train import iterative_run_model as qa_run_model
 from src.t5_model import T5QA
 from src.train import run_model
 from src.zero_extraction_utils import create_zero_re_qa_dataset
