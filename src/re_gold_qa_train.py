@@ -8,15 +8,16 @@ import torch.utils.data.distributed
 from src.re_qa_model import REQA, HyperParameters
 from src.re_qa_train import iterative_run_model as qa_run_model
 from src.t5_model import T5QA
+from src.train import run_model
 from src.zero_extraction_utils import create_zero_re_qa_dataset
 
 
-def run_re_gold_concat_qa(args):
-    """Run the relation-extraction qa models using the gold questions or the
-    concat questions."""
-    if args.mode == "re_gold_concat_qa_train":
+def run_re_gold_qa(args):
+    """Run the relation-extraction qa models using the gold questions for the
+    head entity and the relation."""
+    if args.mode == "re_gold_qa_train":
         mode = "train"
-    elif args.mode == "re_gold_concat_qa_test":
+    elif args.mode == "re_gold_qa_test":
         mode = "test"
     config = HyperParameters(
         model_path=args.model_path,
@@ -27,9 +28,9 @@ def run_re_gold_concat_qa(args):
         learning_rate=args.learning_rate,
         max_epochs=args.max_epochs,
         mode=mode,
-        prediction_input_file=args.prediction_input_file,
+        prediction_file=args.prediction_file,
         checkpoint=args.checkpoint,
-        answer_training_steps=args.answer_training_steps
+        answer_training_steps=args.answer_training_steps,
     )
     model = T5QA(config)
 
@@ -38,7 +39,7 @@ def run_re_gold_concat_qa(args):
         val_loaders,
         train_dataset,
         val_dataset,
-        None,
+        train_sample,
     ) = create_zero_re_qa_dataset(
         question_tokenizer=model.tokenizer,
         answer_tokenizer=model.tokenizer,
@@ -47,14 +48,14 @@ def run_re_gold_concat_qa(args):
         decoder_max_length=config.decoder_max_length,
         train_file=args.train,
         dev_file=args.dev,
-        concat=args.concat_questions,
-        gold_questions=not args.concat_questions,
-        ignore_unknowns=True,
         distributed=False,
-        num_workers=1
+        num_workers=1,
+        ignore_unknowns=args.ignore_unknowns,
+        concat=False,
+        gold_questions=True,
     )
 
-    gold_concat_run_model(
+    run_model(
         model,
         config=config,
         train_dataloader=train_loaders,
@@ -236,19 +237,17 @@ def argument_parser():
     # Train specific
     parser.add_argument("--train", type=str, help="file for train data.")
 
-    parser.add_argument(
-        "--prediction_input_file", type=str, help="file for validation data."
-    )
+    parser.add_argument("--dev", type=str, help="file for validation data.")
 
     parser.add_argument("--concat_questions", type=bool, default=False)
 
-    parser.add_argument("--ignore_unknowns", type=bool, default=True)
+    parser.add_argument("--ignore_unknowns", type=bool, default=False)
 
     # Test specific
     parser.add_argument("--test", type=str, help="file for test data.")
 
     parser.add_argument(
-        "--prediction_output_file", type=str, help="file for saving predictions"
+        "--prediction_file", type=str, help="file for saving predictions"
     )
 
     parser.add_argument("--input_file_name", type=str, help="input file name")
