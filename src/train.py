@@ -20,7 +20,7 @@ import torch
 from datasets import load_dataset
 from torch.utils.data import DataLoader
 
-from src.nq_utils import create_narrative_dataset
+# from src.nq_utils import create_narrative_dataset
 from src.t5_model import T5QA, HyperParameters
 
 

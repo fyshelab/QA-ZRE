@@ -12,7 +12,9 @@ import numpy
 import torch
 from transformers import Adafactor, T5ForConditionalGeneration, T5Tokenizer
 
-from src.nq_utils import white_space_fix
+
+def white_space_fix(text):
+    return " ".join(text.split())
 
 
 @dataclass
