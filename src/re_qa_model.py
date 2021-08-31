@@ -2,7 +2,6 @@
 Generation Used for relation extraction."""
 
 import gc
-import math
 import os
 import random
 from dataclasses import dataclass
@@ -54,6 +53,8 @@ class HyperParameters:
     num_search_samples: Optional[int] = 8
     question_training_steps: Optional[int] = 5
     answer_training_steps: Optional[int] = 1
+    training_steps: Optional[int] = 1
+    update_switch_steps: Optional[int] = 10
 
 
 def tuple_of_tensors_to_tensor(tuple_of_tensors):
@@ -130,7 +131,7 @@ def prob_of_sampled_predictions(loss_fct, sample_outputs):
 
 
 MODEL_NAME = "t5-base"
-Q_MODEL_NAME = "iarfmoose/t5-base-question-generator"
+Q_MODEL_NAME = "mrm8488/t5-base-finetuned-question-generation-ap"
 
 
 class REQA(torch.nn.Module):
@@ -304,26 +305,6 @@ class REQA(torch.nn.Module):
             target_mask = target_mask.to(current_device)
             labels = labels.to(current_device)
 
-        # Partition Computation
-        with torch.no_grad():
-            output = self.partition_model(
-                input_ids=question_input_ids,
-                attention_mask=question_input_mask,
-                decoder_attention_mask=target_mask,
-                decoder_input_ids=self.partition_model._shift_right(labels),
-                labels=None,
-            )
-
-            log_p = -loss_fct(
-                output.logits.view(-1, output.logits.size(-1)),
-                labels.view(-1),
-            )
-
-            b, sz, v = output.logits.size()
-            log_p = log_p.view(b, sz)
-            good_log_p = log_p.masked_fill_(labels == -100, 0.0)
-            partition_log_p = torch.sum(good_log_p, dim=1).squeeze()
-
         # Answer Computation
         self.answer_model.train()
         output = self.answer_model(
@@ -344,7 +325,7 @@ class REQA(torch.nn.Module):
         good_log_p = log_p.masked_fill_(labels == -100, 0.0)
         answer_log_p = torch.sum(good_log_p, dim=1).squeeze()
 
-        loss = -torch.mean(answer_log_p - partition_log_p, dim=0)
+        loss = -torch.mean(answer_log_p, dim=0)
         loss_value = loss.item()
         return loss, loss_value
 
@@ -524,36 +505,16 @@ class REQA(torch.nn.Module):
         question_log_p = torch.sum(good_log_question_p, dim=1).squeeze()
         question_log_p = question_log_p.view(self.config.num_search_samples, b_sz)
 
-        # Partition Computation
-        with torch.no_grad():
-            output = self.partition_model(
-                input_ids=question_input_ids,
-                attention_mask=question_input_mask,
-                decoder_attention_mask=target_mask,
-                decoder_input_ids=self.partition_model._shift_right(labels),
-                labels=None,
-            )
-
-            log_p = -loss_fct(
-                output.logits.view(-1, output.logits.size(-1)),
-                labels.view(-1),
-            )
-
-            b, sz, v = output.logits.size()
-            log_p = log_p.view(b, sz)
-            good_log_p = log_p.masked_fill_(labels == -100, 0.0)
-            partition_log_p = torch.sum(good_log_p, dim=1).squeeze()
-
+        # MML
         re_loss = -torch.mean(
-            torch.mul(
-                torch.mean(
+            torch.log(
+                torch.sum(
                     torch.mul(
                         torch.transpose(torch.exp(answer_log_p), 0, 1),
-                        torch.transpose(question_log_p, 0, 1),
+                        torch.transpose(torch.exp(question_log_p), 0, 1),
                     ),
                     dim=1,
-                ),
-                1.0 / torch.exp(partition_log_p),
+                )
             ),
             dim=0,
         )
@@ -563,7 +524,7 @@ class REQA(torch.nn.Module):
 
         return loss, loss_value
 
-    def iterative_train(self, batch, current_device, phase="answer", sample_p=0.95):
+    def iterative_train(self, batch, current_device, phase="answer", sample_p=0.9):
         # Free memory in GPU, very important!
         clear_cache()
         # Turn on training mode which enables dropout.
@@ -571,12 +532,10 @@ class REQA(torch.nn.Module):
             self.question_optimizer.zero_grad()
             self.answer_optimizer.zero_grad()
             self.question_model.eval()
-            self.partition_model.eval()
             return self.pgg_answer_training(batch, current_device)
 
         elif phase == "question":
             self.question_optimizer.zero_grad()
             self.answer_optimizer.zero_grad()
             self.answer_model.eval()
-            self.partition_model.eval()
             return self.mml_question_training(batch, current_device, sample_p=sample_p)

@@ -6,6 +6,7 @@ import torch.distributed as dist
 import torch.utils.data.distributed
 
 from src.re_qa_model import REQA, HyperParameters
+from src.re_qa_train import iterative_run_model
 from src.t5_model import T5QA
 from src.train import run_model
 from src.zero_extraction_utils import create_zero_re_qa_dataset
@@ -166,13 +167,12 @@ def run_re_qa(args):
         learning_rate=args.learning_rate,
         max_epochs=args.max_epochs,
         mode=mode,
-        prediction_output_file=args.prediction_output_file,
-        question_training_steps=args.question_training_steps,
-        answer_training_steps=args.answer_training_steps,
-        partition_checkpoint=args.partition_checkpoint,
+        prediction_file=args.prediction_file,
+        training_steps=args.training_steps,
         answer_checkpoint=args.answer_checkpoint,
         question_checkpoint=args.question_checkpoint,
         num_search_samples=args.num_search_samples,
+        update_switch_steps=args.update_switch_steps,
     )
     model = REQA(config)
     model = model.to(current_device)
@@ -195,22 +195,51 @@ def run_re_qa(args):
         source_max_length=config.source_max_length,
         decoder_max_length=config.decoder_max_length,
         train_file=args.train,
-        dev_file=args.prediction_input_file,
+        dev_file=args.dev,
         distributed=True,
         num_workers=args.num_workers,
+        ignore_unknowns=False,
+        concat=False,
+        gold_questions=False,
     )
 
-    qa_run_model(
+    # To train the question model, we do not use the negative data with unknown answers.
+    (
+        question_train_loaders,
+        question_val_loaders,
+        question_train_dataset,
+        question_val_dataset,
+        question_train_sampler,
+    ) = create_zero_re_qa_dataset(
+        question_tokenizer=model.module.question_tokenizer,
+        answer_tokenizer=model.module.answer_tokenizer,
+        batch_size=config.batch_size // args.world_size,
+        source_max_length=config.source_max_length,
+        decoder_max_length=config.decoder_max_length,
+        train_file=args.train,
+        dev_file=args.dev,
+        distributed=True,
+        num_workers=args.num_workers,
+        ignore_unknowns=True,
+        concat=False,
+        gold_questions=False,
+    )
+
+    iterative_run_model(
         model,
         config=config,
         train_dataloader=train_loaders,
         dev_dataloader=val_loaders,
         test_dataloader=val_loaders,
+        question_train_dataloader=question_train_loaders,
+        question_dev_dataloader=question_val_loaders,
+        question_test_dataloader=question_val_loaders,
         save_always=True,
         rank=rank,
         train_samplers=[train_sampler],
+        question_train_samplers=[question_train_sampler],
         current_device=current_device,
-        gold_eval_file=args.prediction_input_file,
+        gold_eval_file=args.dev,
     )
 
 
@@ -285,6 +314,12 @@ def argument_parser():
         "--num_search_samples", type=int, default=8, help="Number of search samples"
     )
     parser.add_argument(
+        "--update_switch_steps",
+        type=int,
+        default=10,
+        help="Number of steps to train each question or response module before switching to train the other one!",
+    )
+    parser.add_argument(
         "--num_beam_groups",
         type=int,
         default=4,
@@ -313,6 +348,11 @@ def argument_parser():
         "--answer_training_steps",
         type=int,
         help="number of training steps over the train data for the answer model.",
+    )
+    parser.add_argument(
+        "--training_steps",
+        type=int,
+        help="number of training steps over the train data.",
     )
     parser.add_argument(
         "--question_training_steps",
