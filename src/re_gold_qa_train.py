@@ -82,6 +82,7 @@ def run_re_concat_qa(args):
         mode=mode,
         prediction_file=args.prediction_file,
         checkpoint=args.checkpoint,
+        answer_training_steps=args.answer_training_steps,
     )
     model = T5QA(config)
 
@@ -90,14 +91,20 @@ def run_re_concat_qa(args):
         val_loaders,
         train_dataset,
         val_dataset,
-    ) = create_zero_re_gold_qa_dataset(
-        tokenizer=model.tokenizer,
+        train_sample,
+    ) = create_zero_re_qa_dataset(
+        question_tokenizer=model.tokenizer,
+        answer_tokenizer=model.tokenizer,
         batch_size=config.batch_size,
         source_max_length=config.source_max_length,
         decoder_max_length=config.decoder_max_length,
         train_file=args.train,
         dev_file=args.dev,
+        distributed=False,
+        num_workers=1,
+        ignore_unknowns=args.ignore_unknowns,
         concat=True,
+        gold_questions=False,
     )
 
     run_model(
@@ -105,7 +112,7 @@ def run_re_concat_qa(args):
         config=config,
         train_dataloader=train_loaders,
         dev_dataloader=val_loaders,
-        test_dataloader=None,
+        test_dataloader=val_loaders,
         save_always=True,
     )
 

@@ -2,4 +2,19 @@
 
 source env/bin/activate
 
-python src/re_gold_qa_train.py --mode re_concat_qa_train --model_path $HOME/re_concat_qa_models/ --checkpoint _3_model --learning_rate 0.001 --max_epochs 4 --batch_size 64  --gpu True --train zero-shot-extraction/relation_splits/train.0 --dev zero-shot-extraction/relation_splits/dev.0 
+for (( i=0; i<=9; i++ ))
+do
+    python src/re_gold_qa_train.py \
+       --mode re_concat_qa_train \
+       --model_path $HOME/august_25_runs/re_concat_qa_models_with_unknowns/fold_$i/ \
+       --checkpoint _response_pretrained_model \
+       --learning_rate 0.001 --max_epochs 1 \
+       --concat_questions True \
+       --batch_size 16  --gpu True \
+       --answer_training_steps 4000 \
+       --ignore_unknowns False \
+       --train zero-shot-extraction/relation_splits/train.$i \
+       --dev zero-shot-extraction/relation_splits/dev.$i \
+       --gpu_device 0
+done
+
