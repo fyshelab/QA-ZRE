@@ -35,8 +35,7 @@ class HyperParameters:
     max_epochs: int = 16
     mode: str = "train"
     train: Optional[str] = None
-    prediction_output_file: Optional[str] = None
-    prediction_input_file: Optional[str] = None
+    prediction_file: Optional[str] = None
     seed: int = 8
     test: Optional[str] = None
     dev: Optional[str] = None

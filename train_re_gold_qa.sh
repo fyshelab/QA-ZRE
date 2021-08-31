@@ -6,7 +6,7 @@ for (( i=0; i<=9; i++ ))
 do
     python src/re_gold_qa_train.py \
        --mode re_gold_qa_train \
-       --model_path $HOME/re_gold_qa_models_with_unknowns/fold_$i/ \
+       --model_path $HOME/august_25_runs/re_gold_qa_models_with_unknowns/fold_$i/ \
        --checkpoint _response_pretrained_model \
        --learning_rate 0.001 --max_epochs 1 \
        --concat_questions False \
