@@ -145,10 +145,6 @@ class REQA(torch.nn.Module):
 
         self.model_path = os.path.join(cfg.model_path, "model")
 
-        # Posterior model, this model will not be trained!
-        self.partition_model = T5ForConditionalGeneration.from_pretrained(MODEL_NAME)
-        load_module(self.partition_model, self.model_path, cfg.partition_checkpoint)
-
         # Answer model
         answer_tokenizer = T5Tokenizer.from_pretrained(MODEL_NAME)
 
