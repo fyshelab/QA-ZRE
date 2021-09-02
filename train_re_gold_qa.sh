@@ -2,7 +2,7 @@
 
 source env/bin/activate
 
-for (( i=0; i<=9; i++ ))
+for (( i=6; i<=9; i++ ))
 do
     python src/re_gold_qa_train.py \
        --mode re_gold_qa_train \
