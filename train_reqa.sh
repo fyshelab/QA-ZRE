@@ -1,5 +1,5 @@
 #!/bin/bash
-#SBATCH --job-name=reqa_top_p_train
+#SBATCH --job-name=reqa_mml_pgg_top_p_iterative_train
 #SBATCH --account=rrg-afyshe
 #SBATCH --nodes=4
 #SBATCH --tasks-per-node=4
@@ -30,17 +30,17 @@ srun python src/re_gold_qa_train.py \
     --init_method tcp://$MASTER_ADDR:3456 \
     --world_size $SLURM_NTASKS \
     --mode re_qa_train \
-    --model_path $SCRATCH/re_top_p_qa_models/ \
-    --answer_checkpoint _answer_pretrained_model \
+    --model_path $SCRATCH/re_mml_pgg_top_p_iterative_models/ \
+    --answer_checkpoint _response_pretrained_model \
     --question_checkpoint _question_pretrained_model \
-    --partition_checkpoint _partition_best_model \
-    --answer_training_steps 1000 \
-    --question_training_steps 1000 \
+    --training_steps 4000 \
+    --update_switching_steps 10 \
     --learning_rate 0.001 \
     --max_epochs 1 \
-    --num_search_samples 8 \
-    --batch_size 64  \
+    --num_search_samples 20 \
+    --batch_size 16  \
     --gpu True \
     --num_workers 6 \
+    --concat_questions False \
     --dev zero-shot-extraction/relation_splits/dev.0 \
     --train zero-shot-extraction/relation_splits/train.0
