@@ -168,11 +168,11 @@ def run_re_qa(args):
         max_epochs=args.max_epochs,
         mode=mode,
         prediction_file=args.prediction_file,
-        training_steps=args.training_steps,
+        training_steps=int(args.training_steps),
         answer_checkpoint=args.answer_checkpoint,
         question_checkpoint=args.question_checkpoint,
-        num_search_samples=args.num_search_samples,
-        update_switch_steps=args.update_switch_steps,
+        num_search_samples=int(args.num_search_samples),
+        update_switch_steps=int(args.update_switch_steps),
     )
     model = REQA(config)
     model = model.to(current_device)

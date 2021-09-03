@@ -1,11 +1,11 @@
 #!/bin/bash
-#SBATCH --job-name=reqa_mml_pgg_top_p_iterative_train
+#SBATCH --job-name=reqa_mml_pgg_top_p_iterative_train_switch_50_fold_1
 #SBATCH --account=rrg-afyshe
 #SBATCH --nodes=4
 #SBATCH --tasks-per-node=4
 #SBATCH --gres=gpu:v100l:4
 #SBATCH --mem=0
-#SBATCH --time=0-12:00
+#SBATCH --time=0-04:00
 #SBATCH --cpus-per-task=6
 #SBATCH --output=%N-%j.out
 
@@ -30,17 +30,17 @@ srun python src/re_gold_qa_train.py \
     --init_method tcp://$MASTER_ADDR:3456 \
     --world_size $SLURM_NTASKS \
     --mode re_qa_train \
-    --model_path $SCRATCH/re_mml_pgg_top_p_iterative_models/fold_1/ \
+    --model_path $SCRATCH/re_mml_pgg_top_p_iterative_models/switch_50/fold_1/ \
     --answer_checkpoint _response_pretrained_model \
     --question_checkpoint _question_pretrained_model \
-    --training_steps 2600 \
-    --update_switching_steps 10 \
+    --training_steps 1000 \
+    --update_switching_steps 50 \
     --learning_rate 0.001 \
     --max_epochs 1 \
-    --num_search_samples 20 \
+    --num_search_samples 32 \
     --batch_size 16  \
     --gpu True \
     --num_workers 6 \
-    --concat_questions False \
+    --concat_questions false \
     --dev zero-shot-extraction/relation_splits/dev.1 \
     --train zero-shot-extraction/relation_splits/train.1
