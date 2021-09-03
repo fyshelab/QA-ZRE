@@ -378,7 +378,7 @@ def list_parameters(model):
 
 # load rouge for validation
 
-rouge = datasets.load_metric("rouge")
+# rouge = datasets.load_metric("rouge")
 
 
 def normalize_answer(s):
