@@ -131,8 +131,8 @@ def prob_of_sampled_predictions(loss_fct, sample_outputs):
 
 
 MODEL_NAME = "t5-base"
-Q_MODEL_NAME = "mrm8488/t5-base-finetuned-question-generation-ap"
-
+#Q_MODEL_NAME = "mrm8488/t5-base-finetuned-question-generation-ap"
+Q_MODEL_NAME = "iarfmoose/t5-base-question-generator"
 
 class REQA(torch.nn.Module):
     """Wrapper class around the T5 Models."""
