@@ -5,7 +5,7 @@
 #SBATCH --tasks-per-node=4
 #SBATCH --gres=gpu:v100l:4
 #SBATCH --mem=0
-#SBATCH --time=0-03:00
+#SBATCH --time=0-12:00
 #SBATCH --cpus-per-task=6
 #SBATCH --output=%N-%j.out
 
@@ -30,10 +30,10 @@ srun python src/re_gold_qa_train.py \
     --init_method tcp://$MASTER_ADDR:3456 \
     --world_size $SLURM_NTASKS \
     --mode re_qa_train \
-    --model_path $SCRATCH/re_mml_pgg_top_p_iterative_models/ \
+    --model_path $SCRATCH/re_mml_pgg_top_p_iterative_models/fold_1/ \
     --answer_checkpoint _response_pretrained_model \
     --question_checkpoint _question_pretrained_model \
-    --training_steps 4000 \
+    --training_steps 2600 \
     --update_switching_steps 10 \
     --learning_rate 0.001 \
     --max_epochs 1 \
@@ -42,5 +42,5 @@ srun python src/re_gold_qa_train.py \
     --gpu True \
     --num_workers 6 \
     --concat_questions False \
-    --dev zero-shot-extraction/relation_splits/dev.0 \
-    --train zero-shot-extraction/relation_splits/train.0
+    --dev zero-shot-extraction/relation_splits/dev.1 \
+    --train zero-shot-extraction/relation_splits/train.1

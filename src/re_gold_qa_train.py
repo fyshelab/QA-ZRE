@@ -198,11 +198,10 @@ def run_re_qa(args):
         dev_file=args.dev,
         distributed=True,
         num_workers=args.num_workers,
-        ignore_unknowns=False,
+        ignore_unknowns=True,
         concat=False,
         gold_questions=False,
     )
-
     # To train the question model, we do not use the negative data with unknown answers.
     (
         question_train_loaders,
