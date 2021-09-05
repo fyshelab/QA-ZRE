@@ -17,7 +17,7 @@ def white_space_fix(text):
     return " ".join(text.split())
 
 
-def run_predict(model, dev_dataloader, prediction_file: str) -> None:
+def run_predict(model, dev_dataloader, prediction_file: str, current_device) -> None:
     """Read the 'dev_dataset' and predict results with the model, and save the
     results in the prediction_file."""
     writerparams = {"quotechar": '"', "quoting": csv.QUOTE_ALL}
@@ -25,7 +25,7 @@ def run_predict(model, dev_dataloader, prediction_file: str) -> None:
         writer = csv.writer(out_fp, **writerparams)
         header_written = False
         for batch in dev_dataloader:
-            for ret_row in model.module.predict_step(batch):
+            for ret_row in model.predict_step(batch, current_device):
                 if not header_written:
                     headers = ret_row.keys()
                     writer.writerow(headers)
@@ -94,10 +94,9 @@ def iterative_run_model(
             question_total_loss = []
             answer_total_loss = []
             while step < config.training_steps:
-                print(config.update_switch_steps)
                 for inner_step in range(config.update_switch_steps):
                     question_batch = next(question_iter)
-                    loss, question_loss = model.module.iterative_train(
+                    question_loss = model.module.iterative_train(
                         question_batch, current_device, phase="question", sample_p=0.9
                     )
                     if question_loss:
@@ -118,7 +117,7 @@ def iterative_run_model(
 
                 for inner_step in range(config.update_switch_steps):
                     answer_batch = next(answer_iter)
-                    loss, answer_loss = model.module.iterative_train(
+                    answer_loss = model.module.iterative_train(
                         answer_batch, current_device, phase="answer", sample_p=0.9
                     )
                     if answer_loss:
@@ -182,6 +181,6 @@ def iterative_run_model(
     elif mode == "test":
         print("Predicting...")
         start = time.time()
-        run_predict(model, test_dataloader, config.prediction_file)
+        run_predict(model, test_dataloader, config.prediction_file, current_device)
         msg = "\nTotal prediction time:{} seconds\n".format(time.time() - start)
         print(msg)
