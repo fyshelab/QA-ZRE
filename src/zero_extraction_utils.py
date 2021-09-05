@@ -121,14 +121,16 @@ def create_zero_re_qa_dataset(
     ignore_unknowns=True,
     concat=False,
     gold_questions=False,
+    for_evaluation=False,
 ):
     """Function to create the zero re qa dataset."""
-    train_passages, train_contexts, train_answers = read_zero_re_qa(
-        train_file,
-        ignore_unknowns=ignore_unknowns,
-        gold_question=gold_questions,
-        concat=concat,
-    )
+    if not for_evaluation:
+        train_passages, train_contexts, train_answers = read_zero_re_qa(
+            train_file,
+            ignore_unknowns=ignore_unknowns,
+            gold_question=gold_questions,
+            concat=concat,
+        )
     val_passages, val_contexts, val_answers = read_zero_re_qa(
         dev_file,
         ignore_unknowns=ignore_unknowns,
@@ -151,37 +153,42 @@ def create_zero_re_qa_dataset(
         add_special_tokens=False,
     )
 
-    train_encodings = question_tokenizer(
-        train_contexts,
-        truncation=True,
-        padding="max_length",
-        max_length=source_max_length,
-        add_special_tokens=False,
-    )
-    train_answer_encodings = answer_tokenizer(
-        train_answers,
-        truncation=True,
-        padding="max_length",
-        max_length=decoder_max_length,
-        add_special_tokens=False,
-    )
+    if not for_evaluation:
+        train_encodings = question_tokenizer(
+            train_contexts,
+            truncation=True,
+            padding="max_length",
+            max_length=source_max_length,
+            add_special_tokens=False,
+        )
+        train_answer_encodings = answer_tokenizer(
+            train_answers,
+            truncation=True,
+            padding="max_length",
+            max_length=decoder_max_length,
+            add_special_tokens=False,
+        )
 
     if gold_questions or concat:
-        train_encodings["target_attention_mask"] = train_answer_encodings.attention_mask
 
-        train_encodings["labels"] = train_answer_encodings.input_ids
+        if not for_evaluation:
+            train_encodings[
+                "target_attention_mask"
+            ] = train_answer_encodings.attention_mask
 
-        # because HuggingFace automatically shifts the labels, the labels correspond exactly to `target_ids`.
-        # We have to make sure that the PAD token is ignored
+            train_encodings["labels"] = train_answer_encodings.input_ids
 
-        train_labels = [
-            [
-                -100 if token == answer_tokenizer.pad_token_id else token
-                for token in labels
+            # because HuggingFace automatically shifts the labels, the labels correspond exactly to `target_ids`.
+            # We have to make sure that the PAD token is ignored
+
+            train_labels = [
+                [
+                    -100 if token == answer_tokenizer.pad_token_id else token
+                    for token in labels
+                ]
+                for labels in train_encodings["labels"]
             ]
-            for labels in train_encodings["labels"]
-        ]
-        train_encodings["labels"] = train_labels
+            train_encodings["labels"] = train_labels
 
         val_encodings["target_attention_mask"] = val_answer_encodings.attention_mask
 
@@ -200,33 +207,34 @@ def create_zero_re_qa_dataset(
         val_encodings["labels"] = val_labels
 
     else:
-        train_encodings["passages"] = train_passages
+        if not for_evaluation:
+            train_encodings["passages"] = train_passages
 
-        train_encodings["entity_relation_passage_input_ids"] = train_encodings.pop(
-            "input_ids"
-        )
-        train_encodings["entity_relation_passage_attention_mask"] = train_encodings.pop(
-            "attention_mask"
-        )
+            train_encodings["entity_relation_passage_input_ids"] = train_encodings.pop(
+                "input_ids"
+            )
+            train_encodings[
+                "entity_relation_passage_attention_mask"
+            ] = train_encodings.pop("attention_mask")
 
-        train_encodings["second_entity_labels"] = train_answer_encodings.pop(
-            "input_ids"
-        )
-        train_encodings["second_entity_attention_mask"] = train_answer_encodings.pop(
-            "attention_mask"
-        )
+            train_encodings["second_entity_labels"] = train_answer_encodings.pop(
+                "input_ids"
+            )
+            train_encodings[
+                "second_entity_attention_mask"
+            ] = train_answer_encodings.pop("attention_mask")
 
-        # because HuggingFace automatically shifts the labels, the labels correspond exactly to `target_ids`.
-        # We have to make sure that the PAD token is ignored
+            # because HuggingFace automatically shifts the labels, the labels correspond exactly to `target_ids`.
+            # We have to make sure that the PAD token is ignored
 
-        train_labels = [
-            [
-                -100 if token == answer_tokenizer.pad_token_id else token
-                for token in labels
+            train_labels = [
+                [
+                    -100 if token == answer_tokenizer.pad_token_id else token
+                    for token in labels
+                ]
+                for labels in train_encodings["second_entity_labels"]
             ]
-            for labels in train_encodings["second_entity_labels"]
-        ]
-        train_encodings["second_entity_labels"] = train_labels
+            train_encodings["second_entity_labels"] = train_labels
 
         val_encodings["passages"] = val_passages
         val_encodings["entity_relation_passage_input_ids"] = val_encodings.pop(
@@ -272,7 +280,11 @@ def create_zero_re_qa_dataset(
             if "input_ids" in self.encodings:
                 return len(self.encodings.input_ids)
 
-    train_dataset = HelperDataset(train_encodings)
+    train_dataset = None
+    train_sampler = None
+    train_loader = None
+    if not for_evaluation:
+        train_dataset = HelperDataset(train_encodings)
     val_dataset = HelperDataset(val_encodings)
 
     if distributed:
@@ -286,6 +298,9 @@ def create_zero_re_qa_dataset(
         val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False)
         return train_loader, val_loader, train_dataset, val_dataset, train_sampler
     if not distributed:
-        train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
+        if not for_evaluation:
+            train_loader = DataLoader(
+                train_dataset, batch_size=batch_size, shuffle=True
+            )
         val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False)
         return train_loader, val_loader, train_dataset, val_dataset, None

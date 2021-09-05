@@ -123,123 +123,159 @@ def run_re_qa(args):
     the response generator explored with some search algorithm."""
     if args.mode == "re_qa_train":
         mode = "train"
-    elif args.mode == "re_qa_test":
-        mode = "test"
+        ngpus_per_node = torch.cuda.device_count()
 
-    ngpus_per_node = torch.cuda.device_count()
+        """ This next line is the key to getting DistributedDataParallel working on SLURM:
+            SLURM_NODEID is 0 or 1 in this example, SLURM_LOCALID is the id of the 
+            current process inside a node and is also 0 or 1 in this example."""
 
-    """ This next line is the key to getting DistributedDataParallel working on SLURM:
-		SLURM_NODEID is 0 or 1 in this example, SLURM_LOCALID is the id of the 
- 		current process inside a node and is also 0 or 1 in this example."""
+        local_rank = int(os.environ.get("SLURM_LOCALID"))
 
-    local_rank = int(os.environ.get("SLURM_LOCALID"))
+        rank = int(os.environ.get("SLURM_NODEID")) * ngpus_per_node + local_rank
 
-    rank = int(os.environ.get("SLURM_NODEID")) * ngpus_per_node + local_rank
+        """ This next block parses CUDA_VISIBLE_DEVICES to find out which GPUs 
+        have been allocated to the job, then sets torch.device to the GPU corresponding
+        to the local rank (local rank 0 gets the first GPU, local rank 1 gets the second GPU etc) """
 
-    """ This next block parses CUDA_VISIBLE_DEVICES to find out which GPUs 
-    have been allocated to the job, then sets torch.device to the GPU corresponding
-    to the local rank (local rank 0 gets the first GPU, local rank 1 gets the second GPU etc) """
+        available_gpus = list(os.environ.get("CUDA_VISIBLE_DEVICES").replace(",", ""))
 
-    available_gpus = list(os.environ.get("CUDA_VISIBLE_DEVICES").replace(",", ""))
+        current_device = int(available_gpus[local_rank])
+        torch.cuda.set_device(current_device)
 
-    current_device = int(available_gpus[local_rank])
-    torch.cuda.set_device(current_device)
+        print("From Rank: {}, ==> Initializing Process Group...".format(rank))
 
-    print("From Rank: {}, ==> Initializing Process Group...".format(rank))
+        # init the process group
+        dist.init_process_group(
+            backend=args.dist_backend,
+            init_method=args.init_method,
+            world_size=args.world_size,
+            rank=rank,
+        )
+        print("process group ready!")
 
-    # init the process group
-    dist.init_process_group(
-        backend=args.dist_backend,
-        init_method=args.init_method,
-        world_size=args.world_size,
-        rank=rank,
-    )
-    print("process group ready!")
+        print("From Rank: {}, ==> Making model..".format(rank))
 
-    print("From Rank: {}, ==> Making model..".format(rank))
+        config = HyperParameters(
+            model_path=args.model_path,
+            batch_size=args.batch_size,
+            source_max_length=256,
+            decoder_max_length=32,
+            gpu=args.gpu,
+            learning_rate=args.learning_rate,
+            max_epochs=args.max_epochs,
+            mode=mode,
+            prediction_file=args.prediction_file,
+            training_steps=int(args.training_steps),
+            answer_checkpoint=args.answer_checkpoint,
+            question_checkpoint=args.question_checkpoint,
+            num_search_samples=int(args.num_search_samples),
+            update_switch_steps=int(args.update_switch_steps),
+        )
+        model = REQA(config)
+        model = model.to(current_device)
+        model = torch.nn.parallel.DistributedDataParallel(
+            model, device_ids=[current_device]
+        )
 
-    config = HyperParameters(
-        model_path=args.model_path,
-        batch_size=args.batch_size,
-        source_max_length=256,
-        decoder_max_length=32,
-        gpu=args.gpu,
-        learning_rate=args.learning_rate,
-        max_epochs=args.max_epochs,
-        mode=mode,
-        prediction_file=args.prediction_file,
-        training_steps=int(args.training_steps),
-        answer_checkpoint=args.answer_checkpoint,
-        question_checkpoint=args.question_checkpoint,
-        num_search_samples=int(args.num_search_samples),
-        update_switch_steps=int(args.update_switch_steps),
-    )
-    model = REQA(config)
-    model = model.to(current_device)
-    model = torch.nn.parallel.DistributedDataParallel(
-        model, device_ids=[current_device]
-    )
+        print("From Rank: {}, ==> Preparing data..".format(rank))
 
-    print("From Rank: {}, ==> Preparing data..".format(rank))
+        (
+            train_loaders,
+            val_loaders,
+            train_dataset,
+            val_dataset,
+            train_sampler,
+        ) = create_zero_re_qa_dataset(
+            question_tokenizer=model.module.question_tokenizer,
+            answer_tokenizer=model.module.answer_tokenizer,
+            batch_size=config.batch_size // args.world_size,
+            source_max_length=config.source_max_length,
+            decoder_max_length=config.decoder_max_length,
+            train_file=args.train,
+            dev_file=args.dev,
+            distributed=True,
+            num_workers=args.num_workers,
+            ignore_unknowns=True,
+            concat=False,
+            gold_questions=False,
+        )
+        # To train the question model, we do not use the negative data with unknown answers.
+        (
+            question_train_loaders,
+            question_val_loaders,
+            question_train_dataset,
+            question_val_dataset,
+            question_train_sampler,
+        ) = create_zero_re_qa_dataset(
+            question_tokenizer=model.module.question_tokenizer,
+            answer_tokenizer=model.module.answer_tokenizer,
+            batch_size=config.batch_size // args.world_size,
+            source_max_length=config.source_max_length,
+            decoder_max_length=config.decoder_max_length,
+            train_file=args.train,
+            dev_file=args.dev,
+            distributed=True,
+            num_workers=args.num_workers,
+            ignore_unknowns=True,
+            concat=False,
+            gold_questions=False,
+        )
 
-    (
-        train_loaders,
-        val_loaders,
-        train_dataset,
-        val_dataset,
-        train_sampler,
-    ) = create_zero_re_qa_dataset(
-        question_tokenizer=model.module.question_tokenizer,
-        answer_tokenizer=model.module.answer_tokenizer,
-        batch_size=config.batch_size // args.world_size,
-        source_max_length=config.source_max_length,
-        decoder_max_length=config.decoder_max_length,
-        train_file=args.train,
-        dev_file=args.dev,
-        distributed=True,
-        num_workers=args.num_workers,
-        ignore_unknowns=True,
-        concat=False,
-        gold_questions=False,
-    )
-    # To train the question model, we do not use the negative data with unknown answers.
-    (
-        question_train_loaders,
-        question_val_loaders,
-        question_train_dataset,
-        question_val_dataset,
-        question_train_sampler,
-    ) = create_zero_re_qa_dataset(
-        question_tokenizer=model.module.question_tokenizer,
-        answer_tokenizer=model.module.answer_tokenizer,
-        batch_size=config.batch_size // args.world_size,
-        source_max_length=config.source_max_length,
-        decoder_max_length=config.decoder_max_length,
-        train_file=args.train,
-        dev_file=args.dev,
-        distributed=True,
-        num_workers=args.num_workers,
-        ignore_unknowns=True,
-        concat=False,
-        gold_questions=False,
-    )
+        iterative_run_model(
+            model,
+            config=config,
+            train_dataloader=train_loaders,
+            dev_dataloader=val_loaders,
+            test_dataloader=val_loaders,
+            question_train_dataloader=question_train_loaders,
+            question_dev_dataloader=question_val_loaders,
+            question_test_dataloader=question_val_loaders,
+            save_always=True,
+            rank=rank,
+            train_samplers=[train_sampler],
+            question_train_samplers=[question_train_sampler],
+            current_device=current_device,
+            gold_eval_file=args.dev,
+        )
 
-    iterative_run_model(
-        model,
-        config=config,
-        train_dataloader=train_loaders,
-        dev_dataloader=val_loaders,
-        test_dataloader=val_loaders,
-        question_train_dataloader=question_train_loaders,
-        question_dev_dataloader=question_val_loaders,
-        question_test_dataloader=question_val_loaders,
-        save_always=True,
-        rank=rank,
-        train_samplers=[train_sampler],
-        question_train_samplers=[question_train_sampler],
-        current_device=current_device,
-        gold_eval_file=args.dev,
-    )
+    if args.mode == "re_qa_test":
+        config = HyperParameters(
+            model_path=args.model_path,
+            batch_size=args.batch_size,
+            source_max_length=256,
+            decoder_max_length=32,
+            gpu=args.gpu,
+            learning_rate=args.learning_rate,
+            max_epochs=args.max_epochs,
+            mode="test",
+            prediction_file=args.prediction_file,
+            answer_checkpoint=args.answer_checkpoint,
+            question_checkpoint=args.question_checkpoint,
+        )
+        model = REQA(config)
+        model = model.to(current_device)
+
+        (_, val_loaders, _, val_dataset, _,) = create_zero_re_qa_dataset(
+            question_tokenizer=model.module.question_tokenizer,
+            answer_tokenizer=model.module.answer_tokenizer,
+            batch_size=config.batch_size,
+            source_max_length=config.source_max_length,
+            decoder_max_length=config.decoder_max_length,
+            dev_file=args.dev,
+            distributed=False,
+            num_workers=args.num_workers,
+            ignore_unknowns=True,
+            concat=False,
+            gold_questions=False,
+            for_evaluation=True,
+        )
+
+        iterative_run_model(
+            model,
+            config=config,
+            test_dataloader=val_loaders,
+            current_device=current_device,
+        )
 
 
 def run_main(args):
