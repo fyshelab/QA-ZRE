@@ -34,11 +34,11 @@ srun python src/re_gold_qa_train.py \
     --answer_checkpoint _response_pretrained_model \
     --question_checkpoint _question_pretrained_model \
     --training_steps 1000 \
-    --update_switching_steps 1 \
+    --update_switch_steps 1 \
     --learning_rate 0.001 \
     --max_epochs 1 \
-    --num_search_samples 32 \
-    --batch_size 16  \
+    --num_search_samples 20 \
+    --batch_size 16 \
     --gpu True \
     --num_workers 6 \
     --concat_questions false \
