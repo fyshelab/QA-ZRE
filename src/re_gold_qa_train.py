@@ -253,7 +253,7 @@ def run_re_qa(args):
             question_checkpoint=args.question_checkpoint,
         )
         model = REQA(config)
-        model = model.to(current_device)
+        model = model.to("cuda:0")
 
         (_, val_loaders, _, val_dataset, _,) = create_zero_re_qa_dataset(
             question_tokenizer=model.module.question_tokenizer,
@@ -274,7 +274,7 @@ def run_re_qa(args):
             model,
             config=config,
             test_dataloader=val_loaders,
-            current_device=current_device,
+            current_device=0,
         )
 
 

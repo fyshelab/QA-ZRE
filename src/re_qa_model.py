@@ -2,6 +2,7 @@
 Generation Used for relation extraction."""
 
 import gc
+import math
 import os
 import random
 from dataclasses import dataclass
@@ -529,10 +530,26 @@ class REQA(torch.nn.Module):
             self.question_optimizer.zero_grad()
             self.answer_optimizer.zero_grad()
             self.question_model.eval()
-            return self.pgg_answer_training(batch, current_device)
+            loss, loss_value = self.pgg_answer_training(batch, current_device)
+            if not math.isnan(loss_value):
+                # BackProp
+                loss.backward()
+                # Optimize
+                self.answer_optimizer.step()
+
+            return loss_value
 
         elif phase == "question":
             self.question_optimizer.zero_grad()
             self.answer_optimizer.zero_grad()
             self.answer_model.eval()
-            return self.mml_question_training(batch, current_device, sample_p=sample_p)
+            loss, loss_value = self.mml_question_training(
+                batch, current_device, sample_p=sample_p
+            )
+            if not math.isnan(loss_value):
+                # BackProp
+                loss.backward()
+                # Optimize
+                self.question_optimizer.step()
+
+            return loss_value
