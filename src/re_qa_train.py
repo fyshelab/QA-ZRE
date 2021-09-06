@@ -97,7 +97,7 @@ def iterative_run_model(
                 for inner_step in range(config.update_switch_steps):
                     question_batch = next(question_iter)
                     question_loss = model.module.iterative_train(
-                        question_batch, current_device, phase="question", sample_p=0.9
+                        question_batch, current_device, phase="question", sample_p=0.95
                     )
                     if question_loss:
                         question_total_loss.append(question_loss)
@@ -118,7 +118,7 @@ def iterative_run_model(
                 for inner_step in range(config.update_switch_steps):
                     answer_batch = next(answer_iter)
                     answer_loss = model.module.iterative_train(
-                        answer_batch, current_device, phase="answer", sample_p=0.9
+                        answer_batch, current_device, phase="answer", sample_p=0.95
                     )
                     if answer_loss:
                         answer_total_loss.append(answer_loss)
