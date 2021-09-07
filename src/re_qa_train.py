@@ -9,6 +9,7 @@ import numpy as np
 import torch
 import torch.distributed as dist
 import torch.utils.data.distributed
+from torch.utils.data.sampler import SubsetRandomSampler
 
 from src.re_qa_model import HyperParameters, save
 
@@ -75,69 +76,89 @@ def iterative_run_model(
         epoch = 0
         while epoch < max_epochs:
             # let all processes sync up before starting with a new epoch of training
-            #dist.barrier()
+            # dist.barrier()
 
             # make sure we get different orderings.
-            #for sampler in train_samplers:
+            # for sampler in train_samplers:
             #    sampler.set_epoch(epoch)
 
             # make sure we get different orderings.
-            #for sampler in question_train_samplers:
+            # for sampler in question_train_samplers:
             #    sampler.set_epoch(epoch)
 
             print("\nRank: {0} | Epoch:{1}\n".format(rank, epoch))
             start = time.time()
 
-            answer_iter = iter(train_dataloader)
-            question_iter = iter(question_train_dataloader)
+            dataset_size = len(train_dataloader)
+            indices = list(range(dataset_size))
+            split = dataset_size // 2
+            np.random.shuffle(indices)
+            train_one_indices, train_two_indices = indices[split:], indices[:split]
+
+            # Creating disjoint train samplers
+            train_one_sampler = SubsetRandomSampler(train_one_indices)
+
+            train_two_sampler = SubsetRandomSampler(train_two_indices)
+
+            train_one_loader = torch.utils.data.DataLoader(
+                train_dataloader,
+                batch_size=config.batch_size,
+                sampler=train_one_sampler,
+            )
+
+            train_two_loader = torch.utils.data.DataLoader(
+                train_dataloader,
+                batch_size=config.batch_size,
+                sampler=train_two_sampler,
+            )
+
+            answer_iter = iter(train_one_loader)
+            question_iter = iter(train_two_loader)
             step = 0
             question_total_loss = []
             answer_total_loss = []
             while step < config.training_steps:
-                for inner_step in range(config.update_switch_steps):
-                    question_batch = next(question_iter)
-                    question_loss = model.iterative_train(
-                        question_batch, current_device, phase="question", sample_p=0.95
+                question_batch = next(question_iter)
+                question_loss = model.iterative_train(
+                    question_batch, current_device, phase="question", sample_p=0.95
+                )
+                if question_loss:
+                    question_total_loss.append(question_loss)
+
+                if question_total_loss:
+                    question_mean_loss = np.mean(question_total_loss)
+
+                print(
+                    "\rRank:{0} | Batch:{1} | Question Loss:{2} | Question Mean Loss:{3} | GPU Usage:{4}\n".format(
+                        rank,
+                        step,
+                        question_loss,
+                        question_mean_loss,
+                        torch.cuda.memory_allocated(device=current_device),
                     )
-                    if question_loss:
-                        question_total_loss.append(question_loss)
+                )
 
-                    if question_total_loss:
-                        question_mean_loss = np.mean(question_total_loss)
+                answer_batch = next(answer_iter)
+                answer_loss = model.iterative_train(
+                    answer_batch, current_device, phase="answer", sample_p=0.95
+                )
+                if answer_loss:
+                    answer_total_loss.append(answer_loss)
 
-                    print(
-                        "\rRank:{0} | Batch:{1} | Question Loss:{2} | Question Mean Loss:{3} | GPU Usage:{4}\n".format(
-                            rank,
-                            step + inner_step + 1,
-                            question_loss,
-                            question_mean_loss,
-                            torch.cuda.memory_allocated(device=current_device),
-                        )
+                if answer_total_loss:
+                    answer_mean_loss = np.mean(answer_total_loss)
+
+                print(
+                    "\rRank:{0} | Batch:{1} | Answer Loss:{2} | Answer Mean Loss:{3} | GPU Usage:{4}\n".format(
+                        rank,
+                        step,
+                        answer_loss,
+                        answer_mean_loss,
+                        torch.cuda.memory_allocated(device=current_device),
                     )
+                )
 
-                for inner_step in range(config.update_switch_steps):
-                    #answer_batch = next(answer_iter)
-                    answer_batch = question_batch
-                    answer_loss = model.iterative_train(
-                        answer_batch, current_device, phase="answer", sample_p=0.95
-                    )
-                    if answer_loss:
-                        answer_total_loss.append(answer_loss)
-
-                    if answer_total_loss:
-                        answer_mean_loss = np.mean(answer_total_loss)
-
-                    print(
-                        "\rRank:{0} | Batch:{1} | Answer Loss:{2} | Answer Mean Loss:{3} | GPU Usage:{4}\n".format(
-                            rank,
-                            step + inner_step + 1,
-                            answer_loss,
-                            answer_mean_loss,
-                            torch.cuda.memory_allocated(device=current_device),
-                        )
-                    )
-
-                step += config.update_switch_steps
+                step += 1
                 if rank == 0 and save_always and step > 0 and (step % 100 == 0):
                     save(
                         model.question_model,
@@ -150,7 +171,7 @@ def iterative_run_model(
                         str(epoch) + "_answer_step_" + str(step),
                     )
 
-                #if save_always and step > 0 and (step % 100 == 0):
+                # if save_always and step > 0 and (step % 100 == 0):
                 #    dist.barrier()
 
             if rank == 0 and save_always:

@@ -55,7 +55,7 @@ def run_re_gold_qa(args):
         ignore_unknowns=True,
         concat=False,
         gold_questions=True,
-        for_evaluation=for_evaluation
+        for_evaluation=for_evaluation,
     )
 
     run_model(
@@ -111,7 +111,7 @@ def run_re_concat_qa(args):
         ignore_unknowns=True,
         concat=True,
         gold_questions=False,
-        for_evaluation=for_evaluation
+        for_evaluation=for_evaluation,
     )
 
     run_model(
@@ -179,12 +179,12 @@ def run_re_qa(args):
             update_switch_steps=int(args.update_switch_steps),
         )
         model = REQA(config)
-        model = model.to('cuda:0')
-        #model = torch.nn.parallel.DistributedDataParallel(
+        model = model.to("cuda:0")
+        # model = torch.nn.parallel.DistributedDataParallel(
         #    model, device_ids=[current_device]
-        #)
+        # )
 
-        #print("From Rank: {}, ==> Preparing data..".format(rank))
+        # print("From Rank: {}, ==> Preparing data..".format(rank))
 
         (
             train_loaders,
@@ -196,7 +196,7 @@ def run_re_qa(args):
             question_tokenizer=model.question_tokenizer,
             answer_tokenizer=model.answer_tokenizer,
             batch_size=config.batch_size,
-            #batch_size=config.batch_size // args.world_size,
+            # batch_size=config.batch_size // args.world_size,
             source_max_length=config.source_max_length,
             decoder_max_length=config.decoder_max_length,
             train_file=args.train,
@@ -232,10 +232,10 @@ def run_re_qa(args):
         iterative_run_model(
             model,
             config=config,
-            train_dataloader=train_loaders,
+            train_dataloader=train_dataset,
             dev_dataloader=val_loaders,
             test_dataloader=val_loaders,
-            question_train_dataloader=question_train_loaders,
+            question_train_dataloader=question_train_dataset,
             question_dev_dataloader=question_val_loaders,
             question_test_dataloader=question_val_loaders,
             save_always=True,
