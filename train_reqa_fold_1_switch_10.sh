@@ -1,4 +1,8 @@
 #!/bin/bash
+
+source env/bin/activate
+
+'''
 #SBATCH --job-name=reqa_mml_pgg_top_p_iterative_train_switch_10_fold_1
 #SBATCH --account=rrg-afyshe
 #SBATCH --nodes=4
@@ -44,3 +48,38 @@ srun python src/re_gold_qa_train.py \
     --concat_questions false \
     --dev zero-shot-extraction/relation_splits/dev.1 \
     --train zero-shot-extraction/relation_splits/train.1
+'''
+
+python src/re_gold_qa_train.py \
+    --mode re_qa_train \
+    --model_path $HOME/august_25_runs/re_mml_pgg_top_p_iterative_models/switch_10/fold_1/ \
+    --answer_checkpoint _response_pretrained_model \
+    --question_checkpoint _question_pretrained_model \
+    --training_steps 1000 \
+    --update_switch_steps 10 \
+    --learning_rate 0.001 \
+    --max_epochs 1 \
+    --num_search_samples 10 \
+    --batch_size 2 \
+    --gpu True \
+    --num_workers 6 \
+    --concat_questions false \
+    --dev ./zero-shot-extraction/relation_splits/dev.1 \
+    --train ./zero-shot-extraction/relation_splits/train.1
+
+python src/re_gold_qa_train.py \
+    --mode re_qa_train \
+    --model_path $HOME/august_25_runs/re_mml_pgg_top_p_iterative_models/switch_50/fold_1/ \
+    --answer_checkpoint _response_pretrained_model \
+    --question_checkpoint _question_pretrained_model \
+    --training_steps 1000 \
+    --update_switch_steps 50 \
+    --learning_rate 0.001 \
+    --max_epochs 1 \
+    --num_search_samples 10 \
+    --batch_size 2 \
+    --gpu True \
+    --num_workers 6 \
+    --concat_questions false \
+    --dev ./zero-shot-extraction/relation_splits/dev.1 \
+    --train ./zero-shot-extraction/relation_splits/train.1
