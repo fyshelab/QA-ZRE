@@ -17,8 +17,10 @@ def run_re_gold_qa(args):
     head entity and the relation."""
     if args.mode == "re_gold_qa_train":
         mode = "train"
+        for_evaluation = False
     elif args.mode == "re_gold_qa_test":
         mode = "test"
+        for_evaluation = True
     config = HyperParameters(
         model_path=args.model_path,
         batch_size=args.batch_size,
@@ -50,9 +52,10 @@ def run_re_gold_qa(args):
         dev_file=args.dev,
         distributed=False,
         num_workers=1,
-        ignore_unknowns=args.ignore_unknowns,
+        ignore_unknowns=True,
         concat=False,
         gold_questions=True,
+        for_evaluation=for_evaluation
     )
 
     run_model(
@@ -70,8 +73,10 @@ def run_re_concat_qa(args):
     and the relation."""
     if args.mode == "re_concat_qa_train":
         mode = "train"
+        for_evaluation = False
     elif args.mode == "re_concat_qa_test":
         mode = "test"
+        for_evaluation = True
     config = HyperParameters(
         model_path=args.model_path,
         batch_size=args.batch_size,
@@ -103,9 +108,10 @@ def run_re_concat_qa(args):
         dev_file=args.dev,
         distributed=False,
         num_workers=1,
-        ignore_unknowns=args.ignore_unknowns,
+        ignore_unknowns=True,
         concat=True,
         gold_questions=False,
+        for_evaluation=for_evaluation
     )
 
     run_model(
@@ -123,6 +129,7 @@ def run_re_qa(args):
     the response generator explored with some search algorithm."""
     if args.mode == "re_qa_train":
         mode = "train"
+        '''
         ngpus_per_node = torch.cuda.device_count()
 
         """ This next line is the key to getting DistributedDataParallel working on SLURM:
@@ -154,7 +161,7 @@ def run_re_qa(args):
         print("process group ready!")
 
         print("From Rank: {}, ==> Making model..".format(rank))
-
+        '''
         config = HyperParameters(
             model_path=args.model_path,
             batch_size=args.batch_size,
@@ -172,12 +179,12 @@ def run_re_qa(args):
             update_switch_steps=int(args.update_switch_steps),
         )
         model = REQA(config)
-        model = model.to(current_device)
-        model = torch.nn.parallel.DistributedDataParallel(
-            model, device_ids=[current_device]
-        )
+        model = model.to('cuda:0')
+        #model = torch.nn.parallel.DistributedDataParallel(
+        #    model, device_ids=[current_device]
+        #)
 
-        print("From Rank: {}, ==> Preparing data..".format(rank))
+        #print("From Rank: {}, ==> Preparing data..".format(rank))
 
         (
             train_loaders,
@@ -186,14 +193,15 @@ def run_re_qa(args):
             val_dataset,
             train_sampler,
         ) = create_zero_re_qa_dataset(
-            question_tokenizer=model.module.question_tokenizer,
-            answer_tokenizer=model.module.answer_tokenizer,
-            batch_size=config.batch_size // args.world_size,
+            question_tokenizer=model.question_tokenizer,
+            answer_tokenizer=model.answer_tokenizer,
+            batch_size=config.batch_size,
+            #batch_size=config.batch_size // args.world_size,
             source_max_length=config.source_max_length,
             decoder_max_length=config.decoder_max_length,
             train_file=args.train,
             dev_file=args.dev,
-            distributed=True,
+            distributed=False,
             num_workers=args.num_workers,
             ignore_unknowns=True,
             concat=False,
@@ -207,14 +215,14 @@ def run_re_qa(args):
             question_val_dataset,
             question_train_sampler,
         ) = create_zero_re_qa_dataset(
-            question_tokenizer=model.module.question_tokenizer,
-            answer_tokenizer=model.module.answer_tokenizer,
-            batch_size=config.batch_size // args.world_size,
+            question_tokenizer=model.question_tokenizer,
+            answer_tokenizer=model.answer_tokenizer,
+            batch_size=config.batch_size,
             source_max_length=config.source_max_length,
             decoder_max_length=config.decoder_max_length,
             train_file=args.train,
             dev_file=args.dev,
-            distributed=True,
+            distributed=False,
             num_workers=args.num_workers,
             ignore_unknowns=True,
             concat=False,
@@ -231,10 +239,10 @@ def run_re_qa(args):
             question_dev_dataloader=question_val_loaders,
             question_test_dataloader=question_val_loaders,
             save_always=True,
-            rank=rank,
+            rank=0,
             train_samplers=[train_sampler],
             question_train_samplers=[question_train_sampler],
-            current_device=current_device,
+            current_device=0,
             gold_eval_file=args.dev,
         )
 
@@ -256,8 +264,8 @@ def run_re_qa(args):
         model = model.to("cuda:0")
 
         (_, val_loaders, _, val_dataset, _,) = create_zero_re_qa_dataset(
-            question_tokenizer=model.module.question_tokenizer,
-            answer_tokenizer=model.module.answer_tokenizer,
+            question_tokenizer=model.question_tokenizer,
+            answer_tokenizer=model.answer_tokenizer,
             batch_size=config.batch_size,
             source_max_length=config.source_max_length,
             decoder_max_length=config.decoder_max_length,

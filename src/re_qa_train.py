@@ -75,15 +75,15 @@ def iterative_run_model(
         epoch = 0
         while epoch < max_epochs:
             # let all processes sync up before starting with a new epoch of training
-            dist.barrier()
+            #dist.barrier()
 
             # make sure we get different orderings.
-            for sampler in train_samplers:
-                sampler.set_epoch(epoch)
+            #for sampler in train_samplers:
+            #    sampler.set_epoch(epoch)
 
             # make sure we get different orderings.
-            for sampler in question_train_samplers:
-                sampler.set_epoch(epoch)
+            #for sampler in question_train_samplers:
+            #    sampler.set_epoch(epoch)
 
             print("\nRank: {0} | Epoch:{1}\n".format(rank, epoch))
             start = time.time()
@@ -96,7 +96,7 @@ def iterative_run_model(
             while step < config.training_steps:
                 for inner_step in range(config.update_switch_steps):
                     question_batch = next(question_iter)
-                    question_loss = model.module.iterative_train(
+                    question_loss = model.iterative_train(
                         question_batch, current_device, phase="question", sample_p=0.95
                     )
                     if question_loss:
@@ -116,8 +116,9 @@ def iterative_run_model(
                     )
 
                 for inner_step in range(config.update_switch_steps):
-                    answer_batch = next(answer_iter)
-                    answer_loss = model.module.iterative_train(
+                    #answer_batch = next(answer_iter)
+                    answer_batch = question_batch
+                    answer_loss = model.iterative_train(
                         answer_batch, current_device, phase="answer", sample_p=0.95
                     )
                     if answer_loss:
@@ -139,28 +140,28 @@ def iterative_run_model(
                 step += config.update_switch_steps
                 if rank == 0 and save_always and step > 0 and (step % 100 == 0):
                     save(
-                        model.module.question_model,
-                        model.module.model_path,
+                        model.question_model,
+                        model.model_path,
                         str(epoch) + "_question_step_" + str(step),
                     )
                     save(
-                        model.module.answer_model,
-                        model.module.model_path,
+                        model.answer_model,
+                        model.model_path,
                         str(epoch) + "_answer_step_" + str(step),
                     )
 
-                if save_always and step > 0 and (step % 100 == 0):
-                    dist.barrier()
+                #if save_always and step > 0 and (step % 100 == 0):
+                #    dist.barrier()
 
             if rank == 0 and save_always:
                 save(
-                    model.module.question_model,
-                    model.module.model_path,
+                    model.question_model,
+                    model.model_path,
                     str(epoch) + "_question_full",
                 )
                 save(
-                    model.module.answer_model,
-                    model.module.model_path,
+                    model.answer_model,
+                    model.model_path,
                     str(epoch) + "_answer_full",
                 )
 
