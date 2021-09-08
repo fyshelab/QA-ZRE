@@ -1,15 +1,12 @@
 #!/bin/bash
 
-
-'
-compute canada code.
 #SBATCH --job-name=reqa_mml_pgg_top_p_iterative_train_switch_1_fold_1
 #SBATCH --account=rrg-afyshe
-#SBATCH --nodes=4
-#SBATCH --tasks-per-node=4
-#SBATCH --gres=gpu:v100l:4
-#SBATCH --mem=0
-#SBATCH --time=0-04:00
+#SBATCH --nodes=1
+#SBATCH --tasks-per-node=1
+#SBATCH --gres=gpu:v100l:1
+#SBATCH --mem=12000M
+#SBATCH --time=0-12:00
 #SBATCH --cpus-per-task=6
 #SBATCH --output=%N-%j.out
 
@@ -29,9 +26,6 @@ echo "r$SLURM_NODEID Launching python script"
 echo "All the allocated nodes: $SLURM_JOB_NODELIST"
 
 # The SLURM_NTASKS variable tells the script how many processes are available for this execution. “srun” executes the script <tasks-per-node * nodes> times
-'
-
-source env/bin/activate
 
 python src/re_gold_qa_train.py \
     --mode re_qa_train \
