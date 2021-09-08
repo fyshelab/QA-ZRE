@@ -341,8 +341,8 @@ class REQA(torch.nn.Module):
 
         b_sz, _ = question_input_ids.size()
 
+        self.question_model.train()
         with torch.no_grad():
-            self.question_model.eval()
             # Use top-p sampling to collect samples.
             sampled_question_outputs = self.question_model.generate(
                 input_ids=question_input_ids,
@@ -483,7 +483,6 @@ class REQA(torch.nn.Module):
             question_target_mask = question_target_mask.to(current_device)
             question_labels = question_labels.to(current_device)
 
-        self.question_model.train()
         question_output = self.question_model(
             input_ids=question_input_ids,
             attention_mask=question_input_mask,
@@ -503,16 +502,28 @@ class REQA(torch.nn.Module):
         question_log_p = torch.sum(good_log_question_p, dim=1).squeeze()
         question_log_p = question_log_p.view(self.config.num_search_samples, b_sz)
 
+        cpy_question_log_p = question_log_p.clone().detach()
+        approximate_z = torch.sum(
+            torch.mul(
+                torch.transpose(torch.exp(answer_log_p), 0, 1),
+                torch.transpose(torch.exp(cpy_question_log_p), 0, 1),
+            ),
+            dim=1,
+        )
         # MML
         re_loss = -torch.mean(
-            torch.log(
+            torch.div(
                 torch.sum(
                     torch.mul(
-                        torch.transpose(torch.exp(answer_log_p), 0, 1),
-                        torch.transpose(torch.exp(question_log_p), 0, 1),
+                        torch.mul(
+                            torch.transpose(torch.exp(answer_log_p), 0, 1),
+                            torch.transpose(torch.exp(question_log_p), 0, 1),
+                        ),
+                        torch.transpose(question_log_p, 0, 1),
                     ),
                     dim=1,
-                )
+                ),
+                approximate_z,
             ),
             dim=0,
         )
