@@ -75,14 +75,14 @@ def iterative_run_model(
         epoch = 0
         while epoch < max_epochs:
             # let all processes sync up before starting with a new epoch of training
-            #dist.barrier()
+            # dist.barrier()
 
             # make sure we get different orderings.
-            #for sampler in train_samplers:
+            # for sampler in train_samplers:
             #    sampler.set_epoch(epoch)
 
             # make sure we get different orderings.
-            #for sampler in question_train_samplers:
+            # for sampler in question_train_samplers:
             #    sampler.set_epoch(epoch)
 
             print("\nRank: {0} | Epoch:{1}\n".format(rank, epoch))
@@ -116,8 +116,7 @@ def iterative_run_model(
                     )
 
                 for inner_step in range(config.update_switch_steps):
-                    #answer_batch = next(answer_iter)
-                    answer_batch = question_batch
+                    answer_batch = next(answer_iter)
                     answer_loss = model.iterative_train(
                         answer_batch, current_device, phase="answer", sample_p=0.95
                     )
@@ -150,7 +149,7 @@ def iterative_run_model(
                         str(epoch) + "_answer_step_" + str(step),
                     )
 
-                #if save_always and step > 0 and (step % 100 == 0):
+                # if save_always and step > 0 and (step % 100 == 0):
                 #    dist.barrier()
 
             if rank == 0 and save_always:
