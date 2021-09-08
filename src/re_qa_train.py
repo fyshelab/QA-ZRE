@@ -62,7 +62,7 @@ def iterative_run_model(
     train_samplers=None,
     question_train_samplers=None,
     current_device=0,
-    gold_eval_file="./zero-shot-extraction/relation_splits/dev.0",
+    gold_eval_file=None,
 ) -> None:
     """Run the model on input data (for training or testing)"""
 

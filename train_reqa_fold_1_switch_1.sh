@@ -1,5 +1,8 @@
 #!/bin/bash
+
+
 '
+compute canada code.
 #SBATCH --job-name=reqa_mml_pgg_top_p_iterative_train_switch_1_fold_1
 #SBATCH --account=rrg-afyshe
 #SBATCH --nodes=4
@@ -26,42 +29,25 @@ echo "r$SLURM_NODEID Launching python script"
 echo "All the allocated nodes: $SLURM_JOB_NODELIST"
 
 # The SLURM_NTASKS variable tells the script how many processes are available for this execution. “srun” executes the script <tasks-per-node * nodes> times
-
-srun python src/re_gold_qa_train.py \
-    --init_method tcp://$MASTER_ADDR:3456 \
-    --world_size $SLURM_NTASKS \
-    --mode re_qa_train \
-    --model_path $SCRATCH/re_mml_pgg_top_p_iterative_models/switch_1/fold_1/ \
-    --answer_checkpoint _response_pretrained_model \
-    --question_checkpoint _question_pretrained_model \
-    --training_steps 1000 \
-    --update_switch_steps 1 \
-    --learning_rate 0.001 \
-    --max_epochs 1 \
-    --num_search_samples 20 \
-    --batch_size 16 \
-    --gpu True \
-    --num_workers 6 \
-    --concat_questions false \
-    --dev zero-shot-extraction/relation_splits/dev.1 \
-    --train zero-shot-extraction/relation_splits/train.1
 '
 
 source env/bin/activate
 
 python src/re_gold_qa_train.py \
     --mode re_qa_train \
-    --model_path $HOME/august_25_runs/re_mml_pgg_top_p_iterative_models/sim_update/fold_1/ \
+    --model_path $HOME/re_mml_pgg_top_p_iterative_models/switch_1_update/fold_1/ \
     --answer_checkpoint _response_pretrained_model \
     --question_checkpoint _question_pretrained_model \
-    --training_steps 1000 \
+    --training_steps 8000 \
     --update_switch_steps 1 \
     --learning_rate 0.001 \
     --max_epochs 1 \
     --num_search_samples 10 \
-    --batch_size 2 \
+    --batch_size 4 \
     --gpu True \
     --num_workers 6 \
-    --concat_questions false \
+    --concat_questions False \
     --dev ./zero-shot-extraction/relation_splits/dev.1 \
-    --train ./zero-shot-extraction/relation_splits/train.1
+    --train ./zero-shot-extraction/relation_splits/train.1 \
+    --gpu_device 0 \
+    --seed 12321
