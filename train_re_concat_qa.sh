@@ -1,6 +1,6 @@
 #!/bin/bash
 
-#SBATCH --job-name=reqa_mml_pgg_top_p_iterative_train_concat_fold_1
+#SBATCH --job-name=reqa_train_concat_fold_1
 #SBATCH --account=rrg-afyshe
 #SBATCH --nodes=1
 #SBATCH --tasks-per-node=1
@@ -26,25 +26,6 @@ echo "r$SLURM_NODEID Launching python script"
 echo "All the allocated nodes: $SLURM_JOB_NODELIST"
 
 # The SLURM_NTASKS variable tells the script how many processes are available for this execution. “srun” executes the script <tasks-per-node * nodes> times
-
-'
-to train on all folds
-for (( i=0; i<=9; i++ ))
-do
-    python src/re_gold_qa_train.py \
-       --mode re_concat_qa_train \
-       --model_path $HOME/august_25_runs/re_concat_qa_models_with_unknowns/fold_$i/ \
-       --checkpoint _response_pretrained_model \
-       --learning_rate 0.001 --max_epochs 1 \
-       --concat_questions True \
-       --batch_size 16  --gpu True \
-       --answer_training_steps 4000 \
-       --ignore_unknowns False \
-       --train zero-shot-extraction/relation_splits/train.$i \
-       --dev zero-shot-extraction/relation_splits/dev.$i \
-       --gpu_device 0
-done
-'
 
 python src/re_gold_qa_train.py \
        --mode re_concat_qa_train \
