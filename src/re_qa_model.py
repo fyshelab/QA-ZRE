@@ -10,6 +10,7 @@ from typing import Any, Optional
 
 import numpy
 import torch
+from nltk.translate.bleu_score import sentence_bleu
 from transformers import Adafactor, T5ForConditionalGeneration, T5Tokenizer
 
 
@@ -389,6 +390,22 @@ class REQA(torch.nn.Module):
             for i in range(b_sz)
         ]
 
+        bleu_scores = []
+        for i in range(b_sz):
+            for j in range(self.config.num_search_samples):
+                bleu_scores.append(
+                    sentence_bleu(
+                        batch["entity_relations"][i].split(),
+                        sampled_question_predictions_str_reshaped[i][j].split(),
+                    )
+                )
+
+        bleu_scores = torch.FloatTensor(bleu_scores)
+        if self.config.gpu:
+            bleu_scores = bleu_scores.to(current_device)
+
+        bleu_scores = bleu_scores.view(b_sz, self.config.num_search_samples)
+
         new_articles = []
         for i in range(b_sz):
             for j in range(self.config.num_search_samples):
@@ -553,7 +570,18 @@ class REQA(torch.nn.Module):
             ),
             dim=0,
         )
-        loss = re_loss
+
+        bleu_loss = -torch.mean(
+            torch.sum(
+                torch.mul(
+                    torch.transpose(torch.exp(question_log_p), 0, 1), bleu_scores
+                ),
+                dim=1,
+            ),
+            dim=0,
+        )
+
+        loss = re_loss + bleu_loss
         loss_value = loss.item()
 
         return loss, loss_value
