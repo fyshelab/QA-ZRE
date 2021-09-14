@@ -1,6 +1,6 @@
 #!/bin/bash
 
-#SBATCH --job-name=reqa_mml_pgg_top_p_iterative_train_switch_1_fold_1
+#SBATCH --job-name=reqa_mml_mml_top_p_fold_1
 #SBATCH --account=rrg-afyshe
 #SBATCH --nodes=1
 #SBATCH --tasks-per-node=1
@@ -29,7 +29,7 @@ echo "All the allocated nodes: $SLURM_JOB_NODELIST"
 
 python src/re_gold_qa_train.py \
     --mode re_qa_train \
-    --model_path $SCRATCH/re_mml_pgg_top_p_iterative_models/mml_mml_top_p_more_samples/fold_1 \
+    --model_path $SCRATCH/re_mml_pgg_top_p_iterative_models/mml_mml_top_p_with_blue/fold_1 \
     --answer_checkpoint _response_pretrained_model \
     --question_checkpoint _question_pretrained_model \
     --training_steps 3100 \
