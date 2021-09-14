@@ -29,14 +29,14 @@ echo "All the allocated nodes: $SLURM_JOB_NODELIST"
 
 python src/re_gold_qa_train.py \
     --mode re_qa_train \
-    --model_path $HOME/re_mml_pgg_top_p_iterative_models/switch_1_update/fold_1/ \
+    --model_path $SCRATCH/re_mml_pgg_top_p_iterative_models/mml_mml_top_p_more_samples/fold_1 \
     --answer_checkpoint _response_pretrained_model \
     --question_checkpoint _question_pretrained_model \
-    --training_steps 8000 \
+    --training_steps 3100 \
     --update_switch_steps 1 \
     --learning_rate 0.001 \
     --max_epochs 1 \
-    --num_search_samples 10 \
+    --num_search_samples 12 \
     --batch_size 4 \
     --gpu True \
     --num_workers 6 \

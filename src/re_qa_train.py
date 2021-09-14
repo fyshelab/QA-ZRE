@@ -97,7 +97,7 @@ def iterative_run_model(
                 for inner_step in range(config.update_switch_steps):
                     question_batch = next(question_iter)
                     question_loss = model.iterative_train(
-                        question_batch, current_device, phase="question", sample_p=0.95
+                        question_batch, current_device, phase="question", sample_p=0.98
                     )
                     if question_loss:
                         question_total_loss.append(question_loss)
@@ -115,6 +115,7 @@ def iterative_run_model(
                         )
                     )
 
+                '''
                 for inner_step in range(config.update_switch_steps):
                     answer_batch = next(answer_iter)
                     answer_loss = model.iterative_train(
@@ -135,7 +136,7 @@ def iterative_run_model(
                             torch.cuda.memory_allocated(device=current_device),
                         )
                     )
-
+                '''
                 step += config.update_switch_steps
                 if rank == 0 and save_always and step > 0 and (step % 100 == 0):
                     save(

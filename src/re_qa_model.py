@@ -213,9 +213,21 @@ class REQA(torch.nn.Module):
             question_input_mask = question_input_mask.to(current_device)
 
         with torch.no_grad():
+            '''
             question_predictions = self.question_model.generate(
                 input_ids=question_input_ids,
                 attention_mask=question_input_mask,
+            )
+            '''
+            question_predictions = self.question_model.generate(
+                    input_ids=question_input_ids,
+                    attention_mask=question_input_mask,
+                    no_repeat_ngram_size=self.config.no_repeat_ngram_size,
+                    early_stopping=self.config.early_stopping,
+                    max_length=self.config.decoder_max_length,
+                    num_return_sequences=1,
+                    num_beams=self.config.num_search_samples,
+                    length_penalty=10.0
             )
 
         question_predictions_str = self.question_tokenizer.batch_decode(
@@ -343,7 +355,7 @@ class REQA(torch.nn.Module):
 
         self.question_model.train()
         with torch.no_grad():
-            # Use top-p sampling to collect samples.
+            # Use top-p sampling + beam search to collect samples.
             sampled_question_outputs = self.question_model.generate(
                 input_ids=question_input_ids,
                 do_sample=True,
@@ -356,7 +368,6 @@ class REQA(torch.nn.Module):
                 return_dict_in_generate=True,
                 attention_mask=question_input_mask,
             )
-
             sampled_questions, _ = prob_of_sampled_predictions(
                 loss_fct, sampled_question_outputs
             )
@@ -419,6 +430,7 @@ class REQA(torch.nn.Module):
             -1, seq_len
         )
 
+        '''
         with torch.no_grad():
             output = self.answer_model(
                 input_ids=answer_input_ids,
@@ -438,6 +450,25 @@ class REQA(torch.nn.Module):
             good_log_p = log_p.masked_fill_(labels == -100, 0.0)
             answer_log_p = torch.sum(good_log_p, dim=1).squeeze()
             answer_log_p = answer_log_p.view(self.config.num_search_samples, b_sz)
+        '''
+        output = self.answer_model(
+                input_ids=answer_input_ids,
+                attention_mask=answer_input_mask,
+                decoder_attention_mask=target_mask,
+                decoder_input_ids=self.answer_model._shift_right(labels),
+                labels=None,
+        )
+
+        log_p = -loss_fct(
+                output.logits.view(-1, output.logits.size(-1)),
+                labels.view(-1),
+        )
+
+        b, sz, v = output.logits.size()
+        log_p = log_p.view(b, sz)
+        good_log_p = log_p.masked_fill_(labels == -100, 0.0)
+        answer_log_p = torch.sum(good_log_p, dim=1).squeeze()
+        answer_log_p = answer_log_p.view(self.config.num_search_samples, b_sz)
 
         # Now re-run the question generator and compute the loss for the sampled predictions.
         # This will compute the gradients in the question module.
@@ -502,6 +533,7 @@ class REQA(torch.nn.Module):
         question_log_p = torch.sum(good_log_question_p, dim=1).squeeze()
         question_log_p = question_log_p.view(self.config.num_search_samples, b_sz)
 
+        '''
         cpy_question_log_p = question_log_p.clone().detach()
         approximate_z = torch.sum(
             torch.mul(
@@ -510,6 +542,7 @@ class REQA(torch.nn.Module):
             ),
             dim=1,
         )
+
         # MML
         re_loss = -torch.mean(
             torch.div(
@@ -527,7 +560,19 @@ class REQA(torch.nn.Module):
             ),
             dim=0,
         )
-
+        '''
+        re_loss = -torch.mean(
+            torch.log(
+                torch.sum(
+                    torch.mul(
+                        torch.transpose(torch.exp(answer_log_p), 0, 1),
+                        torch.transpose(torch.exp(question_log_p), 0, 1),
+                    ),
+                    dim=1,
+                )
+            ),
+            dim=0,
+        )
         loss = re_loss
         loss_value = loss.item()
 
@@ -553,7 +598,8 @@ class REQA(torch.nn.Module):
         elif phase == "question":
             self.question_optimizer.zero_grad()
             self.answer_optimizer.zero_grad()
-            self.answer_model.eval()
+            #self.answer_model.eval()
+            self.answer_model.train()
             loss, loss_value = self.mml_question_training(
                 batch, current_device, sample_p=sample_p
             )
@@ -562,5 +608,6 @@ class REQA(torch.nn.Module):
                 loss.backward()
                 # Optimize
                 self.question_optimizer.step()
+                self.answer_optimizer.step()
 
             return loss_value
