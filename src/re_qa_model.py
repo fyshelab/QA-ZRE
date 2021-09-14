@@ -213,21 +213,15 @@ class REQA(torch.nn.Module):
             question_input_mask = question_input_mask.to(current_device)
 
         with torch.no_grad():
-            '''
             question_predictions = self.question_model.generate(
                 input_ids=question_input_ids,
                 attention_mask=question_input_mask,
-            )
-            '''
-            question_predictions = self.question_model.generate(
-                    input_ids=question_input_ids,
-                    attention_mask=question_input_mask,
-                    no_repeat_ngram_size=self.config.no_repeat_ngram_size,
-                    early_stopping=self.config.early_stopping,
-                    max_length=self.config.decoder_max_length,
-                    num_return_sequences=1,
-                    num_beams=self.config.num_search_samples,
-                    length_penalty=10.0
+                no_repeat_ngram_size=self.config.no_repeat_ngram_size,
+                early_stopping=self.config.early_stopping,
+                max_length=self.config.decoder_max_length,
+                num_return_sequences=1,
+                num_beams=self.config.num_search_samples,
+                length_penalty=10.0,
             )
 
         question_predictions_str = self.question_tokenizer.batch_decode(
@@ -237,8 +231,7 @@ class REQA(torch.nn.Module):
         question_predictions_str = [
             remove_prefix(pred, "question: ") for pred in question_predictions_str
         ]
-        # print(question_predictions_str)
-        # print(batch["contexts"])
+
         new_articles = []
         for i in range(len(batch["passages"])):
             new_article = (
@@ -269,6 +262,7 @@ class REQA(torch.nn.Module):
             answer_input_mask,
             question_input_ids,
             question_input_mask,
+            question_predictions_str,
         )
 
     def predict_step(self, batch, current_device):
@@ -278,10 +272,13 @@ class REQA(torch.nn.Module):
         self.answer_model.eval()
         self.question_model.eval()
 
-        # TODO For prediction, maybe we can use beam search and then take the top 1 prediction.
-        answer_input_ids, answer_input_mask, _, _ = self.question_greedy_predict(
-            batch, current_device
-        )
+        (
+            answer_input_ids,
+            answer_input_mask,
+            _,
+            _,
+            question_predictions_str,
+        ) = self.question_greedy_predict(batch, current_device)
 
         second_entity_predictions = self.answer_model.generate(
             input_ids=answer_input_ids,
@@ -290,11 +287,12 @@ class REQA(torch.nn.Module):
         second_entity_predictions_str = self.answer_tokenizer.batch_decode(
             second_entity_predictions, skip_special_tokens=True
         )
-        # print(second_entity_predictions_str)
+
         for index in range(len(second_entity_predictions_str)):
             pred_str = second_entity_predictions_str[index]
             output_batch = {
                 "predictions_str": pred_str,
+                "question_predictions": question_predictions_str[index],
             }
             yield output_batch
 
@@ -308,6 +306,7 @@ class REQA(torch.nn.Module):
             answer_input_mask,
             question_input_ids,
             question_input_mask,
+            _,
         ) = self.question_greedy_predict(batch, current_device)
         target_mask = batch["second_entity_attention_mask"]
         labels = batch["second_entity_labels"]
@@ -355,7 +354,7 @@ class REQA(torch.nn.Module):
 
         self.question_model.train()
         with torch.no_grad():
-            # Use top-p sampling + beam search to collect samples.
+            # Use top-p sampling to collect samples.
             sampled_question_outputs = self.question_model.generate(
                 input_ids=question_input_ids,
                 do_sample=True,
@@ -380,8 +379,7 @@ class REQA(torch.nn.Module):
             remove_prefix(pred, "question: ")
             for pred in sampled_question_predictions_str
         ]
-        # print(batch["contexts"])
-        # print(beam_question_predictions_str)
+
         sampled_question_predictions_str_reshaped = [
             sampled_question_predictions_str[
                 i
@@ -430,38 +428,17 @@ class REQA(torch.nn.Module):
             -1, seq_len
         )
 
-        '''
-        with torch.no_grad():
-            output = self.answer_model(
-                input_ids=answer_input_ids,
-                attention_mask=answer_input_mask,
-                decoder_attention_mask=target_mask,
-                decoder_input_ids=self.answer_model._shift_right(labels),
-                labels=None,
-            )
-
-            log_p = -loss_fct(
-                output.logits.view(-1, output.logits.size(-1)),
-                labels.view(-1),
-            )
-
-            b, sz, v = output.logits.size()
-            log_p = log_p.view(b, sz)
-            good_log_p = log_p.masked_fill_(labels == -100, 0.0)
-            answer_log_p = torch.sum(good_log_p, dim=1).squeeze()
-            answer_log_p = answer_log_p.view(self.config.num_search_samples, b_sz)
-        '''
         output = self.answer_model(
-                input_ids=answer_input_ids,
-                attention_mask=answer_input_mask,
-                decoder_attention_mask=target_mask,
-                decoder_input_ids=self.answer_model._shift_right(labels),
-                labels=None,
+            input_ids=answer_input_ids,
+            attention_mask=answer_input_mask,
+            decoder_attention_mask=target_mask,
+            decoder_input_ids=self.answer_model._shift_right(labels),
+            labels=None,
         )
 
         log_p = -loss_fct(
-                output.logits.view(-1, output.logits.size(-1)),
-                labels.view(-1),
+            output.logits.view(-1, output.logits.size(-1)),
+            labels.view(-1),
         )
 
         b, sz, v = output.logits.size()
@@ -533,7 +510,8 @@ class REQA(torch.nn.Module):
         question_log_p = torch.sum(good_log_question_p, dim=1).squeeze()
         question_log_p = question_log_p.view(self.config.num_search_samples, b_sz)
 
-        '''
+        # another way to implement the mml gradient directly!
+        """
         cpy_question_log_p = question_log_p.clone().detach()
         approximate_z = torch.sum(
             torch.mul(
@@ -560,7 +538,9 @@ class REQA(torch.nn.Module):
             ),
             dim=0,
         )
-        '''
+        """
+
+        # easier way to use MML objective.
         re_loss = -torch.mean(
             torch.log(
                 torch.sum(
@@ -596,9 +576,10 @@ class REQA(torch.nn.Module):
             return loss_value
 
         elif phase == "question":
+            # for MML-MML
             self.question_optimizer.zero_grad()
             self.answer_optimizer.zero_grad()
-            #self.answer_model.eval()
+            # self.answer_model.eval()
             self.answer_model.train()
             loss, loss_value = self.mml_question_training(
                 batch, current_device, sample_p=sample_p
