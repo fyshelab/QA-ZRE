@@ -15,6 +15,7 @@ def read_zero_re_qa(path, ignore_unknowns=True, gold_question=False, concat=Fals
         contexts = []
         answers = []
         passages = []
+        entity_relations = []
         for line in fd:
             line = line.strip()
             line_arr = line.split("\t")
@@ -30,6 +31,7 @@ def read_zero_re_qa(path, ignore_unknowns=True, gold_question=False, concat=Fals
             else:
                 gold_answers = ["no_answer"]
             passages.append(passage)
+            entity_relations.append(white_space_fix(line_arr[2] + " " + line_arr[0]))
             if concat or gold_question:
                 contexts.append(
                     "question: "
@@ -49,7 +51,7 @@ def read_zero_re_qa(path, ignore_unknowns=True, gold_question=False, concat=Fals
                     + " </s>"
                 )
             answers.append(white_space_fix(" and ".join(gold_answers)) + " </s>")
-    return passages, contexts, answers
+    return passages, contexts, answers, entity_relations
 
 
 def test_read_zero_re_qa():
@@ -58,7 +60,7 @@ def test_read_zero_re_qa():
     The function tests three modes: gold questions! concat questions!
     question generator data!
     """
-    passages, contexts, answers = read_zero_re_qa(
+    passages, contexts, answers, entity_relations = read_zero_re_qa(
         "./zero-shot-extraction/relation_splits/train.very_small.0",
         ignore_unknowns=True,
         gold_question=True,
@@ -74,7 +76,7 @@ def test_read_zero_re_qa():
         == "Świecie is located on the west bank of river Vistula at the mouth of river Wda, approximately 40 kilometers north-east of Bydgoszcz, 105 kilometers south of Gdańsk and 190 kilometers south-west of Kaliningrad."
     )
 
-    passages, contexts, answers = read_zero_re_qa(
+    passages, contexts, answers, entity_relations = read_zero_re_qa(
         "./zero-shot-extraction/relation_splits/train.very_small.0",
         ignore_unknowns=False,
         gold_question=True,
@@ -87,7 +89,7 @@ def test_read_zero_re_qa():
         == "question: What olympics was Shakira ? context: Shakira released her first studio albums, Magia and Peligro, in the early 1990s, failing to attain commercial success; however, she rose to prominence in Latin America with her major-label debut, Pies Descalzos (1996), and her fourth album, Dónde Están los Ladrones? (1998). </s>"
     )
 
-    passages, contexts, answers = read_zero_re_qa(
+    passages, contexts, answers, entity_relations = read_zero_re_qa(
         "./zero-shot-extraction/relation_splits/train.very_small.0",
         ignore_unknowns=True,
         gold_question=False,
@@ -97,7 +99,7 @@ def test_read_zero_re_qa():
     expected_context = "question: Świecie <SEP> located next to body of water context: Świecie is located on the west bank of river Vistula at the mouth of river Wda, approximately 40 kilometers north-east of Bydgoszcz, 105 kilometers south of Gdańsk and 190 kilometers south-west of Kaliningrad. </s>"
     assert contexts[100] == expected_context
 
-    passages, contexts, answers = read_zero_re_qa(
+    passages, contexts, answers, entity_relations = read_zero_re_qa(
         "./zero-shot-extraction/relation_splits/train.very_small.0",
         ignore_unknowns=True,
         gold_question=False,
@@ -125,13 +127,18 @@ def create_zero_re_qa_dataset(
 ):
     """Function to create the zero re qa dataset."""
     if not for_evaluation:
-        train_passages, train_contexts, train_answers = read_zero_re_qa(
+        (
+            train_passages,
+            train_contexts,
+            train_answers,
+            train_entity_relations,
+        ) = read_zero_re_qa(
             train_file,
             ignore_unknowns=ignore_unknowns,
             gold_question=gold_questions,
             concat=concat,
         )
-    val_passages, val_contexts, val_answers = read_zero_re_qa(
+    val_passages, val_contexts, val_answers, _ = read_zero_re_qa(
         dev_file,
         ignore_unknowns=ignore_unknowns,
         gold_question=gold_questions,
@@ -209,6 +216,7 @@ def create_zero_re_qa_dataset(
     else:
         if not for_evaluation:
             train_encodings["passages"] = train_passages
+            train_encodings["entity_relations"] = train_entity_relations
 
             train_encodings["entity_relation_passage_input_ids"] = train_encodings.pop(
                 "input_ids"
@@ -268,7 +276,7 @@ def create_zero_re_qa_dataset(
         def __getitem__(self, idx):
             row = {}
             for key, val in self.encodings.items():
-                if key == "passages":
+                if key in ["passages", "entity_relations"]:
                     row[key] = val[idx]
                 else:
                     row[key] = torch.tensor(val[idx])
