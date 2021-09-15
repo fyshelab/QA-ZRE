@@ -581,7 +581,7 @@ class REQA(torch.nn.Module):
             dim=0,
         )
 
-        loss = re_loss + bleu_loss
+        loss = re_loss + 0.05 * bleu_loss
         loss_value = loss.item()
 
         return loss, loss_value
