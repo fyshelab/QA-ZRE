@@ -36,7 +36,7 @@ python src/re_gold_qa_train.py \
     --update_switch_steps 1 \
     --learning_rate 0.001 \
     --max_epochs 1 \
-    --num_search_samples 12 \
+    --num_search_samples 8 \
     --batch_size 4 \
     --gpu True \
     --num_workers 6 \
