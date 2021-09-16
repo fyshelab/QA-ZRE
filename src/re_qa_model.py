@@ -236,7 +236,9 @@ class REQA(torch.nn.Module):
         new_articles = []
         for i in range(len(batch["passages"])):
             new_article = (
-                "question: "
+                "relation: "
+                + batch["entity_relations"][i]
+                + " question: "
                 + question_predictions_str[i]
                 + " context: "
                 + batch["passages"][i]
@@ -390,6 +392,7 @@ class REQA(torch.nn.Module):
             for i in range(b_sz)
         ]
 
+        """
         bleu_scores = []
         for i in range(b_sz):
             for j in range(self.config.num_search_samples):
@@ -405,12 +408,14 @@ class REQA(torch.nn.Module):
             bleu_scores = bleu_scores.to(current_device)
 
         bleu_scores = bleu_scores.view(b_sz, self.config.num_search_samples)
-
+        """
         new_articles = []
         for i in range(b_sz):
             for j in range(self.config.num_search_samples):
                 new_article = (
-                    "question: "
+                    "relation: "
+                    + batch["entity_relations"][i]
+                    + " question: "
                     + sampled_question_predictions_str_reshaped[i][j]
                     + " context: "
                     + batch["passages"][i]
@@ -571,6 +576,7 @@ class REQA(torch.nn.Module):
             dim=0,
         )
 
+        """
         bleu_loss = -torch.mean(
             torch.sum(
                 torch.mul(
@@ -581,7 +587,9 @@ class REQA(torch.nn.Module):
             dim=0,
         )
 
-        loss = re_loss + 0.05 * bleu_loss
+        loss = re_loss + bleu_loss
+        """
+        loss = re_loss
         loss_value = loss.item()
 
         return loss, loss_value
@@ -620,3 +628,18 @@ class REQA(torch.nn.Module):
                 self.answer_optimizer.step()
 
             return loss_value
+
+        """
+        # Answer Only
+        self.question_optimizer.zero_grad()
+        self.answer_optimizer.zero_grad()
+        self.question_model.eval()
+        loss, loss_value = self.pgg_answer_training(batch, current_device)
+        if not math.isnan(loss_value):
+            # BackProp
+            loss.backward()
+            # Optimize
+            self.answer_optimizer.step()
+
+            return loss_value
+        """

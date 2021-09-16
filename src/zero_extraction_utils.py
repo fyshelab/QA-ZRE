@@ -138,7 +138,7 @@ def create_zero_re_qa_dataset(
             gold_question=gold_questions,
             concat=concat,
         )
-    val_passages, val_contexts, val_answers, _ = read_zero_re_qa(
+    val_passages, val_contexts, val_answers, val_entity_relations = read_zero_re_qa(
         dev_file,
         ignore_unknowns=ignore_unknowns,
         gold_question=gold_questions,
@@ -245,6 +245,7 @@ def create_zero_re_qa_dataset(
             train_encodings["second_entity_labels"] = train_labels
 
         val_encodings["passages"] = val_passages
+        val_encodings["entity_relations"] = val_entity_relations
         val_encodings["entity_relation_passage_input_ids"] = val_encodings.pop(
             "input_ids"
         )
