@@ -341,7 +341,9 @@ class REQA(torch.nn.Module):
         loss_value = loss.item()
         return loss, loss_value
 
-    def mml_question_training(self, batch, current_device, sample_p=0.95):
+    def mml_question_training(
+        self, batch, current_device, sample_p=0.95, real_question_batch=None
+    ):
         loss_fct = torch.nn.CrossEntropyLoss(ignore_index=-100, reduction="none")
         if self.config.gpu:
             loss_fct = loss_fct.to(current_device)
@@ -589,12 +591,48 @@ class REQA(torch.nn.Module):
 
         loss = re_loss + bleu_loss
         """
-        loss = re_loss
+
+        # question model on real data
+        real_question_input_ids = real_question_batch[
+            "entity_relation_passage_input_ids"
+        ]
+        real_question_input_mask = real_question_batch[
+            "entity_relation_passage_attention_mask"
+        ]
+        real_question_labels = real_question_batch["labels"]
+        real_question_target_attention_mask = real_question_batch[
+            "target_attention_mask"
+        ]
+
+        if self.config.gpu:
+            real_question_input_ids = real_question_input_ids.to(current_device)
+            real_question_input_mask = real_question_input_mask.to(current_device)
+            real_question_labels = real_question_labels.to(current_device)
+            real_question_target_attention_mask = (
+                real_question_target_attention_mask.to(current_device)
+            )
+
+        output = self.question_model(
+            input_ids=real_question_input_ids,
+            attention_mask=real_question_input_mask,
+            decoder_attention_mask=real_question_target_attention_mask,
+            labels=real_question_labels,
+        )
+        real_loss = output.loss
+
+        loss = re_loss + real_loss
         loss_value = loss.item()
 
         return loss, loss_value
 
-    def iterative_train(self, batch, current_device, phase="answer", sample_p=0.9):
+    def iterative_train(
+        self,
+        batch,
+        current_device,
+        phase="answer",
+        sample_p=0.9,
+        real_question_batch=None,
+    ):
         # Free memory in GPU, very important!
         clear_cache()
         # Turn on training mode which enables dropout.
@@ -618,7 +656,10 @@ class REQA(torch.nn.Module):
             # self.answer_model.eval()
             self.answer_model.train()
             loss, loss_value = self.mml_question_training(
-                batch, current_device, sample_p=sample_p
+                batch,
+                current_device,
+                sample_p=sample_p,
+                real_question_batch=real_question_batch,
             )
             if not math.isnan(loss_value):
                 # BackProp

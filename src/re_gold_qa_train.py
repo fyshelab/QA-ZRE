@@ -5,11 +5,12 @@ import torch
 import torch.distributed as dist
 import torch.utils.data.distributed
 
+from src.question_response.t5_model import T5QA
+from src.question_response.train import run_model
 from src.re_qa_model import REQA, HyperParameters, set_random_seed
 from src.re_qa_train import iterative_run_model
-from src.t5_model import T5QA
-from src.train import run_model
-from src.zero_extraction_utils import create_zero_re_qa_dataset
+from src.zero_extraction_utils import (create_question_generation_dataset,
+                                       create_zero_re_qa_dataset)
 
 
 def run_re_gold_qa(args):
@@ -237,6 +238,19 @@ def run_re_qa(args):
             gold_questions=False,
         )
 
+        (
+            real_question_loader,
+            real_question_dataset,
+            real_question_sampler,
+        ) = create_question_generation_dataset(
+            question_tokenizer=model.question_tokenizer,
+            batch_size=config.batch_size,
+            source_max_length=config.source_max_length,
+            decoder_max_length=config.decoder_max_length,
+            distributed=False,
+            num_workers=args.num_workers,
+        )
+
         iterative_run_model(
             model,
             config=config,
@@ -252,6 +266,7 @@ def run_re_qa(args):
             question_train_samplers=[question_train_sampler],
             current_device=0,
             gold_eval_file=args.dev,
+            real_question_dataloader=real_question_loader,
         )
 
     if args.mode == "re_qa_test":
