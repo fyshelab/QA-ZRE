@@ -5,8 +5,8 @@ import torch
 import torch.distributed as dist
 import torch.utils.data.distributed
 
-from src.question_response.t5_model import T5QA
-from src.question_response.train import run_model
+from src.question_response_generation.t5_model import T5QA
+from src.question_response_generation.train import run_model
 from src.re_qa_model import REQA, HyperParameters, set_random_seed
 from src.re_qa_train import iterative_run_model
 from src.zero_extraction_utils import (create_question_generation_dataset,
