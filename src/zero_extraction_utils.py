@@ -3,6 +3,9 @@ from pathlib import Path
 import torch
 from torch.utils.data import DataLoader
 
+from src.question_response_generation.question_utils import \
+    create_data_for_question_generation
+
 
 def white_space_fix(text):
     return " ".join(text.split())
@@ -313,3 +316,89 @@ def create_zero_re_qa_dataset(
             )
         val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False)
         return train_loader, val_loader, train_dataset, val_dataset, None
+
+
+def create_question_generation_dataset(
+    question_tokenizer,
+    batch_size,
+    source_max_length,
+    decoder_max_length,
+    distributed=True,
+    num_workers=1,
+):
+    """Function to create the zero re qa dataset."""
+
+    contexts, questions = create_data_for_question_generation()
+    train_encodings = question_tokenizer(
+        contexts,
+        truncation=True,
+        padding="max_length",
+        max_length=source_max_length,
+        add_special_tokens=False,
+    )
+    train_answer_encodings = question_tokenizer(
+        questions,
+        truncation=True,
+        padding="max_length",
+        max_length=decoder_max_length,
+        add_special_tokens=False,
+    )
+    train_encodings["target_attention_mask"] = train_answer_encodings.attention_mask
+
+    train_encodings["labels"] = train_answer_encodings.input_ids
+
+    # because HuggingFace automatically shifts the labels, the labels correspond exactly to `target_ids`.
+    # We have to make sure that the PAD token is ignored
+
+    train_labels = [
+        [
+            -100 if token == question_tokenizer.pad_token_id else token
+            for token in labels
+        ]
+        for labels in train_encodings["labels"]
+    ]
+    train_encodings["labels"] = train_labels
+
+    train_encodings["entity_relation_passage_input_ids"] = train_encodings.pop(
+        "input_ids"
+    )
+
+    train_encodings["entity_relation_passage_attention_mask"] = train_encodings.pop(
+        "attention_mask"
+    )
+
+    class HelperDataset(torch.utils.data.Dataset):
+        def __init__(self, encodings):
+            self.encodings = encodings
+
+        def __getitem__(self, idx):
+            row = {}
+            for key, val in self.encodings.items():
+                if key in ["passages", "entity_relations"]:
+                    row[key] = val[idx]
+                else:
+                    row[key] = torch.tensor(val[idx])
+            return row
+
+        def __len__(self):
+            if "entity_relation_passage_input_ids" in self.encodings:
+                return len(self.encodings.entity_relation_passage_input_ids)
+            if "input_ids" in self.encodings:
+                return len(self.encodings.input_ids)
+
+    train_dataset = None
+    train_sampler = None
+    train_loader = None
+    train_dataset = HelperDataset(train_encodings)
+    if distributed:
+        train_sampler = torch.utils.data.distributed.DistributedSampler(train_dataset)
+        train_loader = DataLoader(
+            train_dataset,
+            batch_size=batch_size,
+            num_workers=num_workers,
+            sampler=train_sampler,
+        )
+        return train_loader, train_dataset, train_sampler
+    if not distributed:
+        train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
+        return train_loader, train_dataset, None
