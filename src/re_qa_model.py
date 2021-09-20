@@ -404,7 +404,7 @@ class REQA(torch.nn.Module):
         token_bias_attention_mask = torch.transpose(token_bias_attention_mask, 0, 1)
 
         token_bias_input_ids = token_bias_input_ids.masked_fill(
-            ~token_bias_attention_mask, -1
+            ~token_bias_attention_mask.bool(), -1
         )
 
         self.question_model.train()
