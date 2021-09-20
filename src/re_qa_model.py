@@ -214,6 +214,22 @@ class REQA(torch.nn.Module):
             question_input_mask = question_input_mask.to(current_device)
 
         with torch.no_grad():
+            """
+            question_predictions = self.question_model.generate(
+                input_ids=question_input_ids,
+                do_sample=True,
+                no_repeat_ngram_size=self.config.no_repeat_ngram_size,
+                early_stopping=self.config.early_stopping,
+                max_length=self.config.decoder_max_length,
+                num_return_sequences=1,
+                top_p=0.95,
+                attention_mask=question_input_mask,
+            )
+            """
+            # question_predictions = self.question_model.generate(
+            #    input_ids=question_input_ids,
+            #    attention_mask=question_input_mask,
+            # )
             question_predictions = self.question_model.generate(
                 input_ids=question_input_ids,
                 attention_mask=question_input_mask,
@@ -357,6 +373,40 @@ class REQA(torch.nn.Module):
 
         b_sz, _ = question_input_ids.size()
 
+        token_bias_input_ids = []
+        token_bias_attention_mask = []
+        for i in range(self.config.num_search_samples):
+            token_bias_input_ids_inner = []
+            token_bias_attention_mask_inner = []
+            for b in range(b_sz):
+                shifts = random.randint(3, self.config.decoder_max_length)
+                entity_input_ids = torch.roll(
+                    batch["entity_input_ids"][b, :].squeeze(), shifts, dims=0
+                )
+                entity_attention_mask = torch.roll(
+                    batch["entity_attention_mask"][b, :].squeeze(), shifts, dims=0
+                )
+                token_bias_input_ids_inner.append(entity_input_ids)
+                token_bias_attention_mask_inner.append(entity_attention_mask)
+
+            token_bias_input_ids_inner = torch.stack(token_bias_input_ids_inner, 0)
+            token_bias_attention_mask_inner = torch.stack(
+                token_bias_attention_mask_inner, 0
+            )
+
+            token_bias_input_ids.append(token_bias_input_ids_inner)
+            token_bias_attention_mask.append(token_bias_attention_mask_inner)
+
+        token_bias_input_ids = torch.stack(token_bias_input_ids, 0)
+        token_bias_attention_mask = torch.stack(token_bias_attention_mask, 0)
+
+        token_bias_input_ids = torch.transpose(token_bias_input_ids, 0, 1)
+        token_bias_attention_mask = torch.transpose(token_bias_attention_mask, 0, 1)
+
+        token_bias_input_ids = token_bias_input_ids.masked_fill(
+            ~token_bias_attention_mask, -1
+        )
+
         self.question_model.train()
         with torch.no_grad():
             # Use top-p sampling to collect samples.
@@ -371,6 +421,7 @@ class REQA(torch.nn.Module):
                 output_scores=True,
                 return_dict_in_generate=True,
                 attention_mask=question_input_mask,
+                token_bias=token_bias_input_ids,
             )
             sampled_questions, _ = prob_of_sampled_predictions(
                 loss_fct, sampled_question_outputs
@@ -592,6 +643,7 @@ class REQA(torch.nn.Module):
         loss = re_loss + bleu_loss
         """
 
+        """
         # question model on real data
         real_question_input_ids = real_question_batch[
             "entity_relation_passage_input_ids"
@@ -621,6 +673,8 @@ class REQA(torch.nn.Module):
         real_loss = output.loss
 
         loss = re_loss + real_loss
+        """
+        loss = re_loss
         loss_value = loss.item()
 
         return loss, loss_value

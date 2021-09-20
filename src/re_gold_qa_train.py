@@ -238,6 +238,7 @@ def run_re_qa(args):
             gold_questions=False,
         )
 
+        """
         (
             real_question_loader,
             real_question_dataset,
@@ -250,7 +251,7 @@ def run_re_qa(args):
             distributed=False,
             num_workers=args.num_workers,
         )
-
+        """
         iterative_run_model(
             model,
             config=config,
@@ -266,7 +267,7 @@ def run_re_qa(args):
             question_train_samplers=[question_train_sampler],
             current_device=0,
             gold_eval_file=args.dev,
-            real_question_dataloader=real_question_loader,
+            real_question_dataloader=None,
         )
 
     if args.mode == "re_qa_test":

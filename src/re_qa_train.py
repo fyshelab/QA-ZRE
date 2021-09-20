@@ -91,20 +91,20 @@ def iterative_run_model(
 
             answer_iter = iter(train_dataloader)
             question_iter = iter(question_train_dataloader)
-            real_question_iter = iter(real_question_dataloader)
+            # real_question_iter = iter(real_question_dataloader)
             step = 0
             question_total_loss = []
             answer_total_loss = []
             while step < config.training_steps:
                 for inner_step in range(config.update_switch_steps):
                     question_batch = next(question_iter)
-                    real_question_batch = next(real_question_iter)
+                    # real_question_batch = next(real_question_iter)
                     question_loss = model.iterative_train(
                         question_batch,
                         current_device,
                         phase="question",
                         sample_p=0.95,
-                        real_question_batch=real_question_batch,
+                        # real_question_batch=real_question_batch,
                     )
                     if question_loss:
                         question_total_loss.append(question_loss)
