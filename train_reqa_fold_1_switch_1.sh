@@ -63,6 +63,6 @@ python src/re_gold_qa_train.py \
     --num_workers 6 \
     --concat_questions False \
     --dev ./zero-shot-extraction/relation_splits/dev.1 \
-    --train ./zero-shot-extraction/relation_splits/train.1 \
+    --train ./zero-shot-extraction/relation_splits/train.very_small.0 \
     --gpu_device 0 \
     --seed 12321
