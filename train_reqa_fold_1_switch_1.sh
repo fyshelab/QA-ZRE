@@ -50,15 +50,15 @@ python src/re_gold_qa_train.py \
 
 python src/re_gold_qa_train.py \
     --mode re_qa_train \
-    --model_path $HOME/september_9/mml_mml_top_p_enforced/fold_1 \
+    --model_path $HOME/september_9/mml_mml_top_p_real_question_enforced/fold_1 \
     --answer_checkpoint _response_pretrained_model \
     --question_checkpoint _question_pretrained_model \
     --training_steps 3100 \
     --update_switch_steps 1 \
     --learning_rate 0.001 \
     --max_epochs 1 \
-    --num_search_samples 8 \
-    --batch_size 4 \
+    --num_search_samples 6 \
+    --batch_size 1 \
     --gpu True \
     --num_workers 6 \
     --concat_questions False \
