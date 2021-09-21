@@ -229,7 +229,7 @@ class REQA(torch.nn.Module):
             question_predictions = self.question_model.generate(
                 input_ids=question_input_ids,
                 attention_mask=question_input_mask,
-                token_bias=None
+                token_bias=None,
             )
             """
             question_predictions = self.question_model.generate(
@@ -378,6 +378,7 @@ class REQA(torch.nn.Module):
 
         b_sz, _ = question_input_ids.size()
 
+        """
         token_bias_input_ids = []
         token_bias_attention_mask = []
         for i in range(self.config.num_search_samples):
@@ -416,45 +417,61 @@ class REQA(torch.nn.Module):
         token_bias_input_ids = token_bias_input_ids.view(-1, token_bias_input_ids.shape[-1])
         if self.config.gpu:
             token_bias_input_ids = token_bias_input_ids.to(current_device)
+        """
 
-        self.question_model.train()
         with torch.no_grad():
-            # Use top-p sampling to collect samples.
-            sampled_question_outputs = self.question_model.generate(
-                input_ids=question_input_ids,
-                do_sample=True,
-                no_repeat_ngram_size=self.config.no_repeat_ngram_size,
-                early_stopping=self.config.early_stopping,
-                max_length=self.config.decoder_max_length,
-                num_return_sequences=self.config.num_search_samples,
-                top_p=sample_p,
-                output_scores=True,
-                return_dict_in_generate=True,
-                attention_mask=question_input_mask,
-                token_bias=token_bias_input_ids,
-            )
-            sampled_questions, _ = prob_of_sampled_predictions(
-                loss_fct, sampled_question_outputs
-            )
+            self.question_model.train()
+            final_sampled_question_predictions_str_reshaped = []
+            for i in range(b_sz):
+                temp_set = set()
+                alpha = 0.0
+                while len(temp_set) < self.config.num_search_samples:
+                    # Use top-p sampling to collect samples.
+                    sampled_question_outputs = self.question_model.generate(
+                        input_ids=question_input_ids[i, :],
+                        do_sample=True,
+                        no_repeat_ngram_size=self.config.no_repeat_ngram_size,
+                        early_stopping=self.config.early_stopping,
+                        max_length=self.config.decoder_max_length,
+                        num_return_sequences=self.config.num_search_samples,
+                        top_p=sample_p + alpha,
+                        output_scores=True,
+                        return_dict_in_generate=True,
+                        attention_mask=question_input_mask[i, :],
+                        token_bias=None,
+                    )
+                    sampled_questions, _ = prob_of_sampled_predictions(
+                        loss_fct, sampled_question_outputs
+                    )
 
-        sampled_question_predictions_str = self.question_tokenizer.batch_decode(
-            sampled_questions, skip_special_tokens=True
-        )
+                    sampled_question_predictions_str = (
+                        self.question_tokenizer.batch_decode(
+                            sampled_questions, skip_special_tokens=True
+                        )
+                    )
 
-        sampled_question_predictions_str = [
-            remove_prefix(pred, "question: ")
-            for pred in sampled_question_predictions_str
-        ]
+                    sampled_question_predictions_str = [
+                        remove_prefix(pred, "question: ")
+                        for pred in sampled_question_predictions_str
+                    ]
 
-        print(sampled_question_predictions_str)
-        sampled_question_predictions_str_reshaped = [
-            sampled_question_predictions_str[
-                i
-                * (self.config.num_search_samples) : (i + 1)
-                * (self.config.num_search_samples)
-            ]
-            for i in range(b_sz)
-        ]
+                    sampled_question_predictions_str_reshaped = [
+                        sampled_question_predictions_str[
+                            i
+                            * (self.config.num_search_samples) : (i + 1)
+                            * (self.config.num_search_samples)
+                        ]
+                        for i in range(1)
+                    ]
+                    for sample_i in range(self.config.num_search_samples):
+                        sample = sampled_question_predictions_str_reshaped[0][sample_i]
+                        if (sample not in temp_set) and (
+                            len(temp_set) < self.config.num_search_samples
+                        ):
+                            temp_set.add(sample)
+
+                    alpha += 0.005
+                final_sampled_question_predictions_str_reshaped.append(list(temp_set))
 
         """
         bleu_scores = []
@@ -473,6 +490,8 @@ class REQA(torch.nn.Module):
 
         bleu_scores = bleu_scores.view(b_sz, self.config.num_search_samples)
         """
+
+        real_lenghts = []
         new_articles = []
         for i in range(b_sz):
             for j in range(self.config.num_search_samples):
@@ -480,12 +499,23 @@ class REQA(torch.nn.Module):
                     "relation: "
                     + batch["entity_relations"][i]
                     + " question: "
-                    + sampled_question_predictions_str_reshaped[i][j]
+                    + final_sampled_question_predictions_str_reshaped[i][j]
                     + " context: "
                     + batch["passages"][i]
                     + " </s>"
                 )
                 new_articles.append(new_article)
+                real_lenghts.append(
+                    len(final_sampled_question_predictions_str_reshaped[i][j].split())
+                )
+
+        real_lenghts = torch.transpose(
+            torch.LongTensor(real_lenghts).view(self.config.num_search_samples, b_sz),
+            0,
+            1,
+        )
+        if self.config.gpu:
+            real_lenghts.to(current_device)
 
         answer_inputs = self.answer_tokenizer(
             new_articles,
@@ -546,7 +576,9 @@ class REQA(torch.nn.Module):
         for i in range(b_sz):
             for j in range(self.config.num_search_samples):
                 output_question = (
-                    white_space_fix(sampled_question_predictions_str_reshaped[i][j])
+                    white_space_fix(
+                        final_sampled_question_predictions_str_reshaped[i][j]
+                    )
                     + " </s>"
                 )
                 output_questions.append(output_question)
@@ -627,12 +659,21 @@ class REQA(torch.nn.Module):
         """
 
         # easier way to use MML objective.
+
+        length_weight = 10.0
+        lenght_norm = torch.div(
+            torch.pow(real_lenghts + 5, length_weight), pow(1 + 5, length_weight)
+        )
+        length_normalized_question_log_p = torch.div(
+            torch.transpose(torch.exp(question_log_p), 0, 1), lenght_norm
+        )
+
         re_loss = -torch.mean(
             torch.log(
                 torch.sum(
                     torch.mul(
                         torch.transpose(torch.exp(answer_log_p), 0, 1),
-                        torch.transpose(torch.exp(question_log_p), 0, 1),
+                        length_normalized_question_log_p,
                     ),
                     dim=1,
                 )
@@ -654,7 +695,7 @@ class REQA(torch.nn.Module):
         loss = re_loss + bleu_loss
         """
 
-        '''
+        """
         # question model on real data
         real_question_input_ids = real_question_batch[
             "entity_relation_passage_input_ids"
@@ -684,10 +725,9 @@ class REQA(torch.nn.Module):
         real_loss = output.loss
 
         loss = re_loss + real_loss
-        '''
+        """
         loss = re_loss
         loss_value = loss.item()
-
         return loss, loss_value
 
     def iterative_train(
