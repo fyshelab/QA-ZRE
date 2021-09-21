@@ -424,7 +424,6 @@ class REQA(torch.nn.Module):
             final_sampled_question_predictions_str_reshaped = []
             for i in range(b_sz):
                 temp_set = set()
-                alpha = 0.0
                 while len(temp_set) < self.config.num_search_samples:
                     # Use top-p sampling to collect samples.
                     sampled_question_outputs = self.question_model.generate(
@@ -435,7 +434,6 @@ class REQA(torch.nn.Module):
                         max_length=self.config.decoder_max_length,
                         num_return_sequences=self.config.num_search_samples,
                         top_p=sample_p,
-                        #top_p=sample_p + alpha,
                         output_scores=True,
                         return_dict_in_generate=True,
                         attention_mask=question_input_mask[i, :].view(1, -1),
@@ -466,12 +464,12 @@ class REQA(torch.nn.Module):
                     ]
                     for sample_i in range(self.config.num_search_samples):
                         sample = sampled_question_predictions_str_reshaped[0][sample_i]
-                        if (sample not in temp_set) and (
-                            len(temp_set) < self.config.num_search_samples
-                        ) and (len(sample.split()) > 6):
+                        if (
+                            (sample not in temp_set)
+                            and (len(temp_set) < self.config.num_search_samples)
+                            and (len(sample.split()) > 5)
+                        ):
                             temp_set.add(sample)
-
-                    #alpha = max([alpha + 0.005, 0.98])
 
                 final_sampled_question_predictions_str_reshaped.append(list(temp_set))
 
@@ -518,7 +516,6 @@ class REQA(torch.nn.Module):
         )
         if self.config.gpu:
             real_lenghts.to(current_device)
-
 
         print(final_sampled_question_predictions_str_reshaped)
         answer_inputs = self.answer_tokenizer(
@@ -664,16 +661,15 @@ class REQA(torch.nn.Module):
 
         # easier way to use MML objective.
 
-        length_weight = 20.0
+        length_weight = 3
         lenght_norm = torch.div(
             torch.pow(real_lenghts + 5, length_weight), pow(1 + 5, length_weight)
-        
         )
 
         if self.config.gpu:
             lenght_norm = lenght_norm.to(current_device)
 
-        length_normalized_question_log_p = torch.div(
+        length_normalized_p = torch.mul(
             torch.transpose(torch.exp(question_log_p), 0, 1), lenght_norm
         )
 
@@ -682,7 +678,7 @@ class REQA(torch.nn.Module):
                 torch.sum(
                     torch.mul(
                         torch.transpose(torch.exp(answer_log_p), 0, 1),
-                        length_normalized_question_log_p,
+                        length_normalized_p,
                     ),
                     dim=1,
                 )
@@ -744,7 +740,7 @@ class REQA(torch.nn.Module):
         batch,
         current_device,
         phase="answer",
-        sample_p=0.9,
+        sample_p=0.95,
         real_question_batch=None,
     ):
         # Free memory in GPU, very important!
