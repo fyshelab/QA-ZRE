@@ -226,10 +226,12 @@ class REQA(torch.nn.Module):
                 attention_mask=question_input_mask,
             )
             """
-            # question_predictions = self.question_model.generate(
-            #    input_ids=question_input_ids,
-            #    attention_mask=question_input_mask,
-            # )
+            question_predictions = self.question_model.generate(
+                input_ids=question_input_ids,
+                attention_mask=question_input_mask,
+                token_bias=None
+            )
+            """
             question_predictions = self.question_model.generate(
                 input_ids=question_input_ids,
                 attention_mask=question_input_mask,
@@ -239,7 +241,9 @@ class REQA(torch.nn.Module):
                 num_return_sequences=1,
                 num_beams=self.config.num_search_samples,
                 length_penalty=10.0,
+                token_bias=None
             )
+            """
 
         question_predictions_str = self.question_tokenizer.batch_decode(
             question_predictions, skip_special_tokens=True
@@ -302,6 +306,7 @@ class REQA(torch.nn.Module):
         second_entity_predictions = self.answer_model.generate(
             input_ids=answer_input_ids,
             attention_mask=answer_input_mask,
+            token_bias=None,
         )
         second_entity_predictions_str = self.answer_tokenizer.batch_decode(
             second_entity_predictions, skip_special_tokens=True
@@ -379,7 +384,7 @@ class REQA(torch.nn.Module):
             token_bias_input_ids_inner = []
             token_bias_attention_mask_inner = []
             for b in range(b_sz):
-                shifts = random.randint(3, self.config.decoder_max_length)
+                shifts = random.randint(3, self.config.decoder_max_length // 2)
                 entity_input_ids = torch.roll(
                     batch["entity_input_ids"][b, :].squeeze(), shifts, dims=0
                 )
@@ -405,7 +410,12 @@ class REQA(torch.nn.Module):
 
         token_bias_input_ids = token_bias_input_ids.masked_fill(
             ~token_bias_attention_mask.bool(), -1
+
         )
+
+        token_bias_input_ids = token_bias_input_ids.view(-1, token_bias_input_ids.shape[-1])
+        if self.config.gpu:
+            token_bias_input_ids = token_bias_input_ids.to(current_device)
 
         self.question_model.train()
         with torch.no_grad():
@@ -436,6 +446,7 @@ class REQA(torch.nn.Module):
             for pred in sampled_question_predictions_str
         ]
 
+        print(sampled_question_predictions_str)
         sampled_question_predictions_str_reshaped = [
             sampled_question_predictions_str[
                 i
@@ -643,7 +654,7 @@ class REQA(torch.nn.Module):
         loss = re_loss + bleu_loss
         """
 
-        """
+        '''
         # question model on real data
         real_question_input_ids = real_question_batch[
             "entity_relation_passage_input_ids"
@@ -673,7 +684,7 @@ class REQA(torch.nn.Module):
         real_loss = output.loss
 
         loss = re_loss + real_loss
-        """
+        '''
         loss = re_loss
         loss_value = loss.item()
 
