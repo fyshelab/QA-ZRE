@@ -229,7 +229,6 @@ class REQA(torch.nn.Module):
             question_predictions = self.question_model.generate(
                 input_ids=question_input_ids,
                 attention_mask=question_input_mask,
-                token_bias=None,
             )
             """
             question_predictions = self.question_model.generate(
@@ -241,7 +240,6 @@ class REQA(torch.nn.Module):
                 num_return_sequences=1,
                 num_beams=self.config.num_search_samples,
                 length_penalty=10.0,
-                token_bias=None
             )
             """
 
@@ -306,7 +304,6 @@ class REQA(torch.nn.Module):
         second_entity_predictions = self.answer_model.generate(
             input_ids=answer_input_ids,
             attention_mask=answer_input_mask,
-            token_bias=None,
         )
         second_entity_predictions_str = self.answer_tokenizer.batch_decode(
             second_entity_predictions, skip_special_tokens=True
@@ -424,6 +421,7 @@ class REQA(torch.nn.Module):
             final_sampled_question_predictions_str_reshaped = []
             for i in range(b_sz):
                 temp_set = set()
+                alpha = 0
                 while len(temp_set) < self.config.num_search_samples:
                     # Use top-p sampling to collect samples.
                     sampled_question_outputs = self.question_model.generate(
@@ -433,11 +431,10 @@ class REQA(torch.nn.Module):
                         early_stopping=True,
                         max_length=self.config.decoder_max_length,
                         num_return_sequences=self.config.num_search_samples,
-                        top_p=sample_p,
+                        top_p=max([sample_p + alpha, 0.97]),
                         output_scores=True,
                         return_dict_in_generate=True,
                         attention_mask=question_input_mask[i, :].view(1, -1),
-                        token_bias=None,
                     )
                     sampled_questions, _ = prob_of_sampled_predictions(
                         loss_fct, sampled_question_outputs
@@ -470,6 +467,7 @@ class REQA(torch.nn.Module):
                             and (len(sample.split()) > 5)
                         ):
                             temp_set.add(sample)
+                    alpha = alpha + 0.001
 
                 final_sampled_question_predictions_str_reshaped.append(list(temp_set))
 
@@ -661,7 +659,7 @@ class REQA(torch.nn.Module):
 
         # easier way to use MML objective.
 
-        length_weight = 3
+        length_weight = 2
         lenght_norm = torch.div(
             torch.pow(real_lenghts + 5, length_weight), pow(1 + 5, length_weight)
         )
