@@ -431,7 +431,7 @@ class REQA(torch.nn.Module):
                         early_stopping=True,
                         max_length=self.config.decoder_max_length,
                         num_return_sequences=self.config.num_search_samples,
-                        top_p=max([sample_p + alpha, 0.97]),
+                        top_p=min([sample_p + alpha, 0.97]),
                         output_scores=True,
                         return_dict_in_generate=True,
                         attention_mask=question_input_mask[i, :].view(1, -1),
@@ -462,7 +462,7 @@ class REQA(torch.nn.Module):
                     for sample_i in range(self.config.num_search_samples):
                         sample = sampled_question_predictions_str_reshaped[0][sample_i]
                         if (
-                            (sample not in temp_set)
+                            ((sample_p + alpha > 0.97) or (sample not in temp_set))
                             and (len(temp_set) < self.config.num_search_samples)
                             and (len(sample.split()) > 5)
                         ):
