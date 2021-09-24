@@ -1,5 +1,6 @@
 import csv
 import io
+import math
 import os
 import time
 from configparser import ConfigParser
@@ -95,6 +96,7 @@ def iterative_run_model(
             step = 0
             question_total_loss = []
             answer_total_loss = []
+            question_mean_loss = 0.0
             while step < config.training_steps:
                 for inner_step in range(config.update_switch_steps):
                     question_batch = next(question_iter)
@@ -106,7 +108,7 @@ def iterative_run_model(
                         sample_p=0.95,
                         # real_question_batch=real_question_batch,
                     )
-                    if question_loss:
+                    if question_loss and not math.isinf(question_loss):
                         question_total_loss.append(question_loss)
 
                     if question_total_loss:

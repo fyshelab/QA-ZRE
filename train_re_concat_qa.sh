@@ -1,4 +1,5 @@
 #!/bin/bash
+'
 
 #SBATCH --job-name=reqa_train_concat_fold_1
 #SBATCH --account=rrg-afyshe
@@ -37,6 +38,23 @@ python src/re_gold_qa_train.py \
        --answer_training_steps 8000 \
        --ignore_unknowns False \
        --train ./zero-shot-extraction/relation_splits/train.1 \
+       --dev ./zero-shot-extraction/relation_splits/dev.1 \
+       --gpu_device 0 \
+       --seed 12321
+'
+
+source env/bin/activate
+
+python src/re_gold_qa_train.py \
+       --mode re_concat_qa_train \
+       --model_path $HOME/september_22/concat/ \
+       --checkpoint _response_pretrained_model \
+       --learning_rate 0.001 --max_epochs 1 \
+       --concat_questions False \
+       --batch_size 2  --gpu True \
+       --answer_training_steps 2000 \
+       --ignore_unknowns True \
+       --train ./zero-shot-extraction/relation_splits/train.very_small.1 \
        --dev ./zero-shot-extraction/relation_splits/dev.1 \
        --gpu_device 0 \
        --seed 12321
