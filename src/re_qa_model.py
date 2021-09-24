@@ -503,7 +503,7 @@ class REQA(torch.nn.Module):
                         early_stopping=True,
                         max_length=self.config.decoder_max_length,
                         num_return_sequences=self.config.num_search_samples,
-                        top_p=50,
+                        top_p=100,
                         output_scores=True,
                         return_dict_in_generate=True,
                         attention_mask=question_input_mask[i, :].view(1, -1),
@@ -542,7 +542,7 @@ class REQA(torch.nn.Module):
                         ):
                             temp_set.add(sample)
                 temp_list = list(temp_set)
-                while len(temp_set) < self.config.num_search_samples:
+                while len(temp_list) < self.config.num_search_samples:
                     temp_list.append("This is a dummy question!")
 
                 final_sampled_question_predictions_str_reshaped.append(temp_list)
