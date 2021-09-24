@@ -161,8 +161,12 @@ class REQA(torch.nn.Module):
         # Construct the Question model
         question_model = T5ForConditionalGeneration.from_pretrained(Q_MODEL_NAME)
 
-        self.lm_model = GPT2LMHeadModel.from_pretrained('gpt2-base')
-        self.lm_tokenizer = GPT2TokenizerFast.from_pretrained('gpt2-base')
+        self.lm_model = GPT2LMHeadModel.from_pretrained('gpt2-large')
+        self.lm_tokenizer = GPT2TokenizerFast.from_pretrained('gpt2-large')
+
+        self.lm_tokenizer.add_special_tokens({'pad_token': '[PAD]'})
+
+        self.lm_model.config.layer_norm_epsilon = 1e-12
 
         if cfg.mode == "train":
             # Configurations suggested by the T5 paper.
@@ -832,25 +836,36 @@ class REQA(torch.nn.Module):
         )
         lm_input_ids = lm_encodings.pop("input_ids")
         lm_input_mask = lm_encodings.pop("attention_mask")
+        lm_labels = lm_input_ids
+        lm_labels = [
+            [
+                -100 if token == self.lm_tokenizer.pad_token_id else token
+                for token in labels
+            ]
+            for labels in lm_labels.tolist()
+        ]
+        lm_labels = torch.tensor(lm_labels)
         if self.config.gpu:
             lm_input_mask = lm_input_mask.to(current_device)
             lm_input_ids = lm_input_ids.to(current_device)
+            lm_labels = lm_labels.to(current_device)
 
+        self.lm_model.eval()
         with torch.no_grad():
             lm_output = self.lm_model(
                 input_ids=lm_input_ids,
                 attention_mask=lm_input_mask,
-                labels=lm_input_ids
+                labels=lm_labels
             )
 
             log_lm_p = -loss_fct(
                 lm_output.logits.view(-1, lm_output.logits.size(-1)),
-                lm_input_ids.view(-1),
+                lm_labels.view(-1),
             )
 
             b, sz, v = lm_output.logits.size()
             log_lm_p = log_lm_p.view(b, sz)
-            good_log_lm_p = log_lm_p.masked_fill_(lm_input_ids == self.lm_tokenizer.pad_token_id, 0.0)
+            good_log_lm_p = log_lm_p.masked_fill_(lm_labels == -100, 0.0)
             lm_log_p = torch.sum(good_log_lm_p, dim=1).squeeze()
             lm_log_p = lm_log_p.view(self.config.num_search_samples, b_sz)
 
