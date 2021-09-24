@@ -12,6 +12,7 @@ import numpy
 import torch
 from nltk.translate.bleu_score import sentence_bleu
 from transformers import Adafactor, T5ForConditionalGeneration, T5Tokenizer
+from transformers import GPT2LMHeadModel, GPT2TokenizerFast
 
 
 def white_space_fix(text):
@@ -159,6 +160,9 @@ class REQA(torch.nn.Module):
 
         # Construct the Question model
         question_model = T5ForConditionalGeneration.from_pretrained(Q_MODEL_NAME)
+
+        self.lm_model = GPT2LMHeadModel.from_pretrained('gpt2-base')
+        self.lm_tokenizer = GPT2TokenizerFast.from_pretrained('gpt2-base')
 
         if cfg.mode == "train":
             # Configurations suggested by the T5 paper.
@@ -817,8 +821,54 @@ class REQA(torch.nn.Module):
         )
         real_loss = output.loss
         """
-        # loss = re_loss + real_loss
-        loss = re_loss
+
+        lm_encodings = self.lm_tokenizer(
+            output_questions,
+            truncation=True,
+            padding="max_length",
+            max_length=self.config.decoder_max_length,
+            add_special_tokens=False,
+            return_tensors="pt",
+        )
+        lm_input_ids = lm_encodings.pop("input_ids")
+        lm_input_mask = lm_encodings.pop("attention_mask")
+        if self.config.gpu:
+            lm_input_mask = lm_input_mask.to(current_device)
+            lm_input_ids = lm_input_ids.to(current_device)
+
+        with torch.no_grad():
+            lm_output = self.lm_model(
+                input_ids=lm_input_ids,
+                attention_mask=lm_input_mask,
+                labels=lm_input_ids
+            )
+
+            log_lm_p = -loss_fct(
+                lm_output.logits.view(-1, lm_output.logits.size(-1)),
+                lm_input_ids.view(-1),
+            )
+
+            b, sz, v = lm_output.logits.size()
+            log_lm_p = log_lm_p.view(b, sz)
+            good_log_lm_p = log_lm_p.masked_fill_(lm_input_ids == self.lm_tokenizer.pad_token_id, 0.0)
+            lm_log_p = torch.sum(good_log_lm_p, dim=1).squeeze()
+            lm_log_p = lm_log_p.view(self.config.num_search_samples, b_sz)
+
+        lm_loss = -torch.mean(
+                torch.sum(
+                    torch.mul(
+                        torch.mul(
+                            torch.transpose(torch.exp(lm_log_p), 0, 1),
+                            length_normalized_p,
+                        ),
+                        sample_masks,
+                    ),
+                    dim=1,
+            ),
+            dim=0,
+        )
+
+        loss = re_loss + 0.01 * lm_loss
         loss_value = loss.item()
         return loss, loss_value
 
