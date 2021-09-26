@@ -431,21 +431,17 @@ class REQA(torch.nn.Module):
             sample_masks = []
             for i in range(b_sz):
                 temp_set = set()
-                alpha = 0
+                top_k = 50
                 counter = 0
-                while (
-                    len(temp_set) < (self.config.num_search_samples - 1)
-                    and counter < 10
-                ):
-                    # Use top-p sampling to collect samples.
+                while len(temp_set) < (self.config.num_search_samples) and counter < 10:
+                    # Use top-k sampling to collect samples.
                     sampled_question_outputs = self.question_model.generate(
                         input_ids=question_input_ids[i, :].view(1, -1),
                         do_sample=True,
                         no_repeat_ngram_size=self.config.no_repeat_ngram_size,
-                        early_stopping=True,
                         max_length=self.config.decoder_max_length,
                         num_return_sequences=self.config.num_search_samples,
-                        top_p=min([sample_p + alpha, 0.96]),
+                        top_k=top_k,
                         output_scores=True,
                         return_dict_in_generate=True,
                         attention_mask=question_input_mask[i, :].view(1, -1),
@@ -477,13 +473,14 @@ class REQA(torch.nn.Module):
                         sample = sampled_question_predictions_str_reshaped[0][sample_i]
                         if (
                             (sample not in temp_set)
-                            and (len(temp_set) < (self.config.num_search_samples - 1))
+                            and (len(temp_set) < (self.config.num_search_samples))
                             and (len(sample.split()) > 5)
                         ):
                             temp_set.add(sample)
-                    alpha = alpha + 0.001
+                    top_k += 50
                     counter += 1
 
+                """
                 beam_question_prediction = self.question_model.generate(
                     input_ids=question_input_ids[i, :].view(1, -1),
                     attention_mask=question_input_mask[i, :].view(1, -1),
@@ -550,13 +547,12 @@ class REQA(torch.nn.Module):
                             and (len(sample.split()) > 5)
                         ):
                             temp_set.add(sample)
+                """
                 temp_list = list(temp_set)
-
-                # while len(temp_list) < self.config.num_search_samples:
-                #    temp_list.append("This is a dummy question!")
+                while len(temp_list) < self.config.num_search_samples:
+                    temp_list.append("This is a dummy question!")
 
                 final_sampled_question_predictions_str_reshaped.append(temp_list)
-                """
                 mask = []
                 for sample in temp_list:
                     if sample != "This is a dummy question!":
@@ -565,10 +561,9 @@ class REQA(torch.nn.Module):
                         mask.append(0)
 
                 sample_masks.append(torch.FloatTensor(mask))
-                """
 
-        # sample_masks = torch.stack(sample_masks, 0)
-        # sample_masks = sample_masks.to(current_device)
+        sample_masks = torch.stack(sample_masks, 0)
+        sample_masks = sample_masks.to(current_device)
 
         """
         bleu_scores = []
@@ -614,7 +609,7 @@ class REQA(torch.nn.Module):
         if self.config.gpu:
             real_lenghts.to(current_device)
 
-        # print(final_sampled_question_predictions_str_reshaped)
+        print(final_sampled_question_predictions_str_reshaped)
         answer_inputs = self.answer_tokenizer(
             new_articles,
             truncation=True,
@@ -637,27 +632,34 @@ class REQA(torch.nn.Module):
             labels = labels.to(current_device)
 
         b_sz, seq_len = labels.size()
+        sample_input_mask = (
+            torch.transpose(sample_masks, 0, 1)
+            .view(self.config.num_search_samples * b_sz, 1)
+            .repeat(1, seq_len)
+            .view(-1, seq_len)
+        )
         labels = labels.repeat(1, self.config.num_search_samples).view(-1, seq_len)
         target_mask = target_mask.repeat(1, self.config.num_search_samples).view(
             -1, seq_len
         )
 
+        new_labels = (1 - sample_input_mask) * -100 + labels * sample_input_mask
         output = self.answer_model(
             input_ids=answer_input_ids,
-            attention_mask=answer_input_mask,
-            decoder_attention_mask=target_mask,
-            decoder_input_ids=self.answer_model._shift_right(labels),
+            attention_mask=torch.mul(answer_input_mask, sample_input_mask),
+            decoder_attention_mask=torch.mul(target_mask, sample_input_mask),
+            decoder_input_ids=self.answer_model._shift_right(new_labels),
             labels=None,
         )
 
         log_p = -loss_fct(
             output.logits.view(-1, output.logits.size(-1)),
-            labels.view(-1),
+            new_labels.view(-1),
         )
 
         b, sz, v = output.logits.size()
         log_p = log_p.view(b, sz)
-        good_log_p = log_p.masked_fill_(labels == -100, 0.0)
+        good_log_p = log_p.masked_fill_(new_labels == -100, 0.0)
         answer_log_p = torch.sum(good_log_p, dim=1).squeeze()
         answer_log_p = answer_log_p.view(self.config.num_search_samples, b_sz)
 
@@ -708,22 +710,28 @@ class REQA(torch.nn.Module):
             question_labels = question_labels.to(current_device)
 
         self.question_model.train()
+
+        question_new_labels = (
+            1 - sample_input_mask
+        ) * -100 + question_labels * sample_input_mask
         question_output = self.question_model(
             input_ids=question_input_ids,
-            attention_mask=question_input_mask,
-            decoder_attention_mask=question_target_mask,
-            decoder_input_ids=self.question_model._shift_right(question_labels),
+            attention_mask=torch.mul(question_input_mask, sample_input_mask),
+            decoder_attention_mask=torch.mul(question_target_mask, sample_input_mask),
+            decoder_input_ids=self.question_model._shift_right(question_new_labels),
             labels=None,
         )
 
         log_question_p = -loss_fct(
             question_output.logits.view(-1, question_output.logits.size(-1)),
-            question_labels.view(-1),
+            question_new_labels.view(-1),
         )
 
         b, sz, v = question_output.logits.size()
         log_question_p = log_question_p.view(b, sz)
-        good_log_question_p = log_question_p.masked_fill_(question_labels == -100, 0.0)
+        good_log_question_p = log_question_p.masked_fill_(
+            question_new_labels == -100, 0.0
+        )
         question_log_p = torch.sum(good_log_question_p, dim=1).squeeze()
         question_log_p = question_log_p.view(self.config.num_search_samples, b_sz)
 
@@ -775,8 +783,11 @@ class REQA(torch.nn.Module):
             torch.log(
                 torch.sum(
                     torch.mul(
-                        torch.transpose(torch.exp(answer_log_p), 0, 1),
-                        length_normalized_p,
+                        torch.mul(
+                            torch.transpose(torch.exp(answer_log_p), 0, 1),
+                            length_normalized_p,
+                        ),
+                        sample_masks,
                     ),
                     dim=1,
                 )
@@ -868,8 +879,11 @@ class REQA(torch.nn.Module):
         lm_loss = -torch.mean(
             torch.sum(
                 torch.mul(
-                    torch.transpose(torch.exp(lm_log_p), 0, 1),
-                    length_normalized_p,
+                    torch.mul(
+                        torch.transpose(torch.exp(lm_log_p), 0, 1),
+                        length_normalized_p,
+                    ),
+                    sample_masks,
                 ),
                 dim=1,
             ),
