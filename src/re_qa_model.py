@@ -13,6 +13,7 @@ import torch
 from nltk.translate.bleu_score import sentence_bleu
 from transformers import Adafactor, T5ForConditionalGeneration, T5Tokenizer
 from transformers import GPT2LMHeadModel, GPT2TokenizerFast
+from transformers import RobertaTokenizer, RobertaForCausalLM, RobertaConfig
 
 
 def white_space_fix(text):
@@ -161,12 +162,10 @@ class REQA(torch.nn.Module):
         # Construct the Question model
         question_model = T5ForConditionalGeneration.from_pretrained(Q_MODEL_NAME)
 
-        self.lm_model = GPT2LMHeadModel.from_pretrained('gpt2-large')
-        self.lm_tokenizer = GPT2TokenizerFast.from_pretrained('gpt2-large')
-
-        self.lm_tokenizer.add_special_tokens({'pad_token': '[PAD]'})
-
-        self.lm_model.config.layer_norm_epsilon = 1e-12
+        self.lm_tokenizer = RobertaTokenizer.from_pretrained("roberta-base")
+        config = RobertaConfig.from_pretrained("roberta-base")
+        config.is_decoder = True
+        self.lm_model = RobertaForCausalLM.from_pretrained('roberta-base', config=config)
 
         if cfg.mode == "train":
             # Configurations suggested by the T5 paper.
@@ -767,6 +766,7 @@ class REQA(torch.nn.Module):
             torch.transpose(torch.exp(question_log_p), 0, 1), lenght_norm
         )
 
+        print(sample_masks)
         re_loss = -torch.mean(
             torch.log(
                 torch.sum(
@@ -790,7 +790,7 @@ class REQA(torch.nn.Module):
                     torch.transpose(torch.exp(question_log_p), 0, 1), bleu_scores
                 ),
                 dim=1,
-            ),
+            )ii,
             dim=0,
         )
 
@@ -825,7 +825,6 @@ class REQA(torch.nn.Module):
         )
         real_loss = output.loss
         """
-
         lm_encodings = self.lm_tokenizer(
             output_questions,
             truncation=True,
@@ -836,20 +835,18 @@ class REQA(torch.nn.Module):
         )
         lm_input_ids = lm_encodings.pop("input_ids")
         lm_input_mask = lm_encodings.pop("attention_mask")
-        lm_labels = lm_input_ids
+        if self.config.gpu:
+            lm_input_mask = lm_input_mask.to(current_device)
+            lm_input_ids = lm_input_ids.to(current_device)
+
         lm_labels = [
             [
                 -100 if token == self.lm_tokenizer.pad_token_id else token
                 for token in labels
             ]
-            for labels in lm_labels.tolist()
+            for labels in lm_input_ids.tolist()
         ]
-        lm_labels = torch.tensor(lm_labels)
-        if self.config.gpu:
-            lm_input_mask = lm_input_mask.to(current_device)
-            lm_input_ids = lm_input_ids.to(current_device)
-            lm_labels = lm_labels.to(current_device)
-
+        lm_labels = torch.tensor(lm_labels).to(current_device)
         self.lm_model.eval()
         with torch.no_grad():
             lm_output = self.lm_model(
@@ -883,7 +880,7 @@ class REQA(torch.nn.Module):
             dim=0,
         )
 
-        loss = re_loss + 0.01 * lm_loss
+        loss = re_loss + lm_loss
         loss_value = loss.item()
         return loss, loss_value
 
