@@ -11,9 +11,9 @@ from typing import Any, Optional
 import numpy
 import torch
 from nltk.translate.bleu_score import sentence_bleu
-from transformers import Adafactor, T5ForConditionalGeneration, T5Tokenizer
-from transformers import GPT2LMHeadModel, GPT2TokenizerFast
-from transformers import RobertaTokenizer, RobertaForCausalLM, RobertaConfig
+from transformers import (Adafactor, GPT2LMHeadModel, GPT2TokenizerFast,
+                          RobertaConfig, RobertaForCausalLM, RobertaTokenizer,
+                          T5ForConditionalGeneration, T5Tokenizer)
 
 
 def white_space_fix(text):
@@ -165,7 +165,9 @@ class REQA(torch.nn.Module):
         self.lm_tokenizer = RobertaTokenizer.from_pretrained("roberta-base")
         config = RobertaConfig.from_pretrained("roberta-base")
         config.is_decoder = True
-        self.lm_model = RobertaForCausalLM.from_pretrained('roberta-base', config=config)
+        self.lm_model = RobertaForCausalLM.from_pretrained(
+            "roberta-base", config=config
+        )
 
         if cfg.mode == "train":
             # Configurations suggested by the T5 paper.
@@ -510,7 +512,7 @@ class REQA(torch.nn.Module):
                         early_stopping=True,
                         max_length=self.config.decoder_max_length,
                         num_return_sequences=self.config.num_search_samples,
-                        top_p=100,
+                        top_k=100,
                         output_scores=True,
                         return_dict_in_generate=True,
                         attention_mask=question_input_mask[i, :].view(1, -1),
@@ -549,10 +551,12 @@ class REQA(torch.nn.Module):
                         ):
                             temp_set.add(sample)
                 temp_list = list(temp_set)
-                while len(temp_list) < self.config.num_search_samples:
-                    temp_list.append("This is a dummy question!")
+
+                # while len(temp_list) < self.config.num_search_samples:
+                #    temp_list.append("This is a dummy question!")
 
                 final_sampled_question_predictions_str_reshaped.append(temp_list)
+                """
                 mask = []
                 for sample in temp_list:
                     if sample != "This is a dummy question!":
@@ -561,9 +565,10 @@ class REQA(torch.nn.Module):
                         mask.append(0)
 
                 sample_masks.append(torch.FloatTensor(mask))
+                """
 
-        sample_masks = torch.stack(sample_masks, 0)
-        sample_masks = sample_masks.to(current_device)
+        # sample_masks = torch.stack(sample_masks, 0)
+        # sample_masks = sample_masks.to(current_device)
 
         """
         bleu_scores = []
@@ -609,7 +614,7 @@ class REQA(torch.nn.Module):
         if self.config.gpu:
             real_lenghts.to(current_device)
 
-        print(final_sampled_question_predictions_str_reshaped)
+        # print(final_sampled_question_predictions_str_reshaped)
         answer_inputs = self.answer_tokenizer(
             new_articles,
             truncation=True,
@@ -766,16 +771,12 @@ class REQA(torch.nn.Module):
             torch.transpose(torch.exp(question_log_p), 0, 1), lenght_norm
         )
 
-        print(sample_masks)
         re_loss = -torch.mean(
             torch.log(
                 torch.sum(
                     torch.mul(
-                        torch.mul(
-                            torch.transpose(torch.exp(answer_log_p), 0, 1),
-                            length_normalized_p,
-                        ),
-                        sample_masks,
+                        torch.transpose(torch.exp(answer_log_p), 0, 1),
+                        length_normalized_p,
                     ),
                     dim=1,
                 )
@@ -850,9 +851,7 @@ class REQA(torch.nn.Module):
         self.lm_model.eval()
         with torch.no_grad():
             lm_output = self.lm_model(
-                input_ids=lm_input_ids,
-                attention_mask=lm_input_mask,
-                labels=lm_labels
+                input_ids=lm_input_ids, attention_mask=lm_input_mask, labels=lm_labels
             )
 
             log_lm_p = -loss_fct(
@@ -867,15 +866,12 @@ class REQA(torch.nn.Module):
             lm_log_p = lm_log_p.view(self.config.num_search_samples, b_sz)
 
         lm_loss = -torch.mean(
-                torch.sum(
-                    torch.mul(
-                        torch.mul(
-                            torch.transpose(torch.exp(lm_log_p), 0, 1),
-                            length_normalized_p,
-                        ),
-                        sample_masks,
-                    ),
-                    dim=1,
+            torch.sum(
+                torch.mul(
+                    torch.transpose(torch.exp(lm_log_p), 0, 1),
+                    length_normalized_p,
+                ),
+                dim=1,
             ),
             dim=0,
         )
