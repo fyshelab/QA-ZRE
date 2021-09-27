@@ -249,7 +249,7 @@ class REQA(torch.nn.Module):
                 max_length=self.config.decoder_max_length,
                 num_return_sequences=1,
                 num_beams=self.config.num_search_samples,
-                length_penalty=10.0,
+                #length_penalty=10.0,
             )
 
         question_predictions_str = self.question_tokenizer.batch_decode(
@@ -431,7 +431,7 @@ class REQA(torch.nn.Module):
             sample_masks = []
             for i in range(b_sz):
                 temp_set = set()
-                top_k = 50
+                top_p = sample_p 
                 counter = 0
                 while len(temp_set) < (self.config.num_search_samples) and counter < 10:
                     # Use top-k sampling to collect samples.
@@ -441,7 +441,7 @@ class REQA(torch.nn.Module):
                         no_repeat_ngram_size=self.config.no_repeat_ngram_size,
                         max_length=self.config.decoder_max_length,
                         num_return_sequences=self.config.num_search_samples,
-                        top_k=top_k,
+                        top_p=top_p,
                         output_scores=True,
                         return_dict_in_generate=True,
                         attention_mask=question_input_mask[i, :].view(1, -1),
@@ -477,7 +477,6 @@ class REQA(torch.nn.Module):
                             and (len(sample.split()) > 5)
                         ):
                             temp_set.add(sample)
-                    top_k += 50
                     counter += 1
 
                 """
@@ -560,7 +559,7 @@ class REQA(torch.nn.Module):
                     else:
                         mask.append(0)
 
-                sample_masks.append(torch.FloatTensor(mask))
+                sample_masks.append(torch.LongTensor(mask))
 
         sample_masks = torch.stack(sample_masks, 0)
         sample_masks = sample_masks.to(current_device)
@@ -632,22 +631,29 @@ class REQA(torch.nn.Module):
             labels = labels.to(current_device)
 
         b_sz, seq_len = labels.size()
-        sample_input_mask = (
+        sample_output_mask = (
             torch.transpose(sample_masks, 0, 1)
-            .view(self.config.num_search_samples * b_sz, 1)
+            .reshape(self.config.num_search_samples * b_sz, 1)
             .repeat(1, seq_len)
             .view(-1, seq_len)
         )
+        sample_input_mask = (
+            torch.transpose(sample_masks, 0, 1)
+            .reshape(self.config.num_search_samples * b_sz, 1)
+            .repeat(1, self.config.source_max_length)
+            .view(-1, self.config.source_max_length)
+        )
+        #print(sample_output_mask)
         labels = labels.repeat(1, self.config.num_search_samples).view(-1, seq_len)
         target_mask = target_mask.repeat(1, self.config.num_search_samples).view(
             -1, seq_len
         )
 
-        new_labels = (1 - sample_input_mask) * -100 + labels * sample_input_mask
+        new_labels = (1 - sample_output_mask) * -100 + labels * sample_output_mask
         output = self.answer_model(
             input_ids=answer_input_ids,
             attention_mask=torch.mul(answer_input_mask, sample_input_mask),
-            decoder_attention_mask=torch.mul(target_mask, sample_input_mask),
+            decoder_attention_mask=torch.mul(target_mask, sample_output_mask),
             decoder_input_ids=self.answer_model._shift_right(new_labels),
             labels=None,
         )
@@ -712,12 +718,12 @@ class REQA(torch.nn.Module):
         self.question_model.train()
 
         question_new_labels = (
-            1 - sample_input_mask
-        ) * -100 + question_labels * sample_input_mask
+            1 - sample_output_mask
+        ) * -100 + question_labels * sample_output_mask
         question_output = self.question_model(
             input_ids=question_input_ids,
             attention_mask=torch.mul(question_input_mask, sample_input_mask),
-            decoder_attention_mask=torch.mul(question_target_mask, sample_input_mask),
+            decoder_attention_mask=torch.mul(question_target_mask, sample_output_mask),
             decoder_input_ids=self.question_model._shift_right(question_new_labels),
             labels=None,
         )
