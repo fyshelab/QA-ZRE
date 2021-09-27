@@ -624,7 +624,7 @@ class REQA(torch.nn.Module):
                 temp_set = set()
                 top_p = sample_p
                 counter = 0
-                while len(temp_set) < (self.config.num_search_samples) and counter < 10:
+                while len(temp_set) < (self.config.num_search_samples) and counter < 15:
                     # Use top-k sampling to collect samples.
                     sampled_question_outputs = self.question_model.generate(
                         input_ids=question_input_ids[i, :].view(1, -1),
@@ -632,7 +632,7 @@ class REQA(torch.nn.Module):
                         no_repeat_ngram_size=self.config.no_repeat_ngram_size,
                         max_length=self.config.decoder_max_length,
                         num_return_sequences=self.config.num_search_samples,
-                        top_p=top_p,
+                        top_p=min([top_p, 0.98]),
                         output_scores=True,
                         return_dict_in_generate=True,
                         attention_mask=question_input_mask[i, :].view(1, -1),
@@ -665,9 +665,11 @@ class REQA(torch.nn.Module):
                         if (
                             (sample not in temp_set)
                             and (len(temp_set) < (self.config.num_search_samples))
-                            and (len(sample.split()) > 5)
+                            and (len(sample.split()) > 3)
                         ):
                             temp_set.add(sample)
+
+                    top_p += 0.002
                     counter += 1
 
                 """
@@ -843,6 +845,7 @@ class REQA(torch.nn.Module):
         """
 
         # easier way to use MML objective.
+        """
         length_weight = 2
         lenght_norm = torch.div(
             torch.pow(real_lenghts + 5, length_weight), pow(1 + 5, length_weight)
@@ -851,7 +854,8 @@ class REQA(torch.nn.Module):
             lenght_norm = lenght_norm.to(current_device)
 
         length_normalized_p = torch.mul(torch.exp(question_log_p), lenght_norm)
-
+        """
+        length_normalized_p = torch.exp(question_log_p)
         re_loss = -torch.mean(
             torch.log(
                 torch.sum(
@@ -911,6 +915,7 @@ class REQA(torch.nn.Module):
         real_loss = output.loss
         """
 
+        """
         lm_encodings = self.lm_tokenizer(
             output_questions,
             truncation=True,
@@ -963,8 +968,8 @@ class REQA(torch.nn.Module):
             ),
             dim=0,
         )
-
-        loss = re_loss + lm_loss
+        """
+        loss = re_loss  # + lm_loss
         loss_value = loss.item()
         return loss, loss_value
 
