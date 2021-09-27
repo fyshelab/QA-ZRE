@@ -65,6 +65,40 @@ def tuple_of_tensors_to_tensor(tuple_of_tensors):
     return torch.stack(list(tuple_of_tensors), dim=0)
 
 
+def prepare_response_module_input(
+    answer_input_ids=None,
+    answer_input_mask=None,
+    labels=None,
+    target_mask=None,
+    num_samples=1,
+    sample_masks=None,
+):
+    b_sz, dec_seq_len = labels.size()
+    _, src_seq_len = answer_input_ids.size()
+    labels = labels.repeat(1, num_samples).view(-1, dec_seq_len)
+    target_mask = target_mask.repeat(1, num_samples).view(-1, dec_seq_len)
+    sample_output_mask = (
+        sample_masks.reshape(num_samples * b_sz, 1)
+        .repeat(1, dec_seq_len)
+        .view(-1, dec_seq_len)
+    )
+
+    new_labels = (1 - sample_output_mask) * -100 + labels * sample_output_mask
+
+    sample_input_mask = (
+        sample_masks.reshape(num_samples * b_sz, 1)
+        .repeat(1, src_seq_len)
+        .view(-1, src_seq_len)
+    )
+
+    return (
+        answer_input_ids * sample_input_mask,
+        answer_input_mask * sample_input_mask,
+        target_mask * sample_output_mask,
+        new_labels,
+    )
+
+
 def set_random_seed(seed: int) -> Any:
     """Set the random seed, which initializes the random number generator.
 
@@ -249,7 +283,7 @@ class REQA(torch.nn.Module):
                 max_length=self.config.decoder_max_length,
                 num_return_sequences=1,
                 num_beams=self.config.num_search_samples,
-                #length_penalty=10.0,
+                # length_penalty=10.0,
             )
 
         question_predictions_str = self.question_tokenizer.batch_decode(
@@ -330,7 +364,6 @@ class REQA(torch.nn.Module):
         loss_fct = torch.nn.CrossEntropyLoss(ignore_index=-100, reduction="none")
         if self.config.gpu:
             loss_fct = loss_fct.to(current_device)
-
         (
             answer_input_ids,
             answer_input_mask,
@@ -367,6 +400,164 @@ class REQA(torch.nn.Module):
         loss = -torch.mean(answer_log_p, dim=0)
         loss_value = loss.item()
         return loss, loss_value
+
+    def response_mml_forward(
+        self, batch, new_articles, current_device, sample_masks, loss_fct
+    ):
+        # Get output from the response module
+        answer_inputs = self.answer_tokenizer(
+            new_articles,
+            truncation=True,
+            padding="max_length",
+            max_length=self.config.source_max_length,
+            add_special_tokens=False,
+            return_tensors="pt",
+        )
+
+        answer_input_ids = answer_inputs.input_ids
+        answer_input_mask = answer_inputs.attention_mask
+        if self.config.gpu:
+            answer_input_ids = answer_input_ids.to(current_device)
+            answer_input_mask = answer_input_mask.to(current_device)
+
+        target_mask = batch["second_entity_attention_mask"]
+        labels = batch["second_entity_labels"]
+        if self.config.gpu:
+            target_mask = target_mask.to(current_device)
+            labels = labels.to(current_device)
+
+        b_sz, _ = labels.size()
+
+        (
+            answer_input_ids,
+            answer_input_mask,
+            target_mask,
+            new_labels,
+        ) = prepare_response_module_input(
+            answer_input_ids=answer_input_ids,
+            answer_input_mask=answer_input_mask,
+            labels=labels,
+            target_mask=target_mask,
+            num_samples=self.config.num_search_samples,
+            sample_masks=sample_masks,
+        )
+        output = self.answer_model(
+            input_ids=answer_input_ids,
+            attention_mask=answer_input_mask,
+            decoder_attention_mask=target_mask,
+            decoder_input_ids=self.answer_model._shift_right(new_labels),
+            labels=None,
+        )
+
+        log_p = -loss_fct(
+            output.logits.view(-1, output.logits.size(-1)),
+            new_labels.view(-1),
+        )
+
+        b, s_len, v = output.logits.size()
+        log_p = log_p.view(b, s_len)
+        good_log_p = log_p.masked_fill_(new_labels == -100, 0.0)
+        answer_log_p = torch.sum(good_log_p, dim=1).squeeze()
+        answer_log_p = answer_log_p.view(b_sz, self.config.num_search_samples)
+
+        return answer_log_p
+
+    def question_mml_forward(
+        self,
+        current_device,
+        question_input_ids,
+        question_input_mask,
+        final_sampled_question_predictions_str_reshaped,
+        sample_masks,
+        loss_fct,
+    ):
+        # Now re-run the question generator and compute the loss for the sampled predictions.
+        # This will compute the gradients in the question module.
+        b_sz, src_seq_len = question_input_ids.size()
+        question_input_ids = question_input_ids.repeat(
+            1, self.config.num_search_samples
+        ).view(-1, src_seq_len)
+        question_input_mask = question_input_mask.repeat(
+            1, self.config.num_search_samples
+        ).view(-1, src_seq_len)
+
+        output_questions = []
+        for i in range(b_sz):
+            for j in range(self.config.num_search_samples):
+                output_question = (
+                    white_space_fix(
+                        final_sampled_question_predictions_str_reshaped[i][j]
+                    )
+                    + " </s>"
+                )
+                output_questions.append(output_question)
+
+        question_encodings = self.question_tokenizer(
+            output_questions,
+            truncation=True,
+            padding="max_length",
+            max_length=self.config.decoder_max_length,
+            add_special_tokens=False,
+            return_tensors="pt",
+        )
+        question_labels = question_encodings.pop("input_ids")
+        question_target_mask = question_encodings.pop("attention_mask")
+
+        # because HuggingFace automatically shifts the labels, the labels correspond exactly to `target_ids`.
+        # We have to make sure that the PAD token is ignored
+
+        question_labels = [
+            [
+                -100 if token == self.question_tokenizer.pad_token_id else token
+                for token in labels
+            ]
+            for labels in question_labels.tolist()
+        ]
+        question_labels = torch.tensor(question_labels)
+        if self.config.gpu:
+            question_target_mask = question_target_mask.to(current_device)
+            question_labels = question_labels.to(current_device)
+
+        self.question_model.train()
+
+        _, dec_seq_len = question_labels.size()
+        sample_input_mask = (
+            sample_masks.reshape(self.config.num_search_samples * b_sz, 1)
+            .repeat(1, src_seq_len)
+            .view(-1, src_seq_len)
+        )
+        sample_output_mask = (
+            sample_masks.reshape(self.config.num_search_samples * b_sz, 1)
+            .repeat(1, dec_seq_len)
+            .view(-1, dec_seq_len)
+        )
+
+        question_new_labels = (
+            1 - sample_output_mask
+        ) * -100 + question_labels * sample_output_mask
+
+        question_output = self.question_model(
+            input_ids=question_input_ids * sample_input_mask,
+            attention_mask=question_input_mask * sample_input_mask,
+            decoder_attention_mask=question_target_mask * sample_output_mask,
+            decoder_input_ids=self.question_model._shift_right(question_new_labels),
+            labels=None,
+        )
+
+        log_question_p = -loss_fct(
+            question_output.logits.view(-1, question_output.logits.size(-1)),
+            question_new_labels.view(-1),
+        )
+
+        b, seq_len, v = question_output.logits.size()
+        log_question_p = log_question_p.view(b, seq_len)
+        good_log_question_p = log_question_p.masked_fill_(
+            question_new_labels == -100, 0.0
+        )
+        question_log_p = torch.sum(good_log_question_p, dim=1).squeeze()
+        question_log_p = question_log_p.view(b_sz, self.config.num_search_samples)
+
+        return question_log_p, output_questions
 
     def mml_question_training(
         self, batch, current_device, sample_p=0.95, real_question_batch=None
@@ -431,7 +622,7 @@ class REQA(torch.nn.Module):
             sample_masks = []
             for i in range(b_sz):
                 temp_set = set()
-                top_p = sample_p 
+                top_p = sample_p
                 counter = 0
                 while len(temp_set) < (self.config.num_search_samples) and counter < 10:
                     # Use top-k sampling to collect samples.
@@ -600,146 +791,26 @@ class REQA(torch.nn.Module):
                     len(final_sampled_question_predictions_str_reshaped[i][j].split())
                 )
 
-        real_lenghts = torch.transpose(
-            torch.LongTensor(real_lenghts).view(self.config.num_search_samples, b_sz),
-            0,
-            1,
+        real_lenghts = torch.LongTensor(real_lenghts).view(
+            b_sz, self.config.num_search_samples
         )
         if self.config.gpu:
             real_lenghts.to(current_device)
 
         print(final_sampled_question_predictions_str_reshaped)
-        answer_inputs = self.answer_tokenizer(
-            new_articles,
-            truncation=True,
-            padding="max_length",
-            max_length=self.config.source_max_length,
-            add_special_tokens=False,
-            return_tensors="pt",
+
+        answer_log_p = self.response_mml_forward(
+            batch, new_articles, current_device, sample_masks, loss_fct
         )
 
-        answer_input_ids = answer_inputs.input_ids
-        answer_input_mask = answer_inputs.attention_mask
-        if self.config.gpu:
-            answer_input_ids = answer_input_ids.to(current_device)
-            answer_input_mask = answer_input_mask.to(current_device)
-
-        target_mask = batch["second_entity_attention_mask"]
-        labels = batch["second_entity_labels"]
-        if self.config.gpu:
-            target_mask = target_mask.to(current_device)
-            labels = labels.to(current_device)
-
-        b_sz, seq_len = labels.size()
-        sample_output_mask = (
-            torch.transpose(sample_masks, 0, 1)
-            .reshape(self.config.num_search_samples * b_sz, 1)
-            .repeat(1, seq_len)
-            .view(-1, seq_len)
+        question_log_p, output_questions = self.question_mml_forward(
+            current_device,
+            question_input_ids,
+            question_input_mask,
+            final_sampled_question_predictions_str_reshaped,
+            sample_masks,
+            loss_fct,
         )
-        sample_input_mask = (
-            torch.transpose(sample_masks, 0, 1)
-            .reshape(self.config.num_search_samples * b_sz, 1)
-            .repeat(1, self.config.source_max_length)
-            .view(-1, self.config.source_max_length)
-        )
-        #print(sample_output_mask)
-        labels = labels.repeat(1, self.config.num_search_samples).view(-1, seq_len)
-        target_mask = target_mask.repeat(1, self.config.num_search_samples).view(
-            -1, seq_len
-        )
-
-        new_labels = (1 - sample_output_mask) * -100 + labels * sample_output_mask
-        output = self.answer_model(
-            input_ids=answer_input_ids,
-            attention_mask=torch.mul(answer_input_mask, sample_input_mask),
-            decoder_attention_mask=torch.mul(target_mask, sample_output_mask),
-            decoder_input_ids=self.answer_model._shift_right(new_labels),
-            labels=None,
-        )
-
-        log_p = -loss_fct(
-            output.logits.view(-1, output.logits.size(-1)),
-            new_labels.view(-1),
-        )
-
-        b, sz, v = output.logits.size()
-        log_p = log_p.view(b, sz)
-        good_log_p = log_p.masked_fill_(new_labels == -100, 0.0)
-        answer_log_p = torch.sum(good_log_p, dim=1).squeeze()
-        answer_log_p = answer_log_p.view(self.config.num_search_samples, b_sz)
-
-        # Now re-run the question generator and compute the loss for the sampled predictions.
-        # This will compute the gradients in the question module.
-        b_sz, seq_len = question_input_ids.size()
-        question_input_ids = question_input_ids.repeat(
-            1, self.config.num_search_samples
-        ).view(-1, seq_len)
-        question_input_mask = question_input_mask.repeat(
-            1, self.config.num_search_samples
-        ).view(-1, seq_len)
-        output_questions = []
-        for i in range(b_sz):
-            for j in range(self.config.num_search_samples):
-                output_question = (
-                    white_space_fix(
-                        final_sampled_question_predictions_str_reshaped[i][j]
-                    )
-                    + " </s>"
-                )
-                output_questions.append(output_question)
-
-        question_encodings = self.question_tokenizer(
-            output_questions,
-            truncation=True,
-            padding="max_length",
-            max_length=self.config.decoder_max_length,
-            add_special_tokens=False,
-            return_tensors="pt",
-        )
-        question_labels = question_encodings.pop("input_ids")
-        question_target_mask = question_encodings.pop("attention_mask")
-
-        # because HuggingFace automatically shifts the labels, the labels correspond exactly to `target_ids`.
-        # We have to make sure that the PAD token is ignored
-
-        question_labels = [
-            [
-                -100 if token == self.question_tokenizer.pad_token_id else token
-                for token in labels
-            ]
-            for labels in question_labels.tolist()
-        ]
-        question_labels = torch.tensor(question_labels)
-        if self.config.gpu:
-            question_target_mask = question_target_mask.to(current_device)
-            question_labels = question_labels.to(current_device)
-
-        self.question_model.train()
-
-        question_new_labels = (
-            1 - sample_output_mask
-        ) * -100 + question_labels * sample_output_mask
-        question_output = self.question_model(
-            input_ids=question_input_ids,
-            attention_mask=torch.mul(question_input_mask, sample_input_mask),
-            decoder_attention_mask=torch.mul(question_target_mask, sample_output_mask),
-            decoder_input_ids=self.question_model._shift_right(question_new_labels),
-            labels=None,
-        )
-
-        log_question_p = -loss_fct(
-            question_output.logits.view(-1, question_output.logits.size(-1)),
-            question_new_labels.view(-1),
-        )
-
-        b, sz, v = question_output.logits.size()
-        log_question_p = log_question_p.view(b, sz)
-        good_log_question_p = log_question_p.masked_fill_(
-            question_new_labels == -100, 0.0
-        )
-        question_log_p = torch.sum(good_log_question_p, dim=1).squeeze()
-        question_log_p = question_log_p.view(self.config.num_search_samples, b_sz)
 
         # another way to implement the mml gradient directly!
         """
@@ -772,25 +843,21 @@ class REQA(torch.nn.Module):
         """
 
         # easier way to use MML objective.
-
         length_weight = 2
         lenght_norm = torch.div(
             torch.pow(real_lenghts + 5, length_weight), pow(1 + 5, length_weight)
         )
-
         if self.config.gpu:
             lenght_norm = lenght_norm.to(current_device)
 
-        length_normalized_p = torch.mul(
-            torch.transpose(torch.exp(question_log_p), 0, 1), lenght_norm
-        )
+        length_normalized_p = torch.mul(torch.exp(question_log_p), lenght_norm)
 
         re_loss = -torch.mean(
             torch.log(
                 torch.sum(
                     torch.mul(
                         torch.mul(
-                            torch.transpose(torch.exp(answer_log_p), 0, 1),
+                            torch.exp(answer_log_p),
                             length_normalized_p,
                         ),
                         sample_masks,
@@ -843,6 +910,7 @@ class REQA(torch.nn.Module):
         )
         real_loss = output.loss
         """
+
         lm_encodings = self.lm_tokenizer(
             output_questions,
             truncation=True,
@@ -876,17 +944,17 @@ class REQA(torch.nn.Module):
                 lm_labels.view(-1),
             )
 
-            b, sz, v = lm_output.logits.size()
-            log_lm_p = log_lm_p.view(b, sz)
+            b, seq_len, v = lm_output.logits.size()
+            log_lm_p = log_lm_p.view(b, seq_len)
             good_log_lm_p = log_lm_p.masked_fill_(lm_labels == -100, 0.0)
             lm_log_p = torch.sum(good_log_lm_p, dim=1).squeeze()
-            lm_log_p = lm_log_p.view(self.config.num_search_samples, b_sz)
+            lm_log_p = lm_log_p.view(b_sz, self.config.num_search_samples)
 
         lm_loss = -torch.mean(
             torch.sum(
                 torch.mul(
                     torch.mul(
-                        torch.transpose(torch.exp(lm_log_p), 0, 1),
+                        torch.exp(lm_log_p),
                         length_normalized_p,
                     ),
                     sample_masks,
