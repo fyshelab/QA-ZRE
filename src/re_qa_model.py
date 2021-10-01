@@ -199,12 +199,12 @@ class REQA(torch.nn.Module):
         # Construct the Question model
         question_model = T5ForConditionalGeneration.from_pretrained(Q_MODEL_NAME)
 
-        self.lm_tokenizer = RobertaTokenizer.from_pretrained("roberta-base")
-        config = RobertaConfig.from_pretrained("roberta-base")
-        config.is_decoder = True
-        self.lm_model = RobertaForCausalLM.from_pretrained(
-            "roberta-base", config=config
-        )
+        # self.lm_tokenizer = RobertaTokenizer.from_pretrained("roberta-base")
+        # config = RobertaConfig.from_pretrained("roberta-base")
+        # config.is_decoder = True
+        # self.lm_model = RobertaForCausalLM.from_pretrained(
+        #    "roberta-base", config=config
+        # )
 
         if cfg.mode == "train":
             # Configurations suggested by the T5 paper.
@@ -963,7 +963,7 @@ class REQA(torch.nn.Module):
             dim=0,
         )
         # loss = re_loss #+ lm_loss
-        loss = re_loss + 0.05 * entropy_loss + 0.5 * bleu_loss
+        loss = re_loss + 0.05 * entropy_loss + bleu_loss
         loss_value = loss.item()
         return loss, loss_value
 
