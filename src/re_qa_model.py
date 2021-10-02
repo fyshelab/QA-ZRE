@@ -199,6 +199,14 @@ class REQA(torch.nn.Module):
         # Construct the Question model
         question_model = T5ForConditionalGeneration.from_pretrained(Q_MODEL_NAME)
 
+        # pretrained question model
+        self.init_question_tokenizer = T5Tokenizer.from_pretrained(Q_MODEL_NAME)
+
+        # Construct the pretrained question model
+        self.init_question_model = T5ForConditionalGeneration.from_pretrained(
+            Q_MODEL_NAME
+        )
+
         # self.lm_tokenizer = RobertaTokenizer.from_pretrained("roberta-base")
         # config = RobertaConfig.from_pretrained("roberta-base")
         # config.is_decoder = True
@@ -240,6 +248,9 @@ class REQA(torch.nn.Module):
 
             load_module(answer_model, self.model_path, cfg.answer_checkpoint)
             load_module(question_model, self.model_path, cfg.question_checkpoint)
+            load_module(
+                self.init_question_model, self.model_path, cfg.question_checkpoint
+            )
 
         elif cfg.mode in ["test", "inference"]:
             load_module(answer_model, self.model_path, cfg.answer_checkpoint)
@@ -578,61 +589,22 @@ class REQA(torch.nn.Module):
 
         b_sz, _ = question_input_ids.size()
 
-        """
-        token_bias_input_ids = []
-        token_bias_attention_mask = []
-        for i in range(self.config.num_search_samples):
-            token_bias_input_ids_inner = []
-            token_bias_attention_mask_inner = []
-            for b in range(b_sz):
-                shifts = random.randint(3, self.config.decoder_max_length // 2)
-                entity_input_ids = torch.roll(
-                    batch["entity_input_ids"][b, :].squeeze(), shifts, dims=0
-                )
-                entity_attention_mask = torch.roll(
-                    batch["entity_attention_mask"][b, :].squeeze(), shifts, dims=0
-                )
-                token_bias_input_ids_inner.append(entity_input_ids)
-                token_bias_attention_mask_inner.append(entity_attention_mask)
-
-            token_bias_input_ids_inner = torch.stack(token_bias_input_ids_inner, 0)
-            token_bias_attention_mask_inner = torch.stack(
-                token_bias_attention_mask_inner, 0
-            )
-
-            token_bias_input_ids.append(token_bias_input_ids_inner)
-            token_bias_attention_mask.append(token_bias_attention_mask_inner)
-
-        token_bias_input_ids = torch.stack(token_bias_input_ids, 0)
-        token_bias_attention_mask = torch.stack(token_bias_attention_mask, 0)
-
-        token_bias_input_ids = torch.transpose(token_bias_input_ids, 0, 1)
-        token_bias_attention_mask = torch.transpose(token_bias_attention_mask, 0, 1)
-
-        token_bias_input_ids = token_bias_input_ids.masked_fill(
-            ~token_bias_attention_mask.bool(), -1
-
-        )
-
-        token_bias_input_ids = token_bias_input_ids.view(-1, token_bias_input_ids.shape[-1])
-        if self.config.gpu:
-            token_bias_input_ids = token_bias_input_ids.to(current_device)
-        """
-
         with torch.no_grad():
-            self.question_model.eval()
+            self.init_question_model.eval()
             final_sampled_question_predictions_str_reshaped = []
             sample_masks = []
+            sample_log_ps = []
             for i in range(b_sz):
-                temp_set = set()
+                temp_list = list()
+                sample_log_p = []
                 top_p = sample_p
                 counter = 0
                 while (
-                    len(temp_set) < (self.config.num_search_samples - 1)
+                    len(temp_list) < (self.config.num_search_samples - 1)
                     and counter < 15
                 ):
                     # Use top-k sampling to collect samples.
-                    sampled_question_outputs = self.question_model.generate(
+                    sampled_question_outputs = self.init_question_model.generate(
                         input_ids=question_input_ids[i, :].view(1, -1),
                         do_sample=True,
                         no_repeat_ngram_size=self.config.no_repeat_ngram_size,
@@ -643,12 +615,12 @@ class REQA(torch.nn.Module):
                         return_dict_in_generate=True,
                         attention_mask=question_input_mask[i, :].view(1, -1),
                     )
-                    sampled_questions, _ = prob_of_sampled_predictions(
+                    sampled_questions, question_log_ps = prob_of_sampled_predictions(
                         loss_fct, sampled_question_outputs
                     )
 
                     sampled_question_predictions_str = (
-                        self.question_tokenizer.batch_decode(
+                        self.init_question_tokenizer.batch_decode(
                             sampled_questions, skip_special_tokens=True
                         )
                     )
@@ -668,24 +640,32 @@ class REQA(torch.nn.Module):
                     ]
                     for sample_i in range(self.config.num_search_samples):
                         sample = sampled_question_predictions_str_reshaped[0][sample_i]
-                        if len(temp_set) < (self.config.num_search_samples - 1) and (
-                            len(sample.split()) > 4
+                        if len(temp_list) < (self.config.num_search_samples - 1) and (
+                            len(sample.split()) > 4 and (sample not in temp_list)
                         ):
-                            temp_set.add(sample)
+                            temp_list.append(sample)
+                            sample_log_p.append(question_log_ps[sample_i].item())
 
                     top_p += 0.002
                     counter += 1
 
-                beam_question_prediction = self.question_model.generate(
+                """
+                beam_question_predictions = self.init_question_model.generate(
                     input_ids=question_input_ids[i, :].view(1, -1),
                     attention_mask=question_input_mask[i, :].view(1, -1),
                     no_repeat_ngram_size=self.config.no_repeat_ngram_size,
                     max_length=self.config.decoder_max_length,
-                    num_return_sequences=1,
+                    num_return_sequences=self.config.num_search_samples,
                     num_beams=self.config.num_search_samples,
+                    output_scores=True,
+                    return_dict_in_generate=True,
                 )
-                beam_question_prediction_str = self.question_tokenizer.batch_decode(
-                    beam_question_prediction, skip_special_tokens=True
+                print(beam_question_predictions)
+                beam_questions, beam_question_log_ps = prob_of_sampled_predictions(
+                        loss_fct, beam_question_predictions
+                )
+                beam_question_prediction_str = self.init_question_tokenizer.batch_decode(
+                    beam_questions, skip_special_tokens=True
                 )
 
                 beam_question_prediction_str = [
@@ -693,7 +673,19 @@ class REQA(torch.nn.Module):
                     for pred in beam_question_prediction_str
                 ]
 
-                temp_set.add(beam_question_prediction_str[0])
+                beam_question_predictions_str_reshaped = [
+                        beam_question_prediction_str[
+                            i
+                            * (self.config.num_search_samples) : (i + 1)
+                            * (self.config.num_search_samples)
+                        ]
+                        for i in range(1)
+                ]
+                temp_set.add(beam_question_predictions_str_reshaped[0][0])
+                sample_log_p.append(beam_question_log_ps[0])
+                print(sample_log_p)
+                print(temp_set)
+                """
                 """
                 if len(temp_set) < self.config.num_search_samples:
                     top_k_sampled_question_outputs = self.question_model.generate(
@@ -742,11 +734,13 @@ class REQA(torch.nn.Module):
                         ):
                             temp_set.add(sample)
                 """
-                temp_list = list(temp_set)
                 while len(temp_list) < self.config.num_search_samples:
                     temp_list.append("This is a dummy question!")
+                    sample_log_p.append(0)
 
                 final_sampled_question_predictions_str_reshaped.append(temp_list)
+                sample_log_ps.append(torch.FloatTensor(sample_log_p))
+
                 mask = []
                 for sample in temp_list:
                     if sample != "This is a dummy question!":
@@ -755,6 +749,9 @@ class REQA(torch.nn.Module):
                         mask.append(0)
 
                 sample_masks.append(torch.LongTensor(mask))
+
+        sample_log_ps = torch.stack(sample_log_ps, 0)
+        sample_log_ps = sample_log_ps.to(current_device)
 
         sample_masks = torch.stack(sample_masks, 0)
         sample_masks = sample_masks.to(current_device)
@@ -853,16 +850,8 @@ class REQA(torch.nn.Module):
         if self.config.gpu:
             lenght_norm = lenght_norm.to(current_device)
 
-        entropy = torch.mean(torch.mul(question_log_p, sample_masks), dim=1)
-        entropy_loss = torch.mean(entropy, dim=0)
-
-        bleu_loss = -torch.mean(
-            torch.sum(
-                torch.mul(torch.exp(question_log_p), bleu_scores),
-                dim=1,
-            ),
-            dim=0,
-        )
+        # entropy = torch.mean(torch.mul(question_log_p, sample_masks), dim=1)
+        # entropy_loss = torch.mean(entropy, dim=0)
 
         """
         # question model on real data
@@ -945,6 +934,87 @@ class REQA(torch.nn.Module):
             dim=0,
         )
         """
+        cpy_question_log_p = question_log_p.clone().detach()
+        cpy_answer_log_p = answer_log_p.clone().detach()
+        cpy_length_normalized_question_p = torch.mul(
+            torch.exp(cpy_question_log_p), lenght_norm
+        )
+        approximate_z = torch.sum(
+            torch.mul(
+                torch.mul(
+                    torch.exp(cpy_answer_log_p),
+                    cpy_length_normalized_question_p,
+                ),
+                sample_masks,
+            ),
+            dim=1,
+        )
+
+        length_normalized_question_p = torch.mul(torch.exp(question_log_p), lenght_norm)
+
+        # MML for the question module.
+        question_mml_loss = -torch.mean(
+            torch.div(
+                torch.mean(
+                    torch.mul(
+                        torch.div(
+                            torch.mul(
+                                length_normalized_question_p,
+                                torch.exp(cpy_answer_log_p),
+                            ),
+                            torch.exp(sample_log_ps),
+                        ),
+                        sample_masks,
+                    ),
+                    dim=1,
+                ),
+                approximate_z,
+            ),
+            dim=0,
+        )
+
+        # MML for the answer module.
+        answer_mml_loss = -torch.mean(
+            torch.div(
+                torch.mean(
+                    torch.mul(
+                        torch.div(
+                            torch.mul(
+                                cpy_length_normalized_question_p,
+                                torch.exp(answer_log_p),
+                            ),
+                            torch.exp(sample_log_ps),
+                        ),
+                        sample_masks,
+                    ),
+                    dim=1,
+                ),
+                approximate_z,
+            ),
+            dim=0,
+        )
+
+        # MML
+        """
+        re_loss = -torch.mean(
+            torch.div(
+                torch.sum(
+                    torch.mul(
+                        torch.mul(
+                            torch.transpose(torch.exp(answer_log_p), 0, 1),
+                            torch.transpose(torch.exp(question_log_p), 0, 1),
+                        ),
+                        torch.transpose(question_log_p, 0, 1),
+                    ),
+                    dim=1,
+                ),
+                approximate_z,
+            ),
+            dim=0,
+        )
+        """
+
+        """
         # print(torch.exp(lm_log_p))
         length_normalized_p = torch.mul(torch.exp(question_log_p), lenght_norm)
         re_loss = -torch.mean(
@@ -962,10 +1032,24 @@ class REQA(torch.nn.Module):
             ),
             dim=0,
         )
+        """
+
         # loss = re_loss #+ lm_loss
-        loss = re_loss + 0.05 * entropy_loss + bleu_loss
-        loss_value = loss.item()
-        return loss, loss_value
+        # loss = re_loss + 0.05 * entropy_loss + bleu_loss
+        question_bleu_loss = -torch.mean(
+            torch.mean(
+                torch.mul(
+                    torch.div(
+                        torch.mul(length_normalized_question_p, bleu_scores),
+                        torch.exp(sample_log_ps),
+                    ),
+                    sample_masks,
+                ),
+                dim=1,
+            ),
+            dim=0,
+        )
+        return question_mml_loss + 0.5 * question_bleu_loss, answer_mml_loss
 
     def iterative_train(
         self,
@@ -997,20 +1081,27 @@ class REQA(torch.nn.Module):
             self.answer_optimizer.zero_grad()
             # self.answer_model.eval()
             self.answer_model.train()
-            loss, loss_value = self.mml_question_training(
+            q_loss, a_loss = self.mml_question_training(
                 batch,
                 current_device,
                 sample_p=sample_p,
                 real_question_batch=real_question_batch,
             )
-            if not math.isnan(loss_value) and not torch.isinf(loss):
+            q_loss_value = q_loss.item()
+            a_loss_value = a_loss.item()
+            if not math.isnan(q_loss_value) and not torch.isinf(q_loss):
                 # BackProp
-                loss.backward()
+                q_loss.backward()
                 # Optimize
                 self.question_optimizer.step()
+
+            if not math.isnan(a_loss_value) and not torch.isinf(a_loss):
+                # BackProp
+                a_loss.backward()
+                # Optimize
                 self.answer_optimizer.step()
 
-            return loss_value
+            return q_loss_value
 
         """
         # Answer Only
