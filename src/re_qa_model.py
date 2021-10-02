@@ -1049,6 +1049,10 @@ class REQA(torch.nn.Module):
             ),
             dim=0,
         )
+
+        print(question_mml_loss)
+        print(0.5 * question_bleu_loss)
+        print(answer_mml_loss)
         return question_mml_loss + 0.5 * question_bleu_loss, answer_mml_loss
 
     def iterative_train(
