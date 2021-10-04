@@ -257,6 +257,7 @@ def run_squad_test(args):
         save_always=True,
     )
 
+
 def run_narrativeqa_test(args):
     """Test the trained T5 on narrative qa dataset."""
     config = HyperParameters(
@@ -298,6 +299,7 @@ def run_narrativeqa_test(args):
         test_dataloader=val_loader,
         save_always=True,
     )
+
 
 def run_main(args):
     """Decides what to do in the code."""

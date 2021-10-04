@@ -659,10 +659,12 @@ class REQA(torch.nn.Module):
                     return_dict_in_generate=True,
                 )
                 greedy_questions, greedy_question_log_ps = prob_of_sampled_predictions(
-                        loss_fct, greedy_question_predictions
+                    loss_fct, greedy_question_predictions
                 )
-                greedy_question_prediction_str = self.init_question_tokenizer.batch_decode(
-                    greedy_questions, skip_special_tokens=True
+                greedy_question_prediction_str = (
+                    self.init_question_tokenizer.batch_decode(
+                        greedy_questions, skip_special_tokens=True
+                    )
                 )
 
                 greedy_question_predictions_str = [
@@ -894,9 +896,28 @@ class REQA(torch.nn.Module):
         """
         length_normalized_question_p = torch.mul(torch.exp(question_log_p), lenght_norm)
 
-
-        easier_mml_loss = -torch.mean(torch.log(torch.mean(length_normalized_question_p * torch.exp(answer_log_p) * sample_masks * (1.0 / torch.exp(sample_log_ps)), dim=1)), dim=0)
-        entropy_loss = torch.mean(torch.mean(question_log_p * torch.exp(question_log_p) * sample_masks * (1.0 / torch.exp(sample_log_ps)), dim=1), dim=0)
+        easier_mml_loss = -torch.mean(
+            torch.log(
+                torch.mean(
+                    length_normalized_question_p
+                    * torch.exp(answer_log_p)
+                    * sample_masks
+                    * (1.0 / torch.exp(sample_log_ps)),
+                    dim=1,
+                )
+            ),
+            dim=0,
+        )
+        entropy_loss = torch.mean(
+            torch.mean(
+                question_log_p
+                * torch.exp(question_log_p)
+                * sample_masks
+                * (1.0 / torch.exp(sample_log_ps)),
+                dim=1,
+            ),
+            dim=0,
+        )
         """
         # MML for the question module.
         question_mml_loss = -torch.mean(
