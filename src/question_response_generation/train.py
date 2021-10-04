@@ -307,13 +307,6 @@ def argument_parser():
 
     parser.add_argument("--learning_rate", type=float, default=0.0005)
 
-    parser.add_argument(
-        "--max_gradient_norm",
-        type=float,
-        default=10.0,
-        help="max norm allowed for gradients",
-    )
-
     parser.add_argument("--batch_size", type=int, default=8, help="static batch size")
 
     parser.add_argument(
@@ -344,9 +337,6 @@ def argument_parser():
         "--gpu", type=bool, default=True, help="on gpu or not? True or False"
     )
 
-    parser.add_argument(
-        "--dream_path", type=str, help="path for reading dream scape data!"
-    )
     parser.add_argument(
         "--checkpoint", type=str, help="checkpoint of the trained model."
     )
