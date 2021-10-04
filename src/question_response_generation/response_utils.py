@@ -186,6 +186,7 @@ def create_response_dataset(
     decoder_max_length,
     distributed=False,
     num_workers=0,
+    dataset="all",
 ):
     """Function to mix and create the train/dev dataset for pytorch model."""
 
@@ -272,55 +273,62 @@ def create_response_dataset(
         )
         return train_dataset, dev_dataset, test_dataset
 
-    bq_train_dataset, bq_dev_dataset, bq_test_dataset = read_boolq_dataset()
-    drp_train_dataset, drp_dev_dataset, drp_test_dataset = read_drop_dataset()
-    rc_train_dataset, rc_dev_dataset, rc_test_dataset = read_race_dataset()
-    nq_train_dataset, nq_dev_dataset, nq_test_dataset = read_narrative_dataset()
-    sq_train_dataset, sq_dev_dataset, sq_test_dataset = read_squad_dataset()
+    if dataset == "all":
+        bq_train_dataset, bq_dev_dataset, bq_test_dataset = read_boolq_dataset()
+        drp_train_dataset, drp_dev_dataset, drp_test_dataset = read_drop_dataset()
+        rc_train_dataset, rc_dev_dataset, rc_test_dataset = read_race_dataset()
+        nq_train_dataset, nq_dev_dataset, nq_test_dataset = read_narrative_dataset()
+        sq_train_dataset, sq_dev_dataset, sq_test_dataset = read_squad_dataset()
 
-    bq_train_dataset, bq_dev_dataset, bq_test_dataset = dataset_to_pytorch(
-        bq_train_dataset, bq_dev_dataset, bq_test_dataset
-    )
-    drp_train_dataset, drp_dev_dataset, drp_test_dataset = dataset_to_pytorch(
-        drp_train_dataset, drp_dev_dataset, drp_test_dataset
-    )
-    rc_train_dataset, rc_dev_dataset, rc_test_dataset = dataset_to_pytorch(
-        rc_train_dataset, rc_dev_dataset, rc_test_dataset
-    )
-    nq_train_dataset, nq_dev_dataset, nq_test_dataset = dataset_to_pytorch(
-        nq_train_dataset, nq_dev_dataset, nq_test_dataset
-    )
-    sq_train_dataset, sq_dev_dataset, sq_test_dataset = dataset_to_pytorch(
-        sq_train_dataset, sq_dev_dataset, sq_test_dataset
-    )
+        bq_train_dataset, bq_dev_dataset, bq_test_dataset = dataset_to_pytorch(
+            bq_train_dataset, bq_dev_dataset, bq_test_dataset
+        )
+        drp_train_dataset, drp_dev_dataset, drp_test_dataset = dataset_to_pytorch(
+            drp_train_dataset, drp_dev_dataset, drp_test_dataset
+        )
+        rc_train_dataset, rc_dev_dataset, rc_test_dataset = dataset_to_pytorch(
+            rc_train_dataset, rc_dev_dataset, rc_test_dataset
+        )
+        nq_train_dataset, nq_dev_dataset, nq_test_dataset = dataset_to_pytorch(
+            nq_train_dataset, nq_dev_dataset, nq_test_dataset
+        )
+        sq_train_dataset, sq_dev_dataset, sq_test_dataset = dataset_to_pytorch(
+            sq_train_dataset, sq_dev_dataset, sq_test_dataset
+        )
 
-    train_dataset = torch.utils.data.ConcatDataset(
-        [
-            bq_train_dataset,
-            drp_train_dataset,
-            rc_train_dataset,
-            nq_train_dataset,
-            sq_train_dataset,
-        ]
-    )
-    dev_dataset = torch.utils.data.ConcatDataset(
-        [
-            bq_dev_dataset,
-            drp_dev_dataset,
-            rc_dev_dataset,
-            nq_dev_dataset,
-            sq_dev_dataset,
-        ]
-    )
-    test_dataset = torch.utils.data.ConcatDataset(
-        [
-            bq_test_dataset,
-            drp_test_dataset,
-            rc_test_dataset,
-            nq_test_dataset,
-            sq_test_dataset,
-        ]
-    )
+        train_dataset = torch.utils.data.ConcatDataset(
+            [
+                bq_train_dataset,
+                drp_train_dataset,
+                rc_train_dataset,
+                nq_train_dataset,
+                sq_train_dataset,
+            ]
+        )
+        dev_dataset = torch.utils.data.ConcatDataset(
+            [
+                bq_dev_dataset,
+                drp_dev_dataset,
+                rc_dev_dataset,
+                nq_dev_dataset,
+                sq_dev_dataset,
+            ]
+        )
+        test_dataset = torch.utils.data.ConcatDataset(
+            [
+                bq_test_dataset,
+                drp_test_dataset,
+                rc_test_dataset,
+                nq_test_dataset,
+                sq_test_dataset,
+            ]
+        )
+
+    elif dataset == "narrativeqa":
+        nq_train_dataset, nq_dev_dataset, nq_test_dataset = read_narrative_dataset()
+        train_dataset, dev_dataset, test_dataset = dataset_to_pytorch(
+            nq_train_dataset, nq_dev_dataset, nq_test_dataset
+        )
 
     # Training
     train_sampler = None
