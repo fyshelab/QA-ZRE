@@ -1,4 +1,4 @@
-"""Implementation of the T5 Model for Response Generation.
+"""Implementation of the T5 Model for Response and Question Generation.
 
 (DataParallel Mode)
 """
@@ -19,8 +19,6 @@ def save(model: torch.nn.Module, path: str) -> None:
 
 
 MODEL_NAME = "t5-base"
-# MODEL_NAME = "iarfmoose/t5-base-question-generator"
-# MODEL_NAME = "mrm8488/t5-base-finetuned-question-generation-ap"
 
 
 class T5QA(object):
