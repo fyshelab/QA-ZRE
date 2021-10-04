@@ -383,7 +383,7 @@ class REQA(torch.nn.Module):
             answer_input_mask,
             question_input_ids,
             question_input_mask,
-            _,
+            question_predictions_str,
         ) = self.question_greedy_predict(batch, current_device)
         target_mask = batch["second_entity_attention_mask"]
         labels = batch["second_entity_labels"]
@@ -649,91 +649,32 @@ class REQA(torch.nn.Module):
                     top_p += 0.002
                     counter += 1
 
-                """
-                beam_question_predictions = self.init_question_model.generate(
+                greedy_question_predictions = self.init_question_model.generate(
                     input_ids=question_input_ids[i, :].view(1, -1),
                     attention_mask=question_input_mask[i, :].view(1, -1),
                     no_repeat_ngram_size=self.config.no_repeat_ngram_size,
                     max_length=self.config.decoder_max_length,
-                    num_return_sequences=self.config.num_search_samples,
-                    num_beams=self.config.num_search_samples,
+                    num_return_sequences=1,
                     output_scores=True,
                     return_dict_in_generate=True,
                 )
-                print(beam_question_predictions)
-                beam_questions, beam_question_log_ps = prob_of_sampled_predictions(
-                        loss_fct, beam_question_predictions
+                greedy_questions, greedy_question_log_ps = prob_of_sampled_predictions(
+                        loss_fct, greedy_question_predictions
                 )
-                beam_question_prediction_str = self.init_question_tokenizer.batch_decode(
-                    beam_questions, skip_special_tokens=True
+                greedy_question_prediction_str = self.init_question_tokenizer.batch_decode(
+                    greedy_questions, skip_special_tokens=True
                 )
 
-                beam_question_prediction_str = [
+                greedy_question_predictions_str = [
                     remove_prefix(pred, "question: ")
-                    for pred in beam_question_prediction_str
+                    for pred in greedy_question_prediction_str
                 ]
 
-                beam_question_predictions_str_reshaped = [
-                        beam_question_prediction_str[
-                            i
-                            * (self.config.num_search_samples) : (i + 1)
-                            * (self.config.num_search_samples)
-                        ]
-                        for i in range(1)
-                ]
-                temp_set.add(beam_question_predictions_str_reshaped[0][0])
-                sample_log_p.append(beam_question_log_ps[0])
-                print(sample_log_p)
-                print(temp_set)
-                """
-                """
-                if len(temp_set) < self.config.num_search_samples:
-                    top_k_sampled_question_outputs = self.question_model.generate(
-                        input_ids=question_input_ids[i, :].view(1, -1),
-                        do_sample=True,
-                        no_repeat_ngram_size=self.config.no_repeat_ngram_size,
-                        early_stopping=True,
-                        max_length=self.config.decoder_max_length,
-                        num_return_sequences=self.config.num_search_samples,
-                        top_k=100,
-                        output_scores=True,
-                        return_dict_in_generate=True,
-                        attention_mask=question_input_mask[i, :].view(1, -1),
-                    )
-                    top_k_sampled_questions, _ = prob_of_sampled_predictions(
-                        loss_fct, top_k_sampled_question_outputs
-                    )
+                greedy_sample = greedy_question_predictions_str[0]
+                if greedy_sample not in temp_list:
+                    temp_list.append(greedy_question_predictions_str[0])
+                    sample_log_p.append(greedy_question_log_ps)
 
-                    top_k_sampled_question_predictions_str = (
-                        self.question_tokenizer.batch_decode(
-                            top_k_sampled_questions, skip_special_tokens=True
-                        )
-                    )
-
-                    top_k_sampled_question_predictions_str = [
-                        remove_prefix(pred, "question: ")
-                        for pred in top_k_sampled_question_predictions_str
-                    ]
-
-                    top_k_sampled_question_predictions_str_reshaped = [
-                        top_k_sampled_question_predictions_str[
-                            i
-                            * (self.config.num_search_samples - 1) : (i + 1)
-                            * (self.config.num_search_samples - 1)
-                        ]
-                        for i in range(1)
-                    ]
-                    for sample_i in range(self.config.num_search_samples - 1):
-                        sample = top_k_sampled_question_predictions_str_reshaped[0][
-                            sample_i
-                        ]
-                        if (
-                            (sample not in temp_set)
-                            and (len(temp_set) < (self.config.num_search_samples))
-                            and (len(sample.split()) > 5)
-                        ):
-                            temp_set.add(sample)
-                """
                 while len(temp_list) < self.config.num_search_samples:
                     temp_list.append("This is a dummy question!")
                     sample_log_p.append(0)
@@ -934,6 +875,7 @@ class REQA(torch.nn.Module):
             dim=0,
         )
         """
+        """
         cpy_question_log_p = question_log_p.clone().detach()
         cpy_answer_log_p = answer_log_p.clone().detach()
         cpy_length_normalized_question_p = torch.mul(
@@ -949,9 +891,13 @@ class REQA(torch.nn.Module):
             ),
             dim=1,
         )
-
+        """
         length_normalized_question_p = torch.mul(torch.exp(question_log_p), lenght_norm)
 
+
+        easier_mml_loss = -torch.mean(torch.log(torch.mean(length_normalized_question_p * torch.exp(answer_log_p) * sample_masks * (1.0 / torch.exp(sample_log_ps)), dim=1)), dim=0)
+        entropy_loss = torch.mean(torch.mean(question_log_p * torch.exp(question_log_p) * sample_masks * (1.0 / torch.exp(sample_log_ps)), dim=1), dim=0)
+        """
         # MML for the question module.
         question_mml_loss = -torch.mean(
             torch.div(
@@ -993,6 +939,7 @@ class REQA(torch.nn.Module):
             ),
             dim=0,
         )
+        """
 
         # MML
         """
@@ -1050,10 +997,7 @@ class REQA(torch.nn.Module):
             dim=0,
         )
 
-        print(question_mml_loss)
-        print(0.5 * question_bleu_loss)
-        print(answer_mml_loss)
-        return question_mml_loss + 0.5 * question_bleu_loss, answer_mml_loss
+        return easier_mml_loss + 0.5 * question_bleu_loss + 0.05 * entropy_loss
 
     def iterative_train(
         self,
@@ -1085,27 +1029,21 @@ class REQA(torch.nn.Module):
             self.answer_optimizer.zero_grad()
             # self.answer_model.eval()
             self.answer_model.train()
-            q_loss, a_loss = self.mml_question_training(
+            loss = self.mml_question_training(
                 batch,
                 current_device,
                 sample_p=sample_p,
                 real_question_batch=real_question_batch,
             )
-            q_loss_value = q_loss.item()
-            a_loss_value = a_loss.item()
-            if not math.isnan(q_loss_value) and not torch.isinf(q_loss):
+            loss_value = loss.item()
+            if not math.isnan(loss_value) and not torch.isinf(loss):
                 # BackProp
-                q_loss.backward()
+                loss.backward()
                 # Optimize
                 self.question_optimizer.step()
-
-            if not math.isnan(a_loss_value) and not torch.isinf(a_loss):
-                # BackProp
-                a_loss.backward()
-                # Optimize
                 self.answer_optimizer.step()
 
-            return q_loss_value
+            return loss_value
 
         """
         # Answer Only
