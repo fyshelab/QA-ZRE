@@ -51,8 +51,8 @@ source env/bin/activate
 python3 src/re_gold_qa_train.py \
     --mode re_qa_train \
     --model_path $HOME/september_22/mml_mml_top_p_long_samples/ \
-    --answer_checkpoint _response_pretrained_model \
-    --question_checkpoint _question_pretrained_model \
+    --answer_checkpoint _0_answer_step_2000 \
+    --question_checkpoint _0_question_step_2000 \
     --training_steps 2000 \
     --update_switch_steps 1 \
     --learning_rate 0.001 \

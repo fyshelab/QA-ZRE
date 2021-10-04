@@ -47,12 +47,12 @@ source env/bin/activate
 python src/re_gold_qa_train.py \
        --mode re_gold_qa_train \
        --model_path $HOME/september_22/gold/ \
-       --checkpoint _response_pretrained_model \
+       --checkpoint _0_step_2000_model \
        --learning_rate 0.001 --max_epochs 1 \
        --concat_questions False \
        --batch_size 2  --gpu True \
        --answer_training_steps 2000 \
-       --ignore_unknowns True \
+       --ignore_unknowns False \
        --train ./zero-shot-extraction/relation_splits/train.very_small.1 \
        --dev ./zero-shot-extraction/relation_splits/dev.1 \
        --gpu_device 0 \

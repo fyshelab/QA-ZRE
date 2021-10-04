@@ -104,7 +104,7 @@ def iterative_run_model(
                     question_loss = model.iterative_train(
                         question_batch,
                         current_device,
-                        phase="question",
+                        phase="answer",
                         sample_p=0.95,
                         # real_question_batch=real_question_batch,
                     )

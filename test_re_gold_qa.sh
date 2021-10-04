@@ -49,8 +49,8 @@ python src/re_gold_qa_train.py \
 	       		--dev zero-shot-extraction/relation_splits/dev.1 \
 	       		--gpu_device 0 \
 			--prediction_file $HOME/august_25_runs/re_gold_qa_models_with_unknowns/fold_1/dev.predictions.0.step.0.csv
-'
-for (( j=9; j<=25; j++ ))
+
+for (( j=1; j<=20; j++ ))
 	do
 		step=$((j * 100))
 		printf "step ${step}"
@@ -61,9 +61,24 @@ for (( j=9; j<=25; j++ ))
 	       		--learning_rate 0.001 --max_epochs 1 \
 	       		--concat_questions False \
 	       		--batch_size 16  --gpu True \
-	       		--ignore_unknowns True \
+	       		--ignore_unknowns False \
 	       		--train zero-shot-extraction/relation_splits/train.very_small.1 \
 	       		--dev zero-shot-extraction/relation_splits/dev.1 \
 	       		--gpu_device 0 \
-			--prediction_file $HOME/september_22/gold/dev.predictions.0.step.${step}.csv
+			--prediction_file $HOME/september_22/gold/dev.predictions.1.step.${step}.csv
+			--seed 12321
     	done
+'
+python src/re_gold_qa_train.py \
+	--mode re_gold_qa_test \
+	--model_path $HOME/september_22/gold/ \
+	--checkpoint _0_step_800_model \
+	--learning_rate 0.001 --max_epochs 1 \
+	--concat_questions False \
+	--batch_size 32  --gpu True \
+	--ignore_unknowns False \
+	--train zero-shot-extraction/relation_splits/train.very_small.1 \
+	--dev zero-shot-extraction/relation_splits/test.1 \
+	--gpu_device 0 \
+	--prediction_file $HOME/september_22/gold/test.predictions.1.step.800.csv
+	--seed 12321
