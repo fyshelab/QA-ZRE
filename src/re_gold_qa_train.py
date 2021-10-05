@@ -7,7 +7,7 @@ import torch.utils.data.distributed
 
 from src.question_response_generation.t5_model import T5QA
 from src.question_response_generation.train import run_model
-from src.re_qa_model import REQA, HyperParameters, set_random_seed
+from src.re_qa_model import load_module, REQA, HyperParameters, set_random_seed
 from src.re_qa_train import iterative_run_model
 from src.zero_extraction_utils import create_zero_re_qa_dataset
 
@@ -39,11 +39,7 @@ def run_re_gold_qa(args):
     set_random_seed(config.seed)
     model = T5QA(config)
 
-    loaded_weights = torch.load(
-        model.model_path + args.checkpoint,
-        map_location=lambda storage, loc: storage,
-    )
-    model.load_state_dict(loaded_weights)
+    load_module(model.model.module, model.model_path, args.checkpoint)
 
     (
         train_loaders,
@@ -103,12 +99,7 @@ def run_re_concat_qa(args):
 
     set_random_seed(config.seed)
     model = T5QA(config)
-
-    loaded_weights = torch.load(
-        model.model_path + args.checkpoint,
-        map_location=lambda storage, loc: storage,
-    )
-    model.load_state_dict(loaded_weights)
+    load_module(model.model.module, model.model_path, args.checkpoint)
 
     (
         train_loaders,
