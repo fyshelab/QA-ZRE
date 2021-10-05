@@ -39,7 +39,8 @@ def run_re_gold_qa(args):
     set_random_seed(config.seed)
     model = T5QA(config)
 
-    load_module(model.model.module, model.model_path, args.checkpoint)
+    if not for_evaluation:
+        load_module(model.model.module, model.model_path, args.checkpoint)
 
     (
         train_loaders,
@@ -99,7 +100,8 @@ def run_re_concat_qa(args):
 
     set_random_seed(config.seed)
     model = T5QA(config)
-    load_module(model.model.module, model.model_path, args.checkpoint)
+    if not for_evaluation:
+        load_module(model.model.module, model.model_path, args.checkpoint)
 
     (
         train_loaders,
