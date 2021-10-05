@@ -10,12 +10,14 @@ from pathlib import Path
 from typing import Generator, Optional
 
 import numpy as np
+import torch
 
-from src.question_response_generation.question_utils import \
-    create_question_dataset
+from src.question_response_generation.question_utils import (
+    create_question_dataset, create_question_generation_dataset)
 from src.question_response_generation.response_utils import \
     create_response_dataset
 from src.question_response_generation.t5_model import T5QA, HyperParameters
+from src.re_qa_model import set_random_seed
 
 
 def read_squad_refs(path):
@@ -156,6 +158,7 @@ def run_all(args):
         prediction_file=args.prediction_file,
     )
 
+    set_random_seed(config.seed)
     model = T5QA(config)
 
     if args.question_training:
@@ -214,6 +217,7 @@ def run_squad_test(args):
         checkpoint=args.checkpoint,
     )
 
+    set_random_seed(config.seed)
     model = T5QA(config)
 
     if args.question_training:
@@ -273,6 +277,7 @@ def run_narrativeqa_test(args):
         checkpoint=args.checkpoint,
     )
 
+    set_random_seed(config.seed)
     model = T5QA(config)
 
     (
@@ -301,6 +306,48 @@ def run_narrativeqa_test(args):
     )
 
 
+def run_second_q_pretrain(args):
+    """Run the T5 to do the second pretraining of the question module."""
+    config = HyperParameters(
+        model_path=args.model_path,
+        batch_size=args.batch_size,
+        source_max_length=512,
+        decoder_max_length=128,
+        gpu=args.gpu,
+        learning_rate=args.learning_rate,
+        max_epochs=args.max_epochs,
+        mode="train",
+        prediction_file=args.prediction_file,
+    )
+
+    set_random_seed(config.seed)
+
+    model = T5QA(config)
+
+    loaded_weights = torch.load(
+        model.model_path + args.checkpoint,
+        map_location=lambda storage, loc: storage,
+    )
+    model.load_state_dict(loaded_weights)
+
+    train_loader, _, _ = create_question_generation_dataset(
+        question_tokenizer=model.tokenizer,
+        batch_size=config.batch_size,
+        source_max_length=config.source_max_length,
+        decoder_max_length=config.decoder_max_length,
+        distributed=False,
+        num_workers=1,
+    )
+    run_model(
+        model,
+        config=config,
+        train_dataloader=train_loader,
+        dev_dataloader=None,
+        test_dataloader=None,
+        save_always=True,
+    )
+
+
 def run_main(args):
     """Decides what to do in the code."""
     if args.mode in ["all_train"]:
@@ -309,6 +356,8 @@ def run_main(args):
         run_squad_test(args)
     if args.mode in ["narrativeqa_test"]:
         run_narrativeqa_test(args)
+    if args.mode in ["question_generation_second_pretrain"]:
+        run_second_q_pretrain(args)
 
 
 def argument_parser():
