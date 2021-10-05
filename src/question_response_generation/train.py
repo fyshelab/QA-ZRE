@@ -17,7 +17,7 @@ from src.question_response_generation.question_utils import (
 from src.question_response_generation.response_utils import \
     create_response_dataset
 from src.question_response_generation.t5_model import T5QA, HyperParameters
-from src.re_qa_model import set_random_seed
+from src.re_qa_model import load_module, set_random_seed
 
 
 def read_squad_refs(path):
@@ -324,11 +324,7 @@ def run_second_q_pretrain(args):
 
     model = T5QA(config)
 
-    loaded_weights = torch.load(
-        model.model_path + args.checkpoint,
-        map_location=lambda storage, loc: storage,
-    )
-    model.load_state_dict(loaded_weights)
+    load_module(model.model.module, model.model_path, args.checkpoint)
 
     train_loader, _, _ = create_question_generation_dataset(
         question_tokenizer=model.tokenizer,
