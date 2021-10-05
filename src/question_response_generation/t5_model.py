@@ -59,12 +59,6 @@ class T5QA(object):
                 os.makedirs(cfg.model_path)
             self.model_path = os.path.join(cfg.model_path, "model")
 
-            loaded_weights = torch.load(
-                self.model_path + cfg.checkpoint,
-                map_location=lambda storage, loc: storage,
-            )
-            model.load_state_dict(loaded_weights)
-
         elif cfg.mode in ["test", "inference"]:
             tokenizer = T5Tokenizer.from_pretrained(MODEL_NAME)
             model = T5ForConditionalGeneration.from_pretrained(MODEL_NAME)
