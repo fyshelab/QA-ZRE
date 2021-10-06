@@ -14,7 +14,7 @@ do
 		--checkpoint _0_step_${step}_model \
 		--learning_rate 0.001 --max_epochs 1 \
 		--concat_questions False \
-		--batch_size 16  --gpu True \
+		--batch_size 64  --gpu True \
 		--ignore_unknowns False \
 		--train zero-shot-extraction/relation_splits/train.0 \
 		--dev zero-shot-extraction/relation_splits/dev.0 \
@@ -33,7 +33,7 @@ python src/re_gold_qa_train.py \
 	--checkpoint _0_model \
 	--learning_rate 0.001 --max_epochs 1 \
 	--concat_questions False \
-	--batch_size 16  --gpu True \
+	--batch_size 64  --gpu True \
 	--ignore_unknowns False \
 	--train zero-shot-extraction/relation_splits/train.0 \
 	--dev zero-shot-extraction/relation_splits/dev.0 \
@@ -51,7 +51,7 @@ python src/re_gold_qa_train.py \
 	--checkpoint _response_pretrained_model \
 	--learning_rate 0.001 --max_epochs 1 \
 	--concat_questions False \
-	--batch_size 16  --gpu True \
+	--batch_size 64  --gpu True \
 	--ignore_unknowns False \
 	--train zero-shot-extraction/relation_splits/train.0 \
 	--dev zero-shot-extraction/relation_splits/dev.0 \
