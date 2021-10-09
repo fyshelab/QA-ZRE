@@ -7,10 +7,10 @@ source env/bin/activate
 #wait
 
 printf "fold 1, epoch 1\r\n"
-for (( j=1; j<=12; j ++))
+for (( j=13; j<=13; j ++))
 do
 	k=$((j * 10))
-	end_k=$((k+9))
+	end_k=$((k+1))
 	for (( i=${k}; i<=${end_k}; i++ ))
 	do
 		step=$((i * 100))
@@ -31,7 +31,6 @@ do
 	done
 	wait
 done
-
 '''
 gsutil -m cp gs://acl-2022-storage/gold_fold_1/model_1_model $HOME/gold_fold_1/
 printf "Full epoch 1 \r\n"
