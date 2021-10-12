@@ -729,12 +729,12 @@ class REQA(torch.nn.Module):
         if self.config.gpu:
             lenght_norm = lenght_norm.to(current_device)
 
-        length_normalized_question_p = torch.mul(torch.exp(question_log_p), lenght_norm)
-
+        # length_normalized_question_p = torch.mul(torch.exp(question_log_p), lenght_norm)
+        question_p = torch.exp(question_log_p)
         easier_mml_loss = -torch.mean(
             torch.log(
                 torch.mean(
-                    length_normalized_question_p
+                    question_p
                     * torch.exp(answer_log_p)
                     * sample_masks
                     * (1.0 / torch.exp(sample_log_ps)),
@@ -746,7 +746,7 @@ class REQA(torch.nn.Module):
         entropy_loss = torch.mean(
             torch.mean(
                 question_log_p
-                * torch.exp(question_log_p)
+                * question_p
                 * sample_masks
                 * (1.0 / torch.exp(sample_log_ps)),
                 dim=1,
@@ -757,7 +757,7 @@ class REQA(torch.nn.Module):
             torch.mean(
                 torch.mul(
                     torch.div(
-                        torch.mul(length_normalized_question_p, bleu_scores),
+                        torch.mul(question_p, bleu_scores),
                         torch.exp(sample_log_ps),
                     ),
                     sample_masks,
@@ -767,7 +767,7 @@ class REQA(torch.nn.Module):
             dim=0,
         )
 
-        return easier_mml_loss + 0.5 * question_bleu_loss + 0.05 * entropy_loss
+        return easier_mml_loss + question_bleu_loss + 0.01 * entropy_loss
 
     def iterative_train(
         self,

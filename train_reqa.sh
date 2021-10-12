@@ -1,11 +1,11 @@
 #!/bin/bash
-'
-#SBATCH --job-name=reqa_mml_mml_top_p_long_samples_fold_1
+
+#SBATCH --job-name=reqa_mml_mml_fold_0
 #SBATCH --account=rrg-afyshe
-#SBATCH --nodes=1
-#SBATCH --tasks-per-node=1
-#SBATCH --gres=gpu:v100l:1
-#SBATCH --mem=12000M
+#SBATCH --nodes=4
+#SBATCH --tasks-per-node=4
+#SBATCH --gres=gpu:v100l:4
+#SBATCH --mem=0
 #SBATCH --time=0-15:00
 #SBATCH --cpus-per-task=6
 #SBATCH --output=%N-%j.out
@@ -27,43 +27,24 @@ echo "All the allocated nodes: $SLURM_JOB_NODELIST"
 
 # The SLURM_NTASKS variable tells the script how many processes are available for this execution. “srun” executes the script <tasks-per-node * nodes> times
 
-python src/re_gold_qa_train.py \
+srun python src/re_gold_qa_train.py \
+    --init_method tcp://$MASTER_ADDR:3456 \
+    --world_size $SLURM_NTASKS \
     --mode re_qa_train \
-    --model_path $SCRATCH/re_mml_pgg_top_p_iterative_models/mml_mml_top_p_long_samples/fold_1 \
-    --answer_checkpoint _response_pretrained_model \
-    --question_checkpoint _question_pretrained_model \
-    --training_steps 3100 \
-    --update_switch_steps 1 \
-    --learning_rate 0.001 \
-    --max_epochs 1 \
-    --num_search_samples 8 \
-    --batch_size 4 \
-    --gpu True \
-    --num_workers 6 \
-    --concat_questions False \
-    --dev ./zero-shot-extraction/relation_splits/dev.1 \
-    --train ./zero-shot-extraction/relation_splits/train.1 \
-    --gpu_device 0 \
-    --seed 12321
-'
-source env/bin/activate
-
-python3 src/re_gold_qa_train.py \
-    --mode re_qa_train \
-    --model_path $HOME/oct_11/ \
+    --model_path $SCRATCH/oct_11/ \
     --answer_checkpoint _response_pretrained_model \
     --question_checkpoint _question_second_pretrained_model \
-    --training_steps 2000 \
+    --training_steps 840000 \
     --update_switch_steps 1 \
     --learning_rate 0.001 \
-    --max_epochs 1 \
-    --num_search_samples 6 \
-    --batch_size 2 \
+    --max_epochs 2 \
+    --num_search_samples 8 \
+    --batch_size 64 \
     --gpu True \
     --num_workers 6 \
     --concat_questions False \
     --dev ./zero-shot-extraction/relation_splits/dev.0 \
-    --train ./zero-shot-extraction/relation_splits/train.very_small.0 \
+    --train ./zero-shot-extraction/relation_splits/train.0 \
     --gpu_device 0 \
     --seed 12321 \
     --train_method MML-MML
