@@ -3,7 +3,7 @@
 source env/bin/activate
 
 printf "fold 1, epoch 1\r\n"
-for (( i=1; i<=131; i++ ))
+for (( i=83; i<=83; i++ ))
 do
 	step=$((i * 100))
 	printf "step ${step}\r\n"
@@ -25,6 +25,7 @@ do
 	rm -r -f $HOME/concat_fold_1/model_1_step_${step}_model
 done
 
+'
 gsutil -m cp gs://acl-2022-storage/concat_fold_1/model_1_model $HOME/concat_fold_1/
 printf "Full epoch 1 \r\n"
 python src/re_gold_qa_train.py \
@@ -60,3 +61,4 @@ python src/re_gold_qa_train.py \
 	--prediction_file $HOME/concat_fold_1/concat_fold_1.dev.predictions.1.step.0.csv
 gsutil -m cp $HOME/concat_fold_1/concat_fold_1.dev.predictions.1.step.0.csv gs://acl-2022-storage/concat_fold_1/
 rm -r -f $HOME/concat_fold_1/model_response_pretrained_model
+'

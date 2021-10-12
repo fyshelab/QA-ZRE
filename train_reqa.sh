@@ -50,19 +50,20 @@ source env/bin/activate
 
 python3 src/re_gold_qa_train.py \
     --mode re_qa_train \
-    --model_path $HOME/september_22/mml_mml_top_p_long_samples/ \
-    --answer_checkpoint _0_answer_step_2000 \
-    --question_checkpoint _0_question_step_2000 \
+    --model_path $HOME/oct_11/ \
+    --answer_checkpoint _response_pretrained_model \
+    --question_checkpoint _question_second_pretrained_model \
     --training_steps 2000 \
     --update_switch_steps 1 \
     --learning_rate 0.001 \
     --max_epochs 1 \
-    --num_search_samples 8 \
+    --num_search_samples 6 \
     --batch_size 2 \
     --gpu True \
     --num_workers 6 \
     --concat_questions False \
-    --dev ./zero-shot-extraction/relation_splits/dev.1 \
-    --train ./zero-shot-extraction/relation_splits/train.very_small.1 \
+    --dev ./zero-shot-extraction/relation_splits/dev.0 \
+    --train ./zero-shot-extraction/relation_splits/train.very_small.0 \
     --gpu_device 0 \
-    --seed 12321
+    --seed 12321 \
+    --train_method MML-MML
