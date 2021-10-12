@@ -220,57 +220,18 @@ def run_re_qa(args):
             concat=False,
             gold_questions=False,
         )
-        # To train the question model, we do not use the negative data with unknown answers.
-        (
-            question_train_loaders,
-            question_val_loaders,
-            question_train_dataset,
-            question_val_dataset,
-            question_train_sampler,
-        ) = create_zero_re_qa_dataset(
-            question_tokenizer=model.question_tokenizer,
-            answer_tokenizer=model.answer_tokenizer,
-            batch_size=config.batch_size,
-            source_max_length=config.source_max_length,
-            decoder_max_length=config.decoder_max_length,
-            train_file=args.train,
-            dev_file=args.dev,
-            distributed=False,
-            num_workers=args.num_workers,
-            ignore_unknowns=False,
-            concat=False,
-            gold_questions=False,
-        )
-        """
-        (
-            real_question_loader,
-            real_question_dataset,
-            real_question_sampler,
-        ) = create_question_generation_dataset(
-            question_tokenizer=model.question_tokenizer,
-            batch_size=config.batch_size,
-            source_max_length=config.source_max_length,
-            decoder_max_length=config.decoder_max_length,
-            distributed=False,
-            num_workers=args.num_workers,
-        )
-        """
         iterative_run_model(
             model,
             config=config,
             train_dataloader=train_loaders,
             dev_dataloader=val_loaders,
             test_dataloader=val_loaders,
-            question_train_dataloader=question_train_loaders,
-            question_dev_dataloader=question_val_loaders,
-            question_test_dataloader=question_val_loaders,
             save_always=True,
             rank=0,
             train_samplers=[train_sampler],
-            question_train_samplers=[question_train_sampler],
             current_device=0,
             gold_eval_file=args.dev,
-            # real_question_dataloader=real_question_loader,
+            train_method=args.train_method,
         )
 
     if args.mode == "re_qa_test":
@@ -333,6 +294,12 @@ def argument_parser():
         type=str,
         required=True,
         help="re_gold_qa_train | re_gold_qa_test | re_concat_qa_train | re_concat_qa_test | re_qa_train | re_qa_test",
+    )
+    parser.add_argument(
+        "--train_method",
+        type=str,
+        required=True,
+        help="MML-MML | PGG",
     )
     parser.add_argument(
         "--model_path",

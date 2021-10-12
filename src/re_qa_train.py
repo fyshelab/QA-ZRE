@@ -55,16 +55,12 @@ def iterative_run_model(
     train_dataloader=None,
     dev_dataloader=None,
     test_dataloader=None,
-    question_train_dataloader=None,
-    question_dev_dataloader=None,
-    question_test_dataloader=None,
     save_always: Optional[bool] = False,
     rank=0,
     train_samplers=None,
-    question_train_samplers=None,
     current_device=0,
     gold_eval_file=None,
-    real_question_dataloader=None,
+    train_method="MML-MML",
 ) -> None:
     """Run the model on input data (for training or testing)"""
 
@@ -90,62 +86,35 @@ def iterative_run_model(
             print("\nRank: {0} | Epoch:{1}\n".format(rank, epoch))
             start = time.time()
 
-            answer_iter = iter(train_dataloader)
-            question_iter = iter(question_train_dataloader)
-            # real_question_iter = iter(real_question_dataloader)
+            data_iter = iter(train_dataloader)
             step = 0
-            question_total_loss = []
-            answer_total_loss = []
-            question_mean_loss = 0.0
+            total_loss = []
+            mean_loss = 0.0
             while step < config.training_steps:
                 for inner_step in range(config.update_switch_steps):
-                    question_batch = next(question_iter)
-                    # real_question_batch = next(real_question_iter)
-                    question_loss = model.iterative_train(
-                        question_batch,
+                    data_batch = next(data_iter)
+                    loss = model.iterative_train(
+                        data_batch,
                         current_device,
-                        phase="answer",
+                        phase=train_method,
                         sample_p=0.95,
-                        # real_question_batch=real_question_batch,
                     )
-                    if question_loss and not math.isinf(question_loss):
-                        question_total_loss.append(question_loss)
+                    if loss and not math.isinf(loss):
+                        total_loss.append(loss)
 
-                    if question_total_loss:
-                        question_mean_loss = np.mean(question_total_loss)
+                    if total_loss:
+                        mean_loss = np.mean(total_loss)
 
                     print(
-                        "\rRank:{0} | Batch:{1} | Question Loss:{2} | Question Mean Loss:{3} | GPU Usage:{4}\n".format(
+                        "\rRank:{0} | Batch:{1} | Loss:{2} | Mean Loss:{3} | GPU Usage:{4}\n".format(
                             rank,
                             step + inner_step + 1,
-                            question_loss,
-                            question_mean_loss,
+                            loss,
+                            mean_loss,
                             torch.cuda.memory_allocated(device=current_device),
                         )
                     )
 
-                """
-                for inner_step in range(config.update_switch_steps):
-                    answer_batch = next(answer_iter)
-                    answer_loss = model.iterative_train(
-                        answer_batch, current_device, phase="answer", sample_p=0.95
-                    )
-                    if answer_loss:
-                        answer_total_loss.append(answer_loss)
-
-                    if answer_total_loss:
-                        answer_mean_loss = np.mean(answer_total_loss)
-
-                    print(
-                        "\rRank:{0} | Batch:{1} | Answer Loss:{2} | Answer Mean Loss:{3} | GPU Usage:{4}\n".format(
-                            rank,
-                            step + inner_step + 1,
-                            answer_loss,
-                            answer_mean_loss,
-                            torch.cuda.memory_allocated(device=current_device),
-                        )
-                    )
-                """
                 step += config.update_switch_steps
                 if rank == 0 and save_always and step > 0 and (step % 100 == 0):
                     save(
