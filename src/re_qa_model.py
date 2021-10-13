@@ -722,13 +722,14 @@ class REQA(torch.nn.Module):
         )
 
         # easier way to use MML objective.
+        """
         length_weight = 1.5
         lenght_norm = torch.div(
             torch.pow(real_lenghts + 5, length_weight), pow(1 + 5, length_weight)
         )
         if self.config.gpu:
             lenght_norm = lenght_norm.to(current_device)
-
+        """
         # length_normalized_question_p = torch.mul(torch.exp(question_log_p), lenght_norm)
         question_p = torch.exp(question_log_p)
         easier_mml_loss = -torch.mean(
@@ -743,6 +744,7 @@ class REQA(torch.nn.Module):
             ),
             dim=0,
         )
+        """
         entropy_loss = torch.mean(
             torch.mean(
                 question_log_p
@@ -753,6 +755,8 @@ class REQA(torch.nn.Module):
             ),
             dim=0,
         )
+        """
+        """
         question_bleu_loss = -torch.mean(
             torch.mean(
                 torch.mul(
@@ -766,8 +770,8 @@ class REQA(torch.nn.Module):
             ),
             dim=0,
         )
-
-        return easier_mml_loss + question_bleu_loss + 0.01 * entropy_loss
+        """
+        return easier_mml_loss  # + question_bleu_loss #+ 0.01 * entropy_loss
 
     def iterative_train(
         self,
