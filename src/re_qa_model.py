@@ -721,6 +721,8 @@ class REQA(torch.nn.Module):
             loss_fct,
         )
 
+        print(output_questions)
+
         # easier way to use MML objective.
         """
         length_weight = 1.5
@@ -732,6 +734,14 @@ class REQA(torch.nn.Module):
         """
         # length_normalized_question_p = torch.mul(torch.exp(question_log_p), lenght_norm)
         question_p = torch.exp(question_log_p)
+        print(question_log_p)
+        print(question_p)
+        print(answer_log_p)
+        print(torch.exp(answer_log_p))
+        print(sample_masks)
+        print(sample_log_ps)
+        print(1.0 / torch.exp(sample_log_ps))
+        print("#")
         easier_mml_loss = -torch.mean(
             torch.log(
                 torch.mean(
