@@ -1,2 +1,2 @@
 # dreamscape-qa
-Code related to question answering experiments and other stuff.
+Code related to question generation for relation extraction.
