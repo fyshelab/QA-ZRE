@@ -1,10 +1,5 @@
-"""Implementation of the T5 Model for Response Generation.
-
-Some parts are from huggingface Library.
-https://github.com/huggingface/transformers/tree/master/src/transformers/models/t5
-https://arxiv.org/pdf/1910.10683.pdf
-https://arxiv.org/abs/1804.04235
-"""
+"""Implementation of the T5 Models for Response Generation and Question
+Generation Used for relation extraction."""
 
 import gc
 import math
@@ -15,7 +10,15 @@ from typing import Any, Optional
 
 import numpy
 import torch
+from nltk.translate.bleu_score import SmoothingFunction, sentence_bleu
+
+smoothie = SmoothingFunction().method4
+
 from transformers import Adafactor, T5ForConditionalGeneration, T5Tokenizer
+
+
+def white_space_fix(text):
+    return " ".join(text.split())
 
 
 @dataclass
@@ -42,18 +45,59 @@ class HyperParameters:
     dev: Optional[str] = None
     answer_checkpoint: Optional[str] = "_3_model"
     question_checkpoint: Optional[str] = "_3_model"
+    partition_checkpoint: Optional[str] = "_3_model"
+    checkpoint: Optional[str] = "_3_model"
 
     # Related to beam search decoding.
     beam_decoding: Optional[bool] = False
     num_beams: Optional[int] = 5
+    num_beam_groups: Optional[int] = 4
+    beam_diversity_penalty: Optional[float] = 0.5
     no_repeat_ngram_size: Optional[int] = 2
     early_stopping: Optional[bool] = True
+    num_search_samples: Optional[int] = 8
     question_training_steps: Optional[int] = 5
     answer_training_steps: Optional[int] = 1
+    training_steps: Optional[int] = 1
+    update_switch_steps: Optional[int] = 1
 
 
 def tuple_of_tensors_to_tensor(tuple_of_tensors):
     return torch.stack(list(tuple_of_tensors), dim=0)
+
+
+def prepare_response_module_input(
+    answer_input_ids=None,
+    answer_input_mask=None,
+    labels=None,
+    target_mask=None,
+    num_samples=1,
+    sample_masks=None,
+):
+    b_sz, dec_seq_len = labels.size()
+    _, src_seq_len = answer_input_ids.size()
+    labels = labels.repeat(1, num_samples).view(-1, dec_seq_len)
+    target_mask = target_mask.repeat(1, num_samples).view(-1, dec_seq_len)
+    sample_output_mask = (
+        sample_masks.reshape(num_samples * b_sz, 1)
+        .repeat(1, dec_seq_len)
+        .view(-1, dec_seq_len)
+    )
+
+    new_labels = (1 - sample_output_mask) * -100 + labels * sample_output_mask
+
+    sample_input_mask = (
+        sample_masks.reshape(num_samples * b_sz, 1)
+        .repeat(1, src_seq_len)
+        .view(-1, src_seq_len)
+    )
+
+    return (
+        answer_input_ids * sample_input_mask,
+        answer_input_mask * sample_input_mask,
+        target_mask * sample_output_mask,
+        new_labels,
+    )
 
 
 def set_random_seed(seed: int) -> Any:
@@ -121,23 +165,22 @@ def prob_of_sampled_predictions(loss_fct, sample_outputs):
     pad_mask = torch.transpose(sampled_predictions, 0, 1) == 0
     good_log_p = log_p.masked_fill_(pad_mask, 0.0)
     log_p = torch.sum(good_log_p, dim=0).squeeze()
-    sampled_p = torch.exp(log_p)
-    return sampled_predictions, sampled_p
+    return sampled_predictions, log_p
 
 
 MODEL_NAME = "t5-base"
-# MODEL_NAME = "allenai/unifiedqa-t5-base"
-Q_MODEL_NAME = "iarfmoose/t5-base-question-generator"
 
 
 class REQA(torch.nn.Module):
-    """Wrapper class around the T5 Model."""
+    """Wrapper class around the T5 Models."""
 
-    def __init__(self, cfg: HyperParameters, load_answer=True):
+    def __init__(self, cfg: HyperParameters):
         super(REQA, self).__init__()
         self.config = cfg
 
         set_random_seed(cfg.seed)
+
+        self.model_path = os.path.join(cfg.model_path, "model")
 
         # Answer model
         answer_tokenizer = T5Tokenizer.from_pretrained(MODEL_NAME)
@@ -146,10 +189,18 @@ class REQA(torch.nn.Module):
         answer_model = T5ForConditionalGeneration.from_pretrained(MODEL_NAME)
 
         # Question Model
-        question_tokenizer = T5Tokenizer.from_pretrained(Q_MODEL_NAME)
+        question_tokenizer = T5Tokenizer.from_pretrained(MODEL_NAME)
 
-        # Construct the question model
-        question_model = T5ForConditionalGeneration.from_pretrained(Q_MODEL_NAME)
+        # Construct the Question model
+        question_model = T5ForConditionalGeneration.from_pretrained(MODEL_NAME)
+
+        # pretrained question model
+        self.init_question_tokenizer = T5Tokenizer.from_pretrained(MODEL_NAME)
+
+        # Construct the pretrained question model
+        self.init_question_model = T5ForConditionalGeneration.from_pretrained(
+            MODEL_NAME
+        )
 
         if cfg.mode == "train":
             # Configurations suggested by the T5 paper.
@@ -182,14 +233,14 @@ class REQA(torch.nn.Module):
 
             if not os.path.exists(cfg.model_path):
                 os.makedirs(cfg.model_path)
-            self.model_path = os.path.join(cfg.model_path, "model")
 
-            if load_answer:
-                # we have a pre-trained answer module.
-                load_module(answer_model, self.model_path, cfg.answer_checkpoint)
+            load_module(answer_model, self.model_path, cfg.answer_checkpoint)
+            load_module(question_model, self.model_path, cfg.question_checkpoint)
+            load_module(
+                self.init_question_model, self.model_path, cfg.question_checkpoint
+            )
 
         elif cfg.mode in ["test", "inference"]:
-            self.model_path = os.path.join(cfg.model_path, "model")
             load_module(answer_model, self.model_path, cfg.answer_checkpoint)
             load_module(question_model, self.model_path, cfg.question_checkpoint)
 
@@ -198,28 +249,41 @@ class REQA(torch.nn.Module):
         self.question_model = question_model
         self.question_tokenizer = question_tokenizer
 
-    def question_greedy_predict(self, current_device, batch):
-        """Greedily generate the questions and prepare inputs for the answer
-        module."""
+    def question_beam_predict(self, batch, current_device):
+        """Use beam search to generate the questions and prepare inputs for the
+        answer module."""
         question_input_ids = batch["entity_relation_passage_input_ids"]
         question_input_mask = batch["entity_relation_passage_attention_mask"]
         if self.config.gpu:
             question_input_ids = question_input_ids.to(current_device)
             question_input_mask = question_input_mask.to(current_device)
 
-        question_predictions = self.question_model.generate(
-            input_ids=question_input_ids,
-            attention_mask=question_input_mask,
-        )
+        with torch.no_grad():
+            question_predictions = self.question_model.generate(
+                input_ids=question_input_ids,
+                attention_mask=question_input_mask,
+                no_repeat_ngram_size=self.config.no_repeat_ngram_size,
+                early_stopping=True,
+                max_length=self.config.decoder_max_length,
+                num_return_sequences=1,
+                num_beams=self.config.num_search_samples,
+                length_penalty=1.0,
+            )
 
         question_predictions_str = self.question_tokenizer.batch_decode(
             question_predictions, skip_special_tokens=True
         )
 
+        question_predictions_str = [
+            remove_prefix(pred, "question: ") for pred in question_predictions_str
+        ]
+
         new_articles = []
         for i in range(len(batch["passages"])):
             new_article = (
-                "question: "
+                "relation: "
+                + batch["entity_relations"][i]
+                + " question: "
                 + question_predictions_str[i]
                 + " context: "
                 + batch["passages"][i]
@@ -241,16 +305,28 @@ class REQA(torch.nn.Module):
             answer_input_ids = answer_input_ids.to(current_device)
             answer_input_mask = answer_input_mask.to(current_device)
 
-        return answer_input_ids, answer_input_mask
+        return (
+            answer_input_ids,
+            answer_input_mask,
+            question_input_ids,
+            question_input_mask,
+            question_predictions_str,
+        )
 
-    def predict_step(self, batch):
+    def predict_step(self, batch, current_device):
         # Free memory in GPU, very important!
         clear_cache()
         # disable dropout
         self.answer_model.eval()
         self.question_model.eval()
 
-        answer_input_ids, answer_input_mask = self.question_greedy_predict(batch)
+        (
+            answer_input_ids,
+            answer_input_mask,
+            _,
+            _,
+            question_predictions_str,
+        ) = self.question_beam_predict(batch, current_device)
 
         second_entity_predictions = self.answer_model.generate(
             input_ids=answer_input_ids,
@@ -259,281 +335,493 @@ class REQA(torch.nn.Module):
         second_entity_predictions_str = self.answer_tokenizer.batch_decode(
             second_entity_predictions, skip_special_tokens=True
         )
+
         for index in range(len(second_entity_predictions_str)):
             pred_str = second_entity_predictions_str[index]
             output_batch = {
                 "predictions_str": pred_str,
+                "question_predictions": question_predictions_str[index],
             }
             yield output_batch
 
-    def train_step(
+    def pgg_answer_training(self, batch, current_device):
+        loss_fct = torch.nn.CrossEntropyLoss(ignore_index=-100, reduction="none")
+        if self.config.gpu:
+            loss_fct = loss_fct.to(current_device)
+        (
+            answer_input_ids,
+            answer_input_mask,
+            question_input_ids,
+            question_input_mask,
+            question_predictions_str,
+        ) = self.question_beam_predict(batch, current_device)
+        target_mask = batch["second_entity_attention_mask"]
+        labels = batch["second_entity_labels"]
+        if self.config.gpu:
+            target_mask = target_mask.to(current_device)
+            labels = labels.to(current_device)
+
+        # Answer Computation
+        self.answer_model.train()
+        output = self.answer_model(
+            input_ids=answer_input_ids,
+            attention_mask=answer_input_mask,
+            decoder_attention_mask=target_mask,
+            decoder_input_ids=self.answer_model._shift_right(labels),
+            labels=None,
+        )
+
+        log_p = -loss_fct(
+            output.logits.view(-1, output.logits.size(-1)),
+            labels.view(-1),
+        )
+
+        b, sz, v = output.logits.size()
+        log_p = log_p.view(b, sz)
+        good_log_p = log_p.masked_fill_(labels == -100, 0.0)
+        answer_log_p = torch.sum(good_log_p, dim=1).squeeze()
+
+        loss = -torch.mean(answer_log_p, dim=0)
+        loss_value = loss.item()
+        return loss, loss_value
+
+    def response_mml_forward(
+        self, batch, new_articles, current_device, sample_masks, loss_fct
+    ):
+        # Get output from the response module
+        answer_inputs = self.answer_tokenizer(
+            new_articles,
+            truncation=True,
+            padding="max_length",
+            max_length=self.config.source_max_length,
+            add_special_tokens=False,
+            return_tensors="pt",
+        )
+
+        answer_input_ids = answer_inputs.input_ids
+        answer_input_mask = answer_inputs.attention_mask
+        if self.config.gpu:
+            answer_input_ids = answer_input_ids.to(current_device)
+            answer_input_mask = answer_input_mask.to(current_device)
+
+        target_mask = batch["second_entity_attention_mask"]
+        labels = batch["second_entity_labels"]
+        if self.config.gpu:
+            target_mask = target_mask.to(current_device)
+            labels = labels.to(current_device)
+
+        b_sz, _ = labels.size()
+
+        (
+            answer_input_ids,
+            answer_input_mask,
+            target_mask,
+            new_labels,
+        ) = prepare_response_module_input(
+            answer_input_ids=answer_input_ids,
+            answer_input_mask=answer_input_mask,
+            labels=labels,
+            target_mask=target_mask,
+            num_samples=self.config.num_search_samples,
+            sample_masks=sample_masks,
+        )
+        output = self.answer_model(
+            input_ids=answer_input_ids,
+            attention_mask=answer_input_mask,
+            decoder_attention_mask=target_mask,
+            decoder_input_ids=self.answer_model._shift_right(new_labels),
+            labels=None,
+        )
+
+        log_p = -loss_fct(
+            output.logits.view(-1, output.logits.size(-1)),
+            new_labels.view(-1),
+        )
+
+        b, s_len, v = output.logits.size()
+        log_p = log_p.view(b, s_len)
+        good_log_p = log_p.masked_fill_(new_labels == -100, 0.0)
+        answer_log_p = torch.sum(good_log_p, dim=1).squeeze()
+        answer_log_p = answer_log_p.view(b_sz, self.config.num_search_samples)
+
+        return answer_log_p
+
+    def question_mml_forward(
+        self,
+        current_device,
+        question_input_ids,
+        question_input_mask,
+        final_sampled_question_predictions_str_reshaped,
+        sample_masks,
+        loss_fct,
+    ):
+        # Now re-run the question generator and compute the loss for the sampled predictions.
+        # This will compute the gradients in the question module.
+        b_sz, src_seq_len = question_input_ids.size()
+        question_input_ids = question_input_ids.repeat(
+            1, self.config.num_search_samples
+        ).view(-1, src_seq_len)
+        question_input_mask = question_input_mask.repeat(
+            1, self.config.num_search_samples
+        ).view(-1, src_seq_len)
+
+        output_questions = []
+        for i in range(b_sz):
+            for j in range(self.config.num_search_samples):
+                output_question = (
+                    white_space_fix(
+                        final_sampled_question_predictions_str_reshaped[i][j]
+                    )
+                    + " </s>"
+                )
+                output_questions.append(output_question)
+
+        question_encodings = self.question_tokenizer(
+            output_questions,
+            truncation=True,
+            padding="max_length",
+            max_length=self.config.decoder_max_length,
+            add_special_tokens=False,
+            return_tensors="pt",
+        )
+        question_labels = question_encodings.pop("input_ids")
+        question_target_mask = question_encodings.pop("attention_mask")
+
+        # because HuggingFace automatically shifts the labels, the labels correspond exactly to `target_ids`.
+        # We have to make sure that the PAD token is ignored
+
+        question_labels = [
+            [
+                -100 if token == self.question_tokenizer.pad_token_id else token
+                for token in labels
+            ]
+            for labels in question_labels.tolist()
+        ]
+        question_labels = torch.tensor(question_labels)
+        if self.config.gpu:
+            question_target_mask = question_target_mask.to(current_device)
+            question_labels = question_labels.to(current_device)
+
+        self.question_model.train()
+
+        _, dec_seq_len = question_labels.size()
+        sample_input_mask = (
+            sample_masks.reshape(self.config.num_search_samples * b_sz, 1)
+            .repeat(1, src_seq_len)
+            .view(-1, src_seq_len)
+        )
+        sample_output_mask = (
+            sample_masks.reshape(self.config.num_search_samples * b_sz, 1)
+            .repeat(1, dec_seq_len)
+            .view(-1, dec_seq_len)
+        )
+
+        question_new_labels = (
+            1 - sample_output_mask
+        ) * -100 + question_labels * sample_output_mask
+
+        question_output = self.question_model(
+            input_ids=question_input_ids * sample_input_mask,
+            attention_mask=question_input_mask * sample_input_mask,
+            decoder_attention_mask=question_target_mask * sample_output_mask,
+            decoder_input_ids=self.question_model._shift_right(question_new_labels),
+            labels=None,
+        )
+
+        log_question_p = -loss_fct(
+            question_output.logits.view(-1, question_output.logits.size(-1)),
+            question_new_labels.view(-1),
+        )
+
+        b, seq_len, v = question_output.logits.size()
+        log_question_p = log_question_p.view(b, seq_len)
+        good_log_question_p = log_question_p.masked_fill_(
+            question_new_labels == -100, 0.0
+        )
+        question_log_p = torch.sum(good_log_question_p, dim=1).squeeze()
+        question_log_p = question_log_p.view(b_sz, self.config.num_search_samples)
+
+        return question_log_p, output_questions
+
+    def mml_question_training(self, batch, current_device, sample_p=0.95):
+        loss_fct = torch.nn.CrossEntropyLoss(ignore_index=-100, reduction="none")
+        if self.config.gpu:
+            loss_fct = loss_fct.to(current_device)
+
+        # Loss from the entity relation examples!
+        question_input_ids = batch["entity_relation_passage_input_ids"]
+        question_input_mask = batch["entity_relation_passage_attention_mask"]
+        if self.config.gpu:
+            question_input_ids = question_input_ids.to(current_device)
+            question_input_mask = question_input_mask.to(current_device)
+
+        b_sz, _ = question_input_ids.size()
+
+        with torch.no_grad():
+            self.init_question_model.eval()
+            final_sampled_question_predictions_str_reshaped = []
+            sample_masks = []
+            sample_log_ps = []
+            for i in range(b_sz):
+                temp_list = list()
+                sample_log_p = []
+                top_p = sample_p
+                counter = 0
+                while (
+                    len(temp_list) < (self.config.num_search_samples - 1)
+                    and counter < 15
+                ):
+                    # Use top-p sampling to collect samples.
+                    sampled_question_outputs = self.init_question_model.generate(
+                        input_ids=question_input_ids[i, :].view(1, -1),
+                        do_sample=True,
+                        no_repeat_ngram_size=self.config.no_repeat_ngram_size,
+                        max_length=self.config.decoder_max_length,
+                        num_return_sequences=self.config.num_search_samples,
+                        top_p=min([top_p, 0.98]),
+                        output_scores=True,
+                        return_dict_in_generate=True,
+                        attention_mask=question_input_mask[i, :].view(1, -1),
+                    )
+                    sampled_questions, question_log_ps = prob_of_sampled_predictions(
+                        loss_fct, sampled_question_outputs
+                    )
+
+                    sampled_question_predictions_str = (
+                        self.init_question_tokenizer.batch_decode(
+                            sampled_questions, skip_special_tokens=True
+                        )
+                    )
+
+                    sampled_question_predictions_str = [
+                        remove_prefix(pred, "question: ")
+                        for pred in sampled_question_predictions_str
+                    ]
+
+                    sampled_question_predictions_str_reshaped = [
+                        sampled_question_predictions_str[
+                            i
+                            * (self.config.num_search_samples) : (i + 1)
+                            * (self.config.num_search_samples)
+                        ]
+                        for i in range(1)
+                    ]
+                    for sample_i in range(self.config.num_search_samples):
+                        sample = sampled_question_predictions_str_reshaped[0][sample_i]
+                        if len(temp_list) < (self.config.num_search_samples - 1) and (
+                            len(sample.split()) > 4 and (sample not in temp_list)
+                        ):
+                            temp_list.append(sample)
+                            sample_log_p.append(question_log_ps[sample_i].item())
+
+                    top_p += 0.002
+                    counter += 1
+
+                greedy_question_predictions = self.init_question_model.generate(
+                    input_ids=question_input_ids[i, :].view(1, -1),
+                    attention_mask=question_input_mask[i, :].view(1, -1),
+                    no_repeat_ngram_size=self.config.no_repeat_ngram_size,
+                    max_length=self.config.decoder_max_length,
+                    num_return_sequences=1,
+                    output_scores=True,
+                    return_dict_in_generate=True,
+                )
+                greedy_questions, greedy_question_log_ps = prob_of_sampled_predictions(
+                    loss_fct, greedy_question_predictions
+                )
+                greedy_question_prediction_str = (
+                    self.init_question_tokenizer.batch_decode(
+                        greedy_questions, skip_special_tokens=True
+                    )
+                )
+
+                greedy_question_predictions_str = [
+                    remove_prefix(pred, "question: ")
+                    for pred in greedy_question_prediction_str
+                ]
+
+                greedy_sample = greedy_question_predictions_str[0]
+                if greedy_sample not in temp_list:
+                    temp_list.append(greedy_question_predictions_str[0])
+                    sample_log_p.append(greedy_question_log_ps)
+
+                while len(temp_list) < self.config.num_search_samples:
+                    temp_list.append("This is a dummy question!")
+                    sample_log_p.append(0)
+
+                final_sampled_question_predictions_str_reshaped.append(temp_list)
+                sample_log_ps.append(torch.FloatTensor(sample_log_p))
+
+                mask = []
+                for sample in temp_list:
+                    if sample != "This is a dummy question!":
+                        mask.append(1)
+                    else:
+                        mask.append(0)
+
+                sample_masks.append(torch.LongTensor(mask))
+
+        sample_log_ps = torch.stack(sample_log_ps, 0)
+        sample_log_ps = sample_log_ps.to(current_device)
+
+        sample_masks = torch.stack(sample_masks, 0)
+        sample_masks = sample_masks.to(current_device)
+
+        bleu_scores = []
+        for i in range(b_sz):
+            for j in range(self.config.num_search_samples):
+                bleu_scores.append(
+                    sentence_bleu(
+                        batch["passages"][i].split(),
+                        final_sampled_question_predictions_str_reshaped[i][j].split(),
+                        smoothing_function=smoothie,
+                    )
+                )
+
+        bleu_scores = torch.FloatTensor(bleu_scores)
+        if self.config.gpu:
+            bleu_scores = bleu_scores.to(current_device)
+
+        bleu_scores = bleu_scores.view(b_sz, self.config.num_search_samples)
+
+        real_lenghts = []
+        new_articles = []
+        for i in range(b_sz):
+            for j in range(self.config.num_search_samples):
+                new_article = (
+                    "relation: "
+                    + batch["entity_relations"][i]
+                    + " question: "
+                    + final_sampled_question_predictions_str_reshaped[i][j]
+                    + " context: "
+                    + batch["passages"][i]
+                    + " </s>"
+                )
+                new_articles.append(new_article)
+                real_lenghts.append(
+                    len(final_sampled_question_predictions_str_reshaped[i][j].split())
+                )
+
+        real_lenghts = torch.LongTensor(real_lenghts).view(
+            b_sz, self.config.num_search_samples
+        )
+        if self.config.gpu:
+            real_lenghts.to(current_device)
+
+        answer_log_p = self.response_mml_forward(
+            batch, new_articles, current_device, sample_masks, loss_fct
+        )
+
+        question_log_p, output_questions = self.question_mml_forward(
+            current_device,
+            question_input_ids,
+            question_input_mask,
+            final_sampled_question_predictions_str_reshaped,
+            sample_masks,
+            loss_fct,
+        )
+
+        print(output_questions)
+
+        # easier way to use MML objective.
+        """
+        length_weight = 1.5
+        lenght_norm = torch.div(
+            torch.pow(real_lenghts + 5, length_weight), pow(1 + 5, length_weight)
+        )
+        if self.config.gpu:
+            lenght_norm = lenght_norm.to(current_device)
+        """
+        # length_normalized_question_p = torch.mul(torch.exp(question_log_p), lenght_norm)
+        question_p = torch.exp(question_log_p)
+        print(question_log_p)
+        print(question_p)
+        print(answer_log_p)
+        print(torch.exp(answer_log_p))
+        print(sample_masks)
+        print(sample_log_ps)
+        print(1.0 / torch.exp(sample_log_ps))
+        print("#")
+        easier_mml_loss = -torch.mean(
+            torch.log(
+                torch.mean(
+                    question_p
+                    * torch.exp(answer_log_p)
+                    * sample_masks
+                    * (1.0 / torch.exp(sample_log_ps)),
+                    dim=1,
+                )
+            ),
+            dim=0,
+        )
+        """
+        entropy_loss = torch.mean(
+            torch.mean(
+                question_log_p
+                * question_p
+                * sample_masks
+                * (1.0 / torch.exp(sample_log_ps)),
+                dim=1,
+            ),
+            dim=0,
+        )
+        """
+        """
+        question_bleu_loss = -torch.mean(
+            torch.mean(
+                torch.mul(
+                    torch.div(
+                        torch.mul(question_p, bleu_scores),
+                        torch.exp(sample_log_ps),
+                    ),
+                    sample_masks,
+                ),
+                dim=1,
+            ),
+            dim=0,
+        )
+        """
+        return easier_mml_loss  # + question_bleu_loss #+ 0.01 * entropy_loss
+
+    def iterative_train(
         self,
         batch,
         current_device,
-        phase="answer",
-        answer_lambda=0.1,
-        question_lambda=0.1,
+        phase="MML-MML",
+        sample_p=0.95,
     ):
         # Free memory in GPU, very important!
         clear_cache()
         # Turn on training mode which enables dropout.
-        if phase == "answer":
+        if phase == "PGG":
+            self.question_optimizer.zero_grad()
+            self.answer_optimizer.zero_grad()
             self.question_model.eval()
+            loss, loss_value = self.pgg_answer_training(batch, current_device)
+            if not math.isnan(loss_value):
+                # BackProp
+                loss.backward()
+                # Optimize
+                self.answer_optimizer.step()
+
+            return loss_value
+
+        elif phase == "MML-MML":
+            # for MML-MML
             self.question_optimizer.zero_grad()
-
-            answer_input_ids, answer_input_mask = self.question_greedy_predict(
-                batch, current_device
-            )
-
+            self.answer_optimizer.zero_grad()
             self.answer_model.train()
-            self.answer_optimizer.zero_grad()
-
-            target_mask = batch["second_entity_attention_mask"]
-            labels = batch["second_entity_labels"]
-            if self.config.gpu:
-                target_mask = target_mask.to(current_device)
-                labels = labels.to(current_device)
-
-            output = self.answer_model(
-                input_ids=answer_input_ids,
-                attention_mask=answer_input_mask,
-                decoder_attention_mask=target_mask,
-                labels=labels,
+            loss = self.mml_question_training(
+                batch,
+                current_device,
+                sample_p=sample_p,
             )
-
-            re_loss = output.loss
-
-            clear_cache()
-
-            # Loss from the correct QA examples!
-            input_ids = batch["input_ids"]
-            input_mask = batch["attention_mask"]
-            target_mask = batch["target_attention_mask"]
-            labels = batch["labels"]
-            if self.config.gpu:
-                input_ids = input_ids.to(current_device)
-                input_mask = input_mask.to(current_device)
-                target_mask = target_mask.to(current_device)
-                labels = labels.to(current_device)
-
-            output = self.answer_model(
-                input_ids=input_ids,
-                attention_mask=input_mask,
-                decoder_attention_mask=target_mask,
-                labels=labels,
-            )
-
-            qa_loss = output.loss
-
-            loss = answer_lambda * qa_loss + re_loss
             loss_value = loss.item()
+            if not math.isnan(loss_value) and not torch.isinf(loss):
+                # BackProp
+                loss.backward()
+                # Optimize
+                self.question_optimizer.step()
+                self.answer_optimizer.step()
 
-            # BackProp
-            loss.backward()
-
-            # Optimize
-            self.answer_optimizer.step()
-
-            return {"loss_value": loss_value}
-
-        elif phase == "question":
-            self.question_optimizer.zero_grad()
-            self.answer_optimizer.zero_grad()
-            self.question_model.train()
-            self.answer_model.eval()
-
-            loss_fct = torch.nn.CrossEntropyLoss(ignore_index=-100, reduction="none")
-            if self.config.gpu:
-                loss_fct = loss_fct.to(current_device)
-
-            # Loss from the entity relation examples!
-            question_input_ids = batch["entity_relation_passage_input_ids"]
-            question_input_mask = batch["entity_relation_passage_attention_mask"]
-            if self.config.gpu:
-                question_input_ids = question_input_ids.to(current_device)
-                question_input_mask = question_input_mask.to(current_device)
-
-            b_sz, _ = question_input_ids.size()
-
-            # Use top-p sampling to collect random samples.
-            sampled_question_outputs = self.question_model.generate(
-                input_ids=question_input_ids,
-                attention_mask=question_input_mask,
-                do_sample=True,
-                no_repeat_ngram_size=self.config.no_repeat_ngram_size,
-                early_stopping=self.config.early_stopping,
-                max_length=self.config.decoder_max_length,
-                num_return_sequences=self.config.num_beams // 2,
-                top_p=0.95,
-                output_scores=True,
-                return_dict_in_generate=True,
-            )
-
-            top_p_questions, sampled_p = prob_of_sampled_predictions(
-                loss_fct, sampled_question_outputs
-            )
-
-            # Use beam search to collect samples.
-            beam_question_outputs = self.question_model.generate(
-                input_ids=question_input_ids,
-                attention_mask=question_input_mask,
-                no_repeat_ngram_size=self.config.no_repeat_ngram_size,
-                early_stopping=self.config.early_stopping,
-                max_length=self.config.decoder_max_length,
-                num_return_sequences=self.config.num_beams // 2,
-                num_beams=self.config.num_beams // 2,
-                output_scores=True,
-                return_dict_in_generate=True,
-            )
-
-            beam_questions, beam_p = prob_of_sampled_predictions(
-                loss_fct, beam_question_outputs
-            )
-
-            p = torch.cat(
-                (
-                    sampled_p.view(self.config.num_beams // 2, b_sz),
-                    beam_p.view(self.config.num_beams // 2, b_sz),
-                ),
-                dim=0,
-            )
-            re_p_question = p.view(self.config.num_beams * b_sz).view(
-                self.config.num_beams, b_sz
-            )
-
-            sampled_question_predictions_str = self.question_tokenizer.batch_decode(
-                top_p_questions, skip_special_tokens=True
-            )
-
-            sampled_question_predictions_str_reshaped = [
-                sampled_question_predictions_str[
-                    i
-                    * (self.config.num_beams // 2) : (i + 1)
-                    * (self.config.num_beams // 2)
-                ]
-                for i in range(b_sz)
-            ]
-
-            beam_question_predictions_str = self.question_tokenizer.batch_decode(
-                beam_questions, skip_special_tokens=True
-            )
-
-            beam_question_predictions_str_reshaped = [
-                beam_question_predictions_str[
-                    i
-                    * (self.config.num_beams // 2) : (i + 1)
-                    * (self.config.num_beams // 2)
-                ]
-                for i in range(b_sz)
-            ]
-
-            new_articles = []
-            for i in range(b_sz):
-                for j in range(self.config.num_beams // 2):
-                    new_article = (
-                        "question: "
-                        + sampled_question_predictions_str_reshaped[i][j]
-                        + " context: "
-                        + batch["passages"][i]
-                        + " </s>"
-                    )
-                    new_articles.append(new_article)
-                for j in range(self.config.num_beams // 2):
-                    new_article = (
-                        "question: "
-                        + beam_question_predictions_str_reshaped[i][j]
-                        + " context: "
-                        + batch["passages"][i]
-                        + " </s>"
-                    )
-                    new_articles.append(new_article)
-
-            answer_inputs = self.answer_tokenizer(
-                new_articles,
-                truncation=True,
-                padding="max_length",
-                max_length=self.config.source_max_length,
-                add_special_tokens=False,
-                return_tensors="pt",
-            )
-
-            answer_input_ids = answer_inputs.input_ids
-            answer_input_mask = answer_inputs.attention_mask
-            if self.config.gpu:
-                answer_input_ids = answer_input_ids.to(current_device)
-                answer_input_mask = answer_input_mask.to(current_device)
-
-            target_mask = batch["second_entity_attention_mask"]
-            labels = batch["second_entity_labels"]
-            if self.config.gpu:
-                target_mask = target_mask.to(current_device)
-                labels = labels.to(current_device)
-
-            b_sz, seq_len = labels.size()
-            labels = labels.repeat(1, self.config.num_beams).view(-1, seq_len)
-            target_mask = target_mask.repeat(1, self.config.num_beams).view(-1, seq_len)
-
-            output = self.answer_model(
-                input_ids=answer_input_ids,
-                attention_mask=answer_input_mask,
-                decoder_attention_mask=target_mask,
-                decoder_input_ids=self.answer_model._shift_right(labels),
-                labels=None,
-            )
-
-            log_p = -loss_fct(
-                output.logits.view(-1, output.logits.size(-1)),
-                labels.view(-1),
-            )
-
-            b, sz, v = output.logits.size()
-            log_p = log_p.view(b, sz)
-            good_log_p = log_p.masked_fill_(labels == -100, 0.0)
-            log_p = torch.sum(good_log_p, dim=1).squeeze()
-            p = torch.exp(log_p)
-            re_p_answer = p.view(self.config.num_beams, b_sz)
-            re_loss = -torch.mean(
-                torch.log(
-                    torch.sum(
-                        torch.mul(
-                            torch.transpose(re_p_answer, 0, 1),
-                            torch.transpose(re_p_question, 0, 1),
-                        ),
-                        dim=1,
-                    )
-                ),
-                dim=0,
-            )
-
-            clear_cache()
-
-            # Loss from the correct QA examples!
-            input_ids = batch["question_input_ids"]
-            input_mask = batch["question_attention_mask"]
-            target_mask = batch["question_target_attention_mask"]
-            labels = batch["question_labels"]
-            if self.config.gpu:
-                input_ids = input_ids.to(current_device)
-                input_mask = input_mask.to(current_device)
-                target_mask = target_mask.to(current_device)
-                labels = labels.to(current_device)
-
-            output = self.question_model(
-                input_ids=input_ids,
-                attention_mask=input_mask,
-                decoder_attention_mask=target_mask,
-                labels=labels,
-            )
-
-            qa_loss = output.loss
-
-            loss = question_lambda * qa_loss + re_loss
-            loss_value = loss.item()
-
-            # BackProp
-            loss.backward()
-
-            # Optimize
-            self.question_optimizer.step()
-
-            return {"loss_value": loss_value}
+            return loss_value
