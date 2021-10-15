@@ -95,6 +95,9 @@ def iterative_run_model(
                         phase=train_method,
                         sample_p=0.95,
                     )
+                    if math.isnan(loss):
+                        print("NAN")
+                        exit()
                     if loss and not math.isinf(loss):
                         total_loss.append(loss)
 
