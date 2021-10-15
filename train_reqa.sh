@@ -57,7 +57,7 @@ python src/re_gold_qa_train.py \
     --model_path $HOME/oct_11/ \
     --answer_checkpoint _response_pretrained_model \
     --question_checkpoint _question_second_pretrained_model \
-    --training_steps 2500 \
+    --training_steps 1000 \
     --update_switch_steps 1 \
     --learning_rate 0.0005 \
     --max_epochs 1 \
