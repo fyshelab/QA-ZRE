@@ -49,6 +49,9 @@ srun python src/re_gold_qa_train.py \
     --seed 12321 \
     --train_method MML-MML
 '''
+
+source env/bin/activate
+
 python src/re_gold_qa_train.py \
     --mode re_qa_train \
     --model_path $HOME/oct_11/ \
@@ -56,9 +59,9 @@ python src/re_gold_qa_train.py \
     --question_checkpoint _question_second_pretrained_model \
     --training_steps 2500 \
     --update_switch_steps 1 \
-    --learning_rate 0.001 \
+    --learning_rate 0.0005 \
     --max_epochs 1 \
-    --num_search_samples 8 \
+    --num_search_samples 2 \
     --batch_size 4 \
     --gpu True \
     --num_workers 6 \
