@@ -756,7 +756,6 @@ class REQA(torch.nn.Module):
             dim=0,
         )
         """
-        """
         question_bleu_loss = -torch.mean(
             torch.mean(
                 torch.mul(
@@ -770,8 +769,7 @@ class REQA(torch.nn.Module):
             ),
             dim=0,
         )
-        """
-        return easier_mml_loss  # + question_bleu_loss #+ 0.01 * entropy_loss
+        return easier_mml_loss + question_bleu_loss  # + 0.01 * entropy_loss
 
     def iterative_train(
         self,

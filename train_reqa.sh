@@ -54,15 +54,15 @@ source env/bin/activate
 
 python src/re_gold_qa_train.py \
     --mode re_qa_train \
-    --model_path $HOME/oct_11/bleu_1/ \
+    --model_path $HOME/oct_11/\
     --answer_checkpoint _response_pretrained_model \
     --question_checkpoint _question_second_pretrained_model \
-    --training_steps 1000 \
+    --training_steps 840000 \
     --update_switch_steps 1 \
     --learning_rate 0.0005 \
     --max_epochs 1 \
-    --num_search_samples 2 \
-    --batch_size 3 \
+    --num_search_samples 8 \
+    --batch_size 4 \
     --gpu True \
     --num_workers 6 \
     --concat_questions False \
