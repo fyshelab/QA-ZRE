@@ -734,11 +734,10 @@ class REQA(torch.nn.Module):
         question_p = torch.exp(question_log_p)
         easier_mml_loss = -torch.mean(
             torch.log(
-                torch.mean(
+                torch.sum(
                     question_p
                     * torch.exp(answer_log_p)
-                    * sample_masks
-                    * (1.0 / torch.exp(sample_log_ps)),
+                    * sample_masks,  # * (1.0 / torch.exp(sample_log_ps)),
                     dim=1,
                 )
             ),
@@ -756,20 +755,19 @@ class REQA(torch.nn.Module):
             dim=0,
         )
         """
+        """
         question_bleu_loss = -torch.mean(
-            torch.mean(
+            torch.sum(
                 torch.mul(
-                    torch.div(
-                        torch.mul(question_p, bleu_scores),
-                        torch.exp(sample_log_ps),
-                    ),
+                    torch.mul(question_p, bleu_scores),
                     sample_masks,
                 ),
                 dim=1,
             ),
             dim=0,
         )
-        return easier_mml_loss + question_bleu_loss  # + 0.01 * entropy_loss
+        """
+        return easier_mml_loss  # + question_bleu_loss  # + 0.01 * entropy_loss
 
     def iterative_train(
         self,
