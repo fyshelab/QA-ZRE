@@ -59,7 +59,7 @@ python src/re_gold_qa_train.py \
     --question_checkpoint _question_second_pretrained_model \
     --training_steps 840000 \
     --update_switch_steps 1 \
-    --learning_rate 0.0005 \
+    --learning_rate 0.001 \
     --max_epochs 1 \
     --num_search_samples 8 \
     --batch_size 4 \
