@@ -733,18 +733,23 @@ class REQA(torch.nn.Module):
         # length_normalized_question_p = torch.mul(torch.exp(question_log_p), lenght_norm)
         question_p = torch.exp(question_log_p)
 
-        question_p_cpy = question_p.clone().detach()
+        # to avoind underflow in least possible samples according to the question model.
+        sample_masks = sample_masks.masked_fill_(question_p == 0.0, 0.0)
+        zero_mask = (question_p == 0).float()
+        eps = 1e-12
+        new_question_p = question_p * (1 - zero_mask) + eps * zero_mask
+
+        new_question_p_cpy = new_question_p.clone().detach()
         weighted_important_sampling = torch.sum(
-            sample_masks * question_p_cpy * (1.0 / torch.exp(sample_log_ps)), dim=1
+            sample_masks * new_question_p_cpy * (1.0 / torch.exp(sample_log_ps)), dim=1
         )
         easier_mml_loss = -torch.mean(
             torch.log(
                 torch.div(
                     torch.sum(
-                        question_p
+                        new_question_p
                         * torch.exp(answer_log_p)
-                        * sample_masks
-                        * (1.0 / torch.exp(sample_log_ps)),
+                        * sample_masks * (1.0 / torch.exp(sample_log_ps)),
                         dim=1,
                     ),
                     weighted_important_sampling,
@@ -752,6 +757,11 @@ class REQA(torch.nn.Module):
             ),
             dim=0,
         )
+        print("saeed")
+        print(new_question_p)
+        print(torch.exp(sample_log_ps))
+        print(sample_masks)
+        print(weighted_important_sampling)
         """
         entropy_loss = torch.mean(
             torch.mean(
