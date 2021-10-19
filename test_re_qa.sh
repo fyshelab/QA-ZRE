@@ -3,7 +3,7 @@
 source env/bin/activate
 
 printf "fold 1, epoch 2\r\n"
-for (( i=1; i<=5; i++ ))
+for (( i=1; i<=10; i++ ))
 do
 	step=$((i * 100))
 	printf "step ${step}\r\n"
@@ -16,11 +16,11 @@ do
 		--concat_questions False \
 		--batch_size 64  --gpu True \
 		--ignore_unknowns False \
-		--train zero-shot-extraction/relation_splits/train.0 \
+		--train zero-shot-extraction/relation_splits/train.very_small.0 \
 		--dev zero-shot-extraction/relation_splits/dev.0 \
 		--gpu_device 0 \
 		--seed 12321 \
-		--prediction_file $HOME/oct_17/mml-mml-no-monte-carlo/weighted_importance_sampling_with_no_bleu.dev.predictions.0.step.${step}.csv
+		--prediction_file $HOME/oct_17/mml-mml-no-monte-carlo/no_monte_carlo_no_bleu.dev.predictions.0.step.${step}.csv 
 done
 
 '''
