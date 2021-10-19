@@ -667,24 +667,24 @@ class REQA(torch.nn.Module):
         sample_masks = torch.stack(sample_masks, 0)
         sample_masks = sample_masks.to(current_device)
 
-        bleu_scores = []
-        for i in range(b_sz):
-            for j in range(self.config.num_search_samples):
-                bleu_scores.append(
-                    sentence_bleu(
-                        batch["passages"][i].split(),
-                        final_sampled_question_predictions_str_reshaped[i][j].split(),
-                        smoothing_function=smoothie,
-                    )
-                )
+        # bleu_scores = []
+        # for i in range(b_sz):
+        #    for j in range(self.config.num_search_samples):
+        #        bleu_scores.append(
+        #            sentence_bleu(
+        #                batch["passages"][i].split(),
+        #                final_sampled_question_predictions_str_reshaped[i][j].split(),
+        #                smoothing_function=smoothie,
+        #            )
+        #        )
 
-        bleu_scores = torch.FloatTensor(bleu_scores)
-        if self.config.gpu:
-            bleu_scores = bleu_scores.to(current_device)
+        # bleu_scores = torch.FloatTensor(bleu_scores)
+        # if self.config.gpu:
+        #    bleu_scores = bleu_scores.to(current_device)
 
-        bleu_scores = bleu_scores.view(b_sz, self.config.num_search_samples)
+        # bleu_scores = bleu_scores.view(b_sz, self.config.num_search_samples)
 
-        real_lenghts = []
+        # real_lenghts = []
         new_articles = []
         for i in range(b_sz):
             for j in range(self.config.num_search_samples):
@@ -698,15 +698,15 @@ class REQA(torch.nn.Module):
                     + " </s>"
                 )
                 new_articles.append(new_article)
-                real_lenghts.append(
-                    len(final_sampled_question_predictions_str_reshaped[i][j].split())
-                )
+                # real_lenghts.append(
+                #    len(final_sampled_question_predictions_str_reshaped[i][j].split())
+                # )
 
-        real_lenghts = torch.LongTensor(real_lenghts).view(
-            b_sz, self.config.num_search_samples
-        )
-        if self.config.gpu:
-            real_lenghts.to(current_device)
+        # real_lenghts = torch.LongTensor(real_lenghts).view(
+        #    b_sz, self.config.num_search_samples
+        # )
+        # if self.config.gpu:
+        #    real_lenghts.to(current_device)
 
         answer_log_p = self.response_mml_forward(
             batch, new_articles, current_device, sample_masks, loss_fct
@@ -732,13 +732,22 @@ class REQA(torch.nn.Module):
         """
         # length_normalized_question_p = torch.mul(torch.exp(question_log_p), lenght_norm)
         question_p = torch.exp(question_log_p)
+
+        question_p_cpy = question_p.clone().detach()
+        weighted_important_sampling = torch.sum(
+            sample_masks * question_p_cpy * (1.0 / torch.exp(sample_log_ps)), dim=1
+        )
         easier_mml_loss = -torch.mean(
             torch.log(
-                torch.sum(
-                    question_p
-                    * torch.exp(answer_log_p)
-                    * sample_masks,  # * (1.0 / torch.exp(sample_log_ps)),
-                    dim=1,
+                torch.div(
+                    torch.sum(
+                        question_p
+                        * torch.exp(answer_log_p)
+                        * sample_masks
+                        * (1.0 / torch.exp(sample_log_ps)),
+                        dim=1,
+                    ),
+                    weighted_important_sampling,
                 )
             ),
             dim=0,
@@ -757,11 +766,11 @@ class REQA(torch.nn.Module):
         """
         """
         question_bleu_loss = -torch.mean(
-            torch.sum(
+            torch.mean(
                 torch.mul(
                     torch.mul(question_p, bleu_scores),
                     sample_masks,
-                ),
+                ) * (1.0 / torch.exp(sample_log_ps)),
                 dim=1,
             ),
             dim=0,
