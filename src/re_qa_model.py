@@ -734,8 +734,8 @@ class REQA(torch.nn.Module):
         question_p = torch.exp(question_log_p)
 
         # to avoind underflow in least possible samples according to the question model.
-        sample_masks = sample_masks.masked_fill_(question_p == 0.0, 0.0)
-        zero_mask = (question_p == 0).float()
+        sample_masks = sample_masks.masked_fill_(question_p < 1e-20, 0.0)
+        zero_mask = (question_p < 1e-20).float()
         eps = 1e-12
         new_question_p = question_p * (1 - zero_mask) + eps * zero_mask
 
