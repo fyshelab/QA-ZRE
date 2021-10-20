@@ -11,7 +11,7 @@ import torch
 import torch.distributed as dist
 import torch.utils.data.distributed
 
-from src.re_qa_model import HyperParameters, save
+from src.re_qa_model import HyperParameters, load_module, save
 
 
 def white_space_fix(text):
@@ -123,6 +123,12 @@ def iterative_run_model(
                         model.answer_model,
                         model.model_path,
                         str(epoch) + "_answer_step_" + str(step),
+                    )
+                    # update the behaviour policy with the target policy
+                    load_module(
+                        model.init_question_model,
+                        model.model_path,
+                        str(epoch) + "_question_step_" + str(step),
                     )
 
                 # if save_always and step > 0 and (step % 100 == 0):
