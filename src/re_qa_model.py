@@ -739,25 +739,24 @@ class REQA(torch.nn.Module):
         # eps = 1e-12
         # new_question_p = question_p * (1 - zero_mask) + eps * zero_mask
 
-        question_p_cpy = question_p.clone().detach()
-        weighted_important_sampling = torch.sum(
-            sample_masks * question_p_cpy * (1.0 / torch.exp(sample_log_ps)), dim=1
-        )
+        #question_p_cpy = question_p.clone().detach()
+        #weighted_important_sampling = torch.sum(
+        #    sample_masks * question_p_cpy * (1.0 / torch.exp(sample_log_ps)), dim=1
+        #)
         easier_mml_loss = -torch.mean(
             torch.log(
-                torch.div(
                     torch.sum(
                         question_p
                         * torch.exp(answer_log_p)
                         * sample_masks
                         * (1.0 / torch.exp(sample_log_ps)),
-                        dim=1,
-                    ),
-                    weighted_important_sampling,
+                        dim=1
                 )
             ),
             dim=0,
         )
+
+        kl_distance = -torch.mean(torch.sum(torch.exp(sample_log_ps) * sample_masks * question_log_p, dim=1), dim=0)
         # print("saeed")
         # print(new_question_p)
         # print(torch.exp(sample_log_ps))
@@ -787,7 +786,7 @@ class REQA(torch.nn.Module):
             dim=0,
         )
         """
-        return easier_mml_loss  # + question_bleu_loss  # + 0.01 * entropy_loss
+        return easier_mml_loss + kl_distance # + question_bleu_loss  # + 0.01 * entropy_loss
 
     def iterative_train(
         self,
