@@ -54,10 +54,10 @@ source env/bin/activate
 
 python src/re_gold_qa_train.py \
     --mode re_qa_train \
-    --model_path $HOME/oct_17/mml-mml-no-monte-carlo/\
+    --model_path $HOME/oct_17/\
     --answer_checkpoint _response_pretrained_model \
     --question_checkpoint _question_second_pretrained_model \
-    --training_steps 15000 \
+    --training_steps 1000 \
     --update_switch_steps 1 \
     --learning_rate 0.001 \
     --max_epochs 1 \

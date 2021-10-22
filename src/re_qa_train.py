@@ -125,11 +125,11 @@ def iterative_run_model(
                         str(epoch) + "_answer_step_" + str(step),
                     )
                     # update the behaviour policy with the target policy
-                    #load_module(
+                    # load_module(
                     #    model.init_question_model,
                     #    model.model_path,
                     #    str(epoch) + "_question_step_" + str(step),
-                    #)
+                    # )
 
                 # if save_always and step > 0 and (step % 100 == 0):
                 #    dist.barrier()
