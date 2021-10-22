@@ -9,8 +9,6 @@ install:
 	pip3 install datasets; \
 	pip3 install spacy; \
 
-
-
 .PHONY: clean_code
 clean_code:
 
@@ -19,6 +17,13 @@ clean_code:
 	isort src; \
 	docformatter --in-place src/*py
 
+.PHONY: install_gsutil
+install_gsutil:
+
+	curl -O https://dl.google.com/dl/cloudsdk/channels/rapid/downloads/google-cloud-sdk-361.0.0-linux-arm.tar.gz; \
+	tar -xzf google-cloud-sdk-361.0.0-linux-arm.tar.gz
+	bash google-cloud-sdk/install.sh
+	google-cloud-sdk/bin/gcloud init
 
 .PHONY: train_on_lambda
 train_on_lambda:
