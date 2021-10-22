@@ -3,24 +3,24 @@
 source env/bin/activate
 
 printf "fold 1, epoch 2\r\n"
-for (( i=5; i<=5; i++ ))
+for (( i=1; i<=5; i++ ))
 do
 	step=$((i * 100))
 	printf "step ${step}\r\n"
 	python src/re_gold_qa_train.py \
 		--mode re_qa_test \
-		--model_path $HOME/oct_17/ \
+		--model_path $HOME/oct_22/ \
 		--answer_checkpoint _0_answer_step_${step} \
 		--question_checkpoint _0_question_step_${step} \
 		--learning_rate 0.001 --max_epochs 1 \
 		--concat_questions False \
-		--batch_size 16  --gpu True \
+		--batch_size 64 --gpu True \
 		--ignore_unknowns False \
 		--train zero-shot-extraction/relation_splits/train.very_small.0 \
 		--dev zero-shot-extraction/relation_splits/dev.0 \
 		--gpu_device 0 \
 		--seed 12321 \
-		--prediction_file $HOME/oct_17/normal_sampling_correct_logsumexp.dev.predictions.0.step.${step}.csv
+		--prediction_file $HOME/oct_22/normal_sampling_correct_logsumexp.only_mml_small_train.with_ent_0.1.dev.predictions.0.step.${step}.csv
 done
 
 '''

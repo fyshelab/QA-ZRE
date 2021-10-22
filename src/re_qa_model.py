@@ -745,23 +745,21 @@ class REQA(torch.nn.Module):
         # print(torch.exp(sample_log_ps))
         # print(sample_masks)
         # print(weighted_important_sampling)
-        """
         entropy_loss = torch.mean(
             torch.mean(
-                question_log_p
-                * question_p
-                * sample_masks
-                * (1.0 / torch.exp(sample_log_ps)),
+                torch.exp(question_log_p - sample_log_ps) * question_log_p
+                * sample_masks,
                 dim=1,
             ),
             dim=0,
         )
-        """
-        bleu_ratio = question_log_p - sample_log_ps + torch.log(bleu_scores)
-        bleu_ratio = bleu_ratio.masked_fill_((1.0 - sample_masks).bool(), -float("inf"))
-        question_bleu_loss = -torch.mean(torch.mean(torch.exp(torch.logsumexp(bleu_ratio, dim=1)), dim=1), dim=0)
+        # bleu_ratio = question_log_p - sample_log_ps + torch.log(bleu_scores)
+        #print(bleu_ratio.size())
+        #bleu_ratio = bleu_ratio.masked_fill_((1.0 - sample_masks).bool(), -float("inf"))
+        #question_bleu_loss = -torch.mean(torch.exp(torch.logsumexp(bleu_ratio, dim=1)) / float(self.config.num_search_samples), dim=0)
+        #question_bleu_loss = -torch.mean(torch.mean(torch.exp(question_log_p - sample_log_ps) * bleu_scores * sample_masks, dim=1), dim=0)
 
-        return easier_mml_loss + question_bleu_loss # , zero_mask #+ 0.1 * kl_distance # + question_bleu_loss  # + 0.01 * entropy_loss
+        return easier_mml_loss + 0.5 * entropy_loss #2 * question_bleu_loss # , zero_mask #+ 0.1 * kl_distance # + question_bleu_loss  # + 0.01 * entropy_loss
 
     def iterative_train(
         self,

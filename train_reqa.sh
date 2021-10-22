@@ -54,10 +54,10 @@ source env/bin/activate
 
 python src/re_gold_qa_train.py \
     --mode re_qa_train \
-    --model_path $HOME/oct_17/\
+    --model_path $HOME/oct_22/\
     --answer_checkpoint _response_pretrained_model \
     --question_checkpoint _question_second_pretrained_model \
-    --training_steps 1000 \
+    --training_steps 500 \
     --update_switch_steps 1 \
     --learning_rate 0.001 \
     --max_epochs 1 \
@@ -67,7 +67,7 @@ python src/re_gold_qa_train.py \
     --num_workers 6 \
     --concat_questions False \
     --dev ./zero-shot-extraction/relation_splits/dev.0 \
-    --train ./zero-shot-extraction/relation_splits/train.0 \
+    --train ./zero-shot-extraction/relation_splits/train.very_small.0 \
     --gpu_device 0 \
     --seed 12321 \
     --train_method MML-MML
