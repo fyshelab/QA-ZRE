@@ -722,7 +722,7 @@ class REQA(torch.nn.Module):
         )
 
         # easier way to use MML objective.
-        length_weight = 1.5
+        length_weight = 2
         min_batch_length = torch.min(real_lenghts)
         # lenght_norm = torch.div(
         #    torch.pow(real_lenghts + 5, length_weight), torch.pow(min_batch_length + 5, length_weight)
