@@ -684,7 +684,7 @@ class REQA(torch.nn.Module):
 
         bleu_scores = bleu_scores.view(b_sz, self.config.num_search_samples)
 
-        # real_lenghts = []
+        real_lenghts = []
         new_articles = []
         for i in range(b_sz):
             for j in range(self.config.num_search_samples):
@@ -698,15 +698,15 @@ class REQA(torch.nn.Module):
                     + " </s>"
                 )
                 new_articles.append(new_article)
-                # real_lenghts.append(
-                #    len(final_sampled_question_predictions_str_reshaped[i][j].split())
-                # )
+                real_lenghts.append(
+                    len(final_sampled_question_predictions_str_reshaped[i][j].split())
+                )
 
-        # real_lenghts = torch.LongTensor(real_lenghts).view(
-        #    b_sz, self.config.num_search_samples
-        # )
-        # if self.config.gpu:
-        #    real_lenghts.to(current_device)
+        real_lenghts = torch.LongTensor(real_lenghts).view(
+            b_sz, self.config.num_search_samples
+        )
+        if self.config.gpu:
+            real_lenghts.to(current_device)
 
         answer_log_p = self.response_mml_forward(
             batch, new_articles, current_device, sample_masks, loss_fct
@@ -722,21 +722,25 @@ class REQA(torch.nn.Module):
         )
 
         # easier way to use MML objective.
-        """
         length_weight = 1.5
-        lenght_norm = torch.div(
-            torch.pow(real_lenghts + 5, length_weight), pow(1 + 5, length_weight)
-        )
-        if self.config.gpu:
-            lenght_norm = lenght_norm.to(current_device)
-        """
+        min_batch_length = torch.min(real_lenghts)
+        # lenght_norm = torch.div(
+        #    torch.pow(real_lenghts + 5, length_weight), torch.pow(min_batch_length + 5, length_weight)
+        # )
+
         # length_normalized_question_p = torch.mul(torch.exp(question_log_p), lenght_norm)
         # to avoid underflow in least possible samples according to the question model.
         # sample_masks = sample_masks.masked_fill_(question_p < 1e-20, 0.0)
         # zero_mask = torch.sum(torch.sum((question_p == 0).float(), dim=1), dim=0).item()
         # eps = 1e-12
         # new_question_p = question_p * (1 - zero_mask) + eps * zero_mask
-        ratio_log = question_log_p - sample_log_ps + answer_log_p
+
+        log_lenght_norm = length_weight * (
+            torch.log(real_lenghts + 5) - torch.log(min_batch_length + 5)
+        )
+        if self.config.gpu:
+            log_lenght_norm = log_lenght_norm.to(current_device)
+        ratio_log = question_log_p - sample_log_ps + answer_log_p + log_lenght_norm
         ratio_log = ratio_log.masked_fill_((1.0 - sample_masks).bool(), -float("inf"))
         easier_mml_loss = -torch.mean(torch.logsumexp(ratio_log, dim=1), dim=0)
         # kl_distance = -torch.mean(torch.sum(torch.exp(sample_log_ps) * sample_masks * question_log_p, dim=1), dim=0)
@@ -745,6 +749,7 @@ class REQA(torch.nn.Module):
         # print(torch.exp(sample_log_ps))
         # print(sample_masks)
         # print(weighted_important_sampling)
+        """
         entropy_loss = torch.mean(
             torch.mean(
                 torch.exp(question_log_p - sample_log_ps) * question_log_p
@@ -753,13 +758,14 @@ class REQA(torch.nn.Module):
             ),
             dim=0,
         )
+        """
         # bleu_ratio = question_log_p - sample_log_ps + torch.log(bleu_scores)
-        #print(bleu_ratio.size())
-        #bleu_ratio = bleu_ratio.masked_fill_((1.0 - sample_masks).bool(), -float("inf"))
-        #question_bleu_loss = -torch.mean(torch.exp(torch.logsumexp(bleu_ratio, dim=1)) / float(self.config.num_search_samples), dim=0)
-        #question_bleu_loss = -torch.mean(torch.mean(torch.exp(question_log_p - sample_log_ps) * bleu_scores * sample_masks, dim=1), dim=0)
+        # print(bleu_ratio.size())
+        # bleu_ratio = bleu_ratio.masked_fill_((1.0 - sample_masks).bool(), -float("inf"))
+        # question_bleu_loss = -torch.mean(torch.exp(torch.logsumexp(bleu_ratio, dim=1)) / float(self.config.num_search_samples), dim=0)
+        # question_bleu_loss = -torch.mean(torch.mean(torch.exp(question_log_p - sample_log_ps) * bleu_scores * sample_masks, dim=1), dim=0)
 
-        return easier_mml_loss + 0.5 * entropy_loss #2 * question_bleu_loss # , zero_mask #+ 0.1 * kl_distance # + question_bleu_loss  # + 0.01 * entropy_loss
+        return easier_mml_loss  # + 0.5 * entropy_loss #2 * question_bleu_loss # , zero_mask #+ 0.1 * kl_distance # + question_bleu_loss  # + 0.01 * entropy_loss
 
     def iterative_train(
         self,
