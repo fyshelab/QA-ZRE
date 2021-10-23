@@ -20,7 +20,7 @@ do
 		--dev zero-shot-extraction/relation_splits/dev.0 \
 		--gpu_device 0 \
 		--seed 12321 \
-		--prediction_file $HOME/oct_22/normal_sampling_correct_logsumexp.only_mml_small_train.with_ent_0.5.dev.predictions.0.step.${step}.csv
+		--prediction_file $HOME/oct_22/normal_sampling_correct_logsumexp.only_mml_small_train.with_len_1.5.dev.predictions.0.step.${step}.csv
 done
 
 '''
