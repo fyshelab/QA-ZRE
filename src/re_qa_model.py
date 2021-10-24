@@ -722,18 +722,8 @@ class REQA(torch.nn.Module):
         )
 
         # easier way to use MML objective.
-        length_weight = 2
+        length_weight = 1.5
         min_batch_length = torch.min(real_lenghts)
-        # lenght_norm = torch.div(
-        #    torch.pow(real_lenghts + 5, length_weight), torch.pow(min_batch_length + 5, length_weight)
-        # )
-
-        # length_normalized_question_p = torch.mul(torch.exp(question_log_p), lenght_norm)
-        # to avoid underflow in least possible samples according to the question model.
-        # sample_masks = sample_masks.masked_fill_(question_p < 1e-20, 0.0)
-        # zero_mask = torch.sum(torch.sum((question_p == 0).float(), dim=1), dim=0).item()
-        # eps = 1e-12
-        # new_question_p = question_p * (1 - zero_mask) + eps * zero_mask
 
         log_lenght_norm = length_weight * (
             torch.log(real_lenghts + 5) - torch.log(min_batch_length + 5)
@@ -743,29 +733,25 @@ class REQA(torch.nn.Module):
         ratio_log = question_log_p - sample_log_ps + answer_log_p + log_lenght_norm
         ratio_log = ratio_log.masked_fill_((1.0 - sample_masks).bool(), -float("inf"))
         easier_mml_loss = -torch.mean(torch.logsumexp(ratio_log, dim=1), dim=0)
-        # kl_distance = -torch.mean(torch.sum(torch.exp(sample_log_ps) * sample_masks * question_log_p, dim=1), dim=0)
-        # print("saeed")
-        # print(new_question_p)
-        # print(torch.exp(sample_log_ps))
-        # print(sample_masks)
-        # print(weighted_important_sampling)
-        """
+
         entropy_loss = torch.mean(
             torch.mean(
-                torch.exp(question_log_p - sample_log_ps) * question_log_p
+                torch.exp(question_log_p - sample_log_ps)
+                * question_log_p
                 * sample_masks,
                 dim=1,
             ),
             dim=0,
         )
-        """
-        # bleu_ratio = question_log_p - sample_log_ps + torch.log(bleu_scores)
-        # print(bleu_ratio.size())
-        # bleu_ratio = bleu_ratio.masked_fill_((1.0 - sample_masks).bool(), -float("inf"))
-        # question_bleu_loss = -torch.mean(torch.exp(torch.logsumexp(bleu_ratio, dim=1)) / float(self.config.num_search_samples), dim=0)
-        # question_bleu_loss = -torch.mean(torch.mean(torch.exp(question_log_p - sample_log_ps) * bleu_scores * sample_masks, dim=1), dim=0)
+        question_bleu_loss = -torch.mean(
+            torch.mean(
+                torch.exp(question_log_p - sample_log_ps) * bleu_scores * sample_masks,
+                dim=1,
+            ),
+            dim=0,
+        )
 
-        return easier_mml_loss  # + 0.5 * entropy_loss #2 * question_bleu_loss # , zero_mask #+ 0.1 * kl_distance # + question_bleu_loss  # + 0.01 * entropy_loss
+        return easier_mml_loss + 0.1 * entropy_loss + question_bleu_loss
 
     def iterative_train(
         self,
@@ -801,8 +787,6 @@ class REQA(torch.nn.Module):
                 sample_p=sample_p,
             )
             loss_value = loss.item()
-            # if zero_mask != 0:
-            #    print("skipped this batch due to underflows\r\n")
 
             if not math.isnan(loss_value) and not torch.isinf(loss):
                 # BackProp
