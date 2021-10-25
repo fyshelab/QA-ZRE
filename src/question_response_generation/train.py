@@ -156,6 +156,7 @@ def run_all(args):
         max_epochs=args.max_epochs,
         mode="train",
         prediction_file=args.prediction_file,
+        seed=args.seed,
     )
 
     set_random_seed(config.seed)
@@ -215,6 +216,7 @@ def run_squad_test(args):
         mode="test",
         prediction_file=args.prediction_file,
         checkpoint=args.checkpoint,
+        seed=args.seed,
     )
 
     set_random_seed(config.seed)
@@ -275,6 +277,7 @@ def run_narrativeqa_test(args):
         mode="test",
         prediction_file=args.prediction_file,
         checkpoint=args.checkpoint,
+        seed=args.seed,
     )
 
     set_random_seed(config.seed)
@@ -318,6 +321,7 @@ def run_second_q_pretrain(args):
         max_epochs=args.max_epochs,
         mode="train",
         prediction_file=args.prediction_file,
+        seed=args.seed,
     )
 
     set_random_seed(config.seed)

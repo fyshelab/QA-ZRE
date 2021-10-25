@@ -18,7 +18,7 @@ def save(model: torch.nn.Module, path: str) -> None:
     torch.save(model.state_dict(), path)
 
 
-MODEL_NAME = "t5-base"
+MODEL_NAME = "t5-small"
 
 
 class T5QA(object):
