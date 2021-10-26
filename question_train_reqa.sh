@@ -25,4 +25,5 @@ echo "r$SLURM_NODEID Launching python script"
 
 echo "All the allocated nodes: $SLURM_JOB_NODELIST"
 '''
-python src/question_response_generation/train.py --question_training True --mode all_train --model_path $SCRATCH/re_question_generation_model/ --learning_rate 0.0001 --max_epochs 6 --batch_size 16 --gpu True --gpu_device 0
+
+python src/question_response_generation/train.py --question_training True --mode all_train --model_path $HOME/question_model/ --learning_rate 0.0005 --max_epochs 4 --batch_size 64 --gpu True --gpu_device 0 --sed 12321
