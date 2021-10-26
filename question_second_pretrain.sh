@@ -33,10 +33,11 @@ source env/bin/activate
 python src/question_response_generation/train.py \
   --question_training True \
   --mode question_generation_second_pretrain \
-  --model_path $HOME/re_question_generation_second_pretrain_model/ \
-  --learning_rate 0.001 \
+  --model_path $HOME/question_model/ \
+  --checkpoint _question_pretrained_first_stage \
+  --learning_rate 0.0005 \
   --max_epochs 1 \
-  --batch_size 16 \
+  --batch_size 64 \
   --gpu True \
   --gpu_device 0 \
   --seed 12321
