@@ -46,14 +46,14 @@ source env/bin/activate
 
 python src/re_gold_qa_train.py \
        --mode re_gold_qa_train \
-       --model_path $HOME/oct_11/gold/ \
-       --checkpoint _response_pretrained_model \
-       --learning_rate 0.001 --max_epochs 2 \
+       --model_path $HOME/gold_fold_1/ \
+       --checkpoint _response_pretrained \
+       --learning_rate 0.0005 --max_epochs 1 \
        --concat_questions False \
-       --batch_size 2  --gpu True \
-       --answer_training_steps 2000 \
+       --batch_size 128  --gpu True \
+       --answer_training_steps 6562 \
        --ignore_unknowns False \
-       --train ./zero-shot-extraction/relation_splits/train.very_small.0 \
+       --train ./zero-shot-extraction/relation_splits/train.0 \
        --dev ./zero-shot-extraction/relation_splits/dev.0 \
        --gpu_device 0 \
        --seed 12321
