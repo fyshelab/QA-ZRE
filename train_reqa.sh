@@ -70,4 +70,4 @@ python src/re_gold_qa_train.py \
     --train ./zero-shot-extraction/relation_splits/train.very_small.0 \
     --gpu_device 0 \
     --seed 12321 \
-    --train_method MML-MML
+    --train_method MML
