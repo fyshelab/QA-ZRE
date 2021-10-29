@@ -281,9 +281,7 @@ class REQA(torch.nn.Module):
         new_articles = []
         for i in range(len(batch["passages"])):
             new_article = (
-                "relation: "
-                + batch["entity_relations"][i]
-                + " question: "
+                "question: "
                 + question_predictions_str[i]
                 + " context: "
                 + batch["passages"][i]
@@ -425,24 +423,25 @@ class REQA(torch.nn.Module):
             num_samples=self.config.num_search_samples,
             sample_masks=sample_masks,
         )
-        output = self.answer_model(
-            input_ids=answer_input_ids,
-            attention_mask=answer_input_mask,
-            decoder_attention_mask=target_mask,
-            decoder_input_ids=self.answer_model._shift_right(new_labels),
-            labels=None,
-        )
+        with torch.no_grad():
+            output = self.answer_model(
+                input_ids=answer_input_ids,
+                attention_mask=answer_input_mask,
+                decoder_attention_mask=target_mask,
+                decoder_input_ids=self.answer_model._shift_right(new_labels),
+                labels=None,
+            )
 
-        log_p = -loss_fct(
-            output.logits.view(-1, output.logits.size(-1)),
-            new_labels.view(-1),
-        )
+            log_p = -loss_fct(
+                output.logits.view(-1, output.logits.size(-1)),
+                new_labels.view(-1),
+            )
 
-        b, s_len, v = output.logits.size()
-        log_p = log_p.view(b, s_len)
-        good_log_p = log_p.masked_fill_(new_labels == -100, 0.0)
-        answer_log_p = torch.sum(good_log_p, dim=1).squeeze()
-        answer_log_p = answer_log_p.view(b_sz, self.config.num_search_samples)
+            b, s_len, v = output.logits.size()
+            log_p = log_p.view(b, s_len)
+            good_log_p = log_p.masked_fill_(new_labels == -100, 0.0)
+            answer_log_p = torch.sum(good_log_p, dim=1).squeeze()
+            answer_log_p = answer_log_p.view(b_sz, self.config.num_search_samples)
 
         return answer_log_p
 
@@ -609,7 +608,7 @@ class REQA(torch.nn.Module):
                     for sample_i in range(self.config.num_search_samples):
                         sample = sampled_question_predictions_str_reshaped[0][sample_i]
                         if len(temp_list) < (self.config.num_search_samples - 1) and (
-                            len(sample.split()) > 4 and (sample not in temp_list)
+                            sample not in temp_list
                         ):
                             temp_list.append(sample)
                             sample_log_p.append(question_log_ps[sample_i].item())
@@ -689,9 +688,7 @@ class REQA(torch.nn.Module):
         for i in range(b_sz):
             for j in range(self.config.num_search_samples):
                 new_article = (
-                    "relation: "
-                    + batch["entity_relations"][i]
-                    + " question: "
+                    "question: "
                     + final_sampled_question_predictions_str_reshaped[i][j]
                     + " context: "
                     + batch["passages"][i]
@@ -722,6 +719,7 @@ class REQA(torch.nn.Module):
         )
 
         # easier way to use MML objective.
+        """
         length_weight = 2.0
         min_batch_length = torch.min(real_lenghts)
 
@@ -730,9 +728,22 @@ class REQA(torch.nn.Module):
         )
         if self.config.gpu:
             log_lenght_norm = log_lenght_norm.to(current_device)
-        ratio_log = question_log_p - sample_log_ps + answer_log_p + log_lenght_norm
-        ratio_log = ratio_log.masked_fill_((1.0 - sample_masks).bool(), -float("inf"))
-        easier_mml_loss = -torch.mean(torch.logsumexp(ratio_log, dim=1), dim=0)
+        """
+        # ratio_log = question_log_p - sample_log_ps + answer_log_p + log_lenght_norm
+        question_log_p_cpy = question_log_p.clone().detach()
+        answer_log_p_cpy = answer_log_p.clone().detach()
+        ratio_log = question_log_p_cpy - sample_log_ps + answer_log_p_cpy
+        ratio_log_main = ratio_log - torch.logsumexp(ratio_log, dim=1).view(
+            -1, 1
+        ).repeat(1, self.config.num_search_samples)
+        ratio_log_main = ratio_log_main.masked_fill_(
+            (1.0 - sample_masks).bool(), -float("inf")
+        )
+        direct_mml_loss = -torch.mean(
+            torch.sum(torch.exp(ratio_log_main) * question_log_p, dim=1), dim=0
+        )
+        # easier_mml_loss = -torch.mean(torch.logsumexp(ratio_log, dim=1), dim=0)
+        """
         entropy_loss = torch.mean(
             torch.mean(
                 torch.exp(question_log_p - sample_log_ps + log_lenght_norm)
@@ -749,8 +760,8 @@ class REQA(torch.nn.Module):
             ),
             dim=0,
         )
-
-        return easier_mml_loss + question_bleu_loss + 0.05 * entropy_loss
+        """
+        return direct_mml_loss  # + question_bleu_loss + 0.05 * entropy_loss
 
     def iterative_train(
         self,
@@ -763,7 +774,7 @@ class REQA(torch.nn.Module):
         clear_cache()
         # Turn on training mode which enables dropout.
         if phase == "PGG":
-            self.question_optimizer.zero_grad()
+            # self.question_optimizer.zero_grad()
             self.answer_optimizer.zero_grad()
             self.question_model.eval()
             loss, loss_value = self.pgg_answer_training(batch, current_device)
@@ -793,5 +804,24 @@ class REQA(torch.nn.Module):
                 # Optimize
                 self.question_optimizer.step()
                 self.answer_optimizer.step()
+
+            return loss_value
+
+        elif phase == "MML":
+            # for MML-MML
+            self.question_optimizer.zero_grad()
+            self.answer_model.eval()
+            loss = self.mml_question_training(
+                batch,
+                current_device,
+                sample_p=sample_p,
+            )
+            loss_value = loss.item()
+
+            if not math.isnan(loss_value) and not torch.isinf(loss):
+                # BackProp
+                loss.backward()
+                # Optimize
+                self.question_optimizer.step()
 
             return loss_value

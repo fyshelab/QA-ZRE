@@ -50,10 +50,10 @@ python src/re_gold_qa_train.py \
        --checkpoint _response_pretrained \
        --learning_rate 0.0005 --max_epochs 1 \
        --concat_questions False \
-       --batch_size 128  --gpu True \
-       --answer_training_steps 6562 \
+       --batch_size 4  --gpu True \
+       --answer_training_steps 1000 \
        --ignore_unknowns False \
-       --train ./zero-shot-extraction/relation_splits/train.0 \
+       --train ./zero-shot-extraction/relation_splits/train.very_small.0 \
        --dev ./zero-shot-extraction/relation_splits/dev.0 \
        --gpu_device 0 \
        --seed 12321
