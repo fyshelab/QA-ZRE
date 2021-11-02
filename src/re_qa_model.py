@@ -666,6 +666,7 @@ class REQA(torch.nn.Module):
         sample_masks = torch.stack(sample_masks, 0)
         sample_masks = sample_masks.to(current_device)
 
+        """
         bleu_scores = []
         for i in range(b_sz):
             for j in range(self.config.num_search_samples):
@@ -682,8 +683,8 @@ class REQA(torch.nn.Module):
             bleu_scores = bleu_scores.to(current_device)
 
         bleu_scores = bleu_scores.view(b_sz, self.config.num_search_samples)
-
-        real_lenghts = []
+        """
+        # real_lenghts = []
         new_articles = []
         for i in range(b_sz):
             for j in range(self.config.num_search_samples):
@@ -695,15 +696,15 @@ class REQA(torch.nn.Module):
                     + " </s>"
                 )
                 new_articles.append(new_article)
-                real_lenghts.append(
-                    len(final_sampled_question_predictions_str_reshaped[i][j].split())
-                )
+                # real_lenghts.append(
+                #    len(final_sampled_question_predictions_str_reshaped[i][j].split())
+                # )
 
-        real_lenghts = torch.LongTensor(real_lenghts).view(
-            b_sz, self.config.num_search_samples
-        )
-        if self.config.gpu:
-            real_lenghts.to(current_device)
+        # real_lenghts = torch.LongTensor(real_lenghts).view(
+        #    b_sz, self.config.num_search_samples
+        # )
+        # if self.config.gpu:
+        #    real_lenghts.to(current_device)
 
         answer_log_p = self.response_mml_forward(
             batch, new_articles, current_device, sample_masks, loss_fct
@@ -729,6 +730,7 @@ class REQA(torch.nn.Module):
         if self.config.gpu:
             log_lenght_norm = log_lenght_norm.to(current_device)
         """
+        """
         # ratio_log = question_log_p - sample_log_ps + answer_log_p + log_lenght_norm
         question_log_p_cpy = question_log_p.clone().detach()
         answer_log_p_cpy = answer_log_p.clone().detach()
@@ -743,6 +745,7 @@ class REQA(torch.nn.Module):
             torch.sum(torch.exp(ratio_log_main) * question_log_p, dim=1), dim=0
         )
         # easier_mml_loss = -torch.mean(torch.logsumexp(ratio_log, dim=1), dim=0)
+        """
         """
         entropy_loss = torch.mean(
             torch.mean(
@@ -761,7 +764,10 @@ class REQA(torch.nn.Module):
             dim=0,
         )
         """
-        return direct_mml_loss  # + question_bleu_loss + 0.05 * entropy_loss
+        ratio_log = question_log_p - sample_log_ps + answer_log_p
+        ratio_log = ratio_log.masked_fill_((1.0 - sample_masks).bool(), -float("inf"))
+        easier_mml_loss = -torch.mean(torch.logsumexp(ratio_log, dim=1), dim=0)
+        return easier_mml_loss
 
     def iterative_train(
         self,
