@@ -567,8 +567,7 @@ class REQA(torch.nn.Module):
                 top_p = sample_p
                 counter = 0
                 while (
-                    len(temp_list) < (self.config.num_search_samples - 1)
-                    and counter < 15
+                    len(temp_list) < (self.config.num_search_samples) and counter < 15
                 ):
                     # Use top-p sampling to collect samples.
                     sampled_question_outputs = self.init_question_model.generate(
@@ -607,7 +606,7 @@ class REQA(torch.nn.Module):
                     ]
                     for sample_i in range(self.config.num_search_samples):
                         sample = sampled_question_predictions_str_reshaped[0][sample_i]
-                        if len(temp_list) < (self.config.num_search_samples - 1) and (
+                        if len(temp_list) < (self.config.num_search_samples) and (
                             sample not in temp_list
                         ):
                             temp_list.append(sample)
@@ -615,34 +614,6 @@ class REQA(torch.nn.Module):
 
                     top_p += 0.002
                     counter += 1
-
-                greedy_question_predictions = self.init_question_model.generate(
-                    input_ids=question_input_ids[i, :].view(1, -1),
-                    attention_mask=question_input_mask[i, :].view(1, -1),
-                    no_repeat_ngram_size=self.config.no_repeat_ngram_size,
-                    max_length=self.config.decoder_max_length,
-                    num_return_sequences=1,
-                    output_scores=True,
-                    return_dict_in_generate=True,
-                )
-                greedy_questions, greedy_question_log_ps = prob_of_sampled_predictions(
-                    loss_fct, greedy_question_predictions
-                )
-                greedy_question_prediction_str = (
-                    self.init_question_tokenizer.batch_decode(
-                        greedy_questions, skip_special_tokens=True
-                    )
-                )
-
-                greedy_question_predictions_str = [
-                    remove_prefix(pred, "question: ")
-                    for pred in greedy_question_prediction_str
-                ]
-
-                greedy_sample = greedy_question_predictions_str[0]
-                if greedy_sample not in temp_list:
-                    temp_list.append(greedy_question_predictions_str[0])
-                    sample_log_p.append(greedy_question_log_ps)
 
                 while len(temp_list) < self.config.num_search_samples:
                     temp_list.append("This is a dummy question!")
@@ -666,25 +637,6 @@ class REQA(torch.nn.Module):
         sample_masks = torch.stack(sample_masks, 0)
         sample_masks = sample_masks.to(current_device)
 
-        """
-        bleu_scores = []
-        for i in range(b_sz):
-            for j in range(self.config.num_search_samples):
-                bleu_scores.append(
-                    sentence_bleu(
-                        batch["passages"][i].split(),
-                        final_sampled_question_predictions_str_reshaped[i][j].split(),
-                        smoothing_function=smoothie,
-                    )
-                )
-
-        bleu_scores = torch.FloatTensor(bleu_scores)
-        if self.config.gpu:
-            bleu_scores = bleu_scores.to(current_device)
-
-        bleu_scores = bleu_scores.view(b_sz, self.config.num_search_samples)
-        """
-        # real_lenghts = []
         new_articles = []
         for i in range(b_sz):
             for j in range(self.config.num_search_samples):
@@ -696,15 +648,6 @@ class REQA(torch.nn.Module):
                     + " </s>"
                 )
                 new_articles.append(new_article)
-                # real_lenghts.append(
-                #    len(final_sampled_question_predictions_str_reshaped[i][j].split())
-                # )
-
-        # real_lenghts = torch.LongTensor(real_lenghts).view(
-        #    b_sz, self.config.num_search_samples
-        # )
-        # if self.config.gpu:
-        #    real_lenghts.to(current_device)
 
         answer_log_p = self.response_mml_forward(
             batch, new_articles, current_device, sample_masks, loss_fct
@@ -720,50 +663,6 @@ class REQA(torch.nn.Module):
         )
 
         # easier way to use MML objective.
-        """
-        length_weight = 2.0
-        min_batch_length = torch.min(real_lenghts)
-
-        log_lenght_norm = length_weight * (
-            torch.log(real_lenghts + 5) - torch.log(min_batch_length + 5)
-        )
-        if self.config.gpu:
-            log_lenght_norm = log_lenght_norm.to(current_device)
-        """
-        """
-        # ratio_log = question_log_p - sample_log_ps + answer_log_p + log_lenght_norm
-        question_log_p_cpy = question_log_p.clone().detach()
-        answer_log_p_cpy = answer_log_p.clone().detach()
-        ratio_log = question_log_p_cpy - sample_log_ps + answer_log_p_cpy
-        ratio_log_main = ratio_log - torch.logsumexp(ratio_log, dim=1).view(
-            -1, 1
-        ).repeat(1, self.config.num_search_samples)
-        ratio_log_main = ratio_log_main.masked_fill_(
-            (1.0 - sample_masks).bool(), -float("inf")
-        )
-        direct_mml_loss = -torch.mean(
-            torch.sum(torch.exp(ratio_log_main) * question_log_p, dim=1), dim=0
-        )
-        # easier_mml_loss = -torch.mean(torch.logsumexp(ratio_log, dim=1), dim=0)
-        """
-        """
-        entropy_loss = torch.mean(
-            torch.mean(
-                torch.exp(question_log_p - sample_log_ps + log_lenght_norm)
-                * question_log_p
-                * sample_masks,
-                dim=1,
-            ),
-            dim=0,
-        )
-        question_bleu_loss = -torch.mean(
-            torch.mean(
-                torch.exp(question_log_p - sample_log_ps + log_lenght_norm) * bleu_scores * sample_masks,
-                dim=1,
-            ),
-            dim=0,
-        )
-        """
         ratio_log = question_log_p - sample_log_ps + answer_log_p
         ratio_log = ratio_log.masked_fill_((1.0 - sample_masks).bool(), -float("inf"))
         easier_mml_loss = -torch.mean(torch.logsumexp(ratio_log, dim=1), dim=0)
