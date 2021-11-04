@@ -54,15 +54,15 @@ source env/bin/activate
 
 python src/re_gold_qa_train.py \
     --mode re_qa_train \
-    --model_path $HOME/mml_pgg/\
+    --model_path ./mml_tune/\
     --answer_checkpoint _response_pretrained \
     --question_checkpoint _question_pretrained_second_stage \
-    --training_steps 2000 \
+    --training_steps 1000 \
     --update_switch_steps 1 \
     --learning_rate 0.0005 \
     --max_epochs 1 \
-    --num_search_samples 32 \
-    --batch_size 8 \
+    --num_search_samples 3 \
+    --batch_size 2 \
     --gpu True \
     --num_workers 6 \
     --concat_questions False \
