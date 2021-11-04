@@ -1,13 +1,13 @@
 #!/bin/bash
 source env/bin/activate
 printf "fold 1, epoch 2\r\n"
-for (( i=6; i<=10; i++ ))
+for (( i=8; i<=10; i++ ))
 do
 	step=$((i * 100))
 	printf "step ${step}\r\n"
 	python src/re_gold_qa_train.py \
 		--mode re_qa_test \
-		--model_path $HOME/mml_mml_tune/ \
+		--model_path ./pgg_tune/ \
 		--answer_checkpoint _0_answer_step_${step} \
 		--question_checkpoint _0_question_step_${step} \
 		--learning_rate 0.0005 --max_epochs 1 \
@@ -18,7 +18,7 @@ do
 		--dev zero-shot-extraction/relation_splits/dev.0 \
 		--gpu_device 0 \
 		--seed 12321 \
-		--prediction_file $HOME/mml_mml_tune/mml_mml.dev.predictions.0.step.${step}.csv
+		--prediction_file ./pgg_tune/pgg.dev.predictions.1.step.${step}.csv
 done
 '''
 python src/re_gold_qa_train.py \

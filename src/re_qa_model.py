@@ -79,7 +79,7 @@ def prepare_response_module_input(
     target_mask = target_mask.repeat(1, num_samples).view(-1, dec_seq_len)
 
     return (
-        answer_input_ids 
+        answer_input_ids,
         answer_input_mask,
         target_mask,
         labels,
@@ -408,6 +408,7 @@ class REQA(torch.nn.Module):
             target_mask=target_mask,
             num_samples=self.config.num_search_samples,
         )
+
         with torch.no_grad():
             output = self.answer_model(
                 input_ids=answer_input_ids,
@@ -587,7 +588,6 @@ class REQA(torch.nn.Module):
             sampled_question_predictions_str_reshaped,
             loss_fct,
         )
-
         # easier way to use MML objective.
         ratio_log = question_log_p - sample_log_ps + answer_log_p
         easier_mml_loss = -torch.mean(torch.logsumexp(ratio_log, dim=1), dim=0)
