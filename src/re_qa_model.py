@@ -269,6 +269,8 @@ class REQA(torch.nn.Module):
             new_article = (
                 "question: "
                 + question_predictions_str[i]
+                + " "
+                + batch["entity_relations"]
                 + " context: "
                 + batch["passages"][i]
                 + " </s>"
@@ -369,9 +371,7 @@ class REQA(torch.nn.Module):
         loss_value = loss.item()
         return loss, loss_value
 
-    def response_mml_forward(
-        self, batch, new_articles, current_device, loss_fct
-    ):
+    def response_mml_forward(self, batch, new_articles, current_device, loss_fct):
         # Get output from the response module
         answer_inputs = self.answer_tokenizer(
             new_articles,
@@ -505,9 +505,7 @@ class REQA(torch.nn.Module):
 
         b, seq_len, v = question_output.logits.size()
         log_question_p = log_question_p.view(b, seq_len)
-        good_log_question_p = log_question_p.masked_fill_(
-            question_labels == -100, 0.0
-        )
+        good_log_question_p = log_question_p.masked_fill_(question_labels == -100, 0.0)
         question_log_p = torch.sum(good_log_question_p, dim=1).squeeze()
         question_log_p = question_log_p.view(b_sz, self.config.num_search_samples)
 
@@ -571,6 +569,8 @@ class REQA(torch.nn.Module):
                 new_article = (
                     "question: "
                     + sampled_question_predictions_str_reshaped[i][j]
+                    + " "
+                    + batch["entity_relations"]
                     + " context: "
                     + batch["passages"][i]
                     + " </s>"
@@ -597,14 +597,13 @@ class REQA(torch.nn.Module):
         self,
         batch,
         current_device,
-        phase="MML-MML",
+        phase="MML",
         sample_p=0.95,
     ):
         # Free memory in GPU, very important!
         clear_cache()
         # Turn on training mode which enables dropout.
         if phase == "PGG":
-            # self.question_optimizer.zero_grad()
             self.answer_optimizer.zero_grad()
             self.question_model.eval()
             loss, loss_value = self.pgg_answer_training(batch, current_device)
@@ -612,27 +611,6 @@ class REQA(torch.nn.Module):
                 # BackProp
                 loss.backward()
                 # Optimize
-                self.answer_optimizer.step()
-
-            return loss_value
-
-        elif phase == "MML-MML":
-            # for MML-MML
-            self.question_optimizer.zero_grad()
-            self.answer_optimizer.zero_grad()
-            self.answer_model.train()
-            loss = self.mml_question_training(
-                batch,
-                current_device,
-                sample_p=sample_p,
-            )
-            loss_value = loss.item()
-
-            if not math.isnan(loss_value) and not torch.isinf(loss):
-                # BackProp
-                loss.backward()
-                # Optimize
-                self.question_optimizer.step()
                 self.answer_optimizer.step()
 
             return loss_value

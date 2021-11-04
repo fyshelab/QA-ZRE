@@ -54,9 +54,9 @@ source env/bin/activate
 
 python src/re_gold_qa_train.py \
     --mode re_qa_train \
-    --model_path ./pgg_tune/\
-    --answer_checkpoint _0_answer_pgg_best \
-    --question_checkpoint _0_question_mml_best_1 \
+    --model_path ./mml_tune/\
+    --answer_checkpoint _response_pretrained \
+    --question_checkpoint _question_pretrained_second_stage \
     --training_steps 1000 \
     --update_switch_steps 1 \
     --learning_rate 0.0005 \
@@ -70,4 +70,4 @@ python src/re_gold_qa_train.py \
     --train ./zero-shot-extraction/relation_splits/train.very_small.0 \
     --gpu_device 0 \
     --seed 12321 \
-    --train_method PGG
+    --train_method MML
