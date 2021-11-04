@@ -72,31 +72,17 @@ def prepare_response_module_input(
     labels=None,
     target_mask=None,
     num_samples=1,
-    sample_masks=None,
 ):
     b_sz, dec_seq_len = labels.size()
     _, src_seq_len = answer_input_ids.size()
     labels = labels.repeat(1, num_samples).view(-1, dec_seq_len)
     target_mask = target_mask.repeat(1, num_samples).view(-1, dec_seq_len)
-    sample_output_mask = (
-        sample_masks.reshape(num_samples * b_sz, 1)
-        .repeat(1, dec_seq_len)
-        .view(-1, dec_seq_len)
-    )
-
-    new_labels = (1 - sample_output_mask) * -100 + labels * sample_output_mask
-
-    sample_input_mask = (
-        sample_masks.reshape(num_samples * b_sz, 1)
-        .repeat(1, src_seq_len)
-        .view(-1, src_seq_len)
-    )
 
     return (
-        answer_input_ids * sample_input_mask,
-        answer_input_mask * sample_input_mask,
-        target_mask * sample_output_mask,
-        new_labels,
+        answer_input_ids 
+        answer_input_mask,
+        target_mask,
+        labels,
     )
 
 
@@ -384,7 +370,7 @@ class REQA(torch.nn.Module):
         return loss, loss_value
 
     def response_mml_forward(
-        self, batch, new_articles, current_device, sample_masks, loss_fct
+        self, batch, new_articles, current_device, loss_fct
     ):
         # Get output from the response module
         answer_inputs = self.answer_tokenizer(
@@ -421,7 +407,6 @@ class REQA(torch.nn.Module):
             labels=labels,
             target_mask=target_mask,
             num_samples=self.config.num_search_samples,
-            sample_masks=sample_masks,
         )
         with torch.no_grad():
             output = self.answer_model(
@@ -451,7 +436,6 @@ class REQA(torch.nn.Module):
         question_input_ids,
         question_input_mask,
         final_sampled_question_predictions_str_reshaped,
-        sample_masks,
         loss_fct,
     ):
         # Now re-run the question generator and compute the loss for the sampled predictions.
@@ -504,38 +488,24 @@ class REQA(torch.nn.Module):
         self.question_model.train()
 
         _, dec_seq_len = question_labels.size()
-        sample_input_mask = (
-            sample_masks.reshape(self.config.num_search_samples * b_sz, 1)
-            .repeat(1, src_seq_len)
-            .view(-1, src_seq_len)
-        )
-        sample_output_mask = (
-            sample_masks.reshape(self.config.num_search_samples * b_sz, 1)
-            .repeat(1, dec_seq_len)
-            .view(-1, dec_seq_len)
-        )
-
-        question_new_labels = (
-            1 - sample_output_mask
-        ) * -100 + question_labels * sample_output_mask
 
         question_output = self.question_model(
-            input_ids=question_input_ids * sample_input_mask,
-            attention_mask=question_input_mask * sample_input_mask,
-            decoder_attention_mask=question_target_mask * sample_output_mask,
-            decoder_input_ids=self.question_model._shift_right(question_new_labels),
+            input_ids=question_input_ids,
+            attention_mask=question_input_mask,
+            decoder_attention_mask=question_target_mask,
+            decoder_input_ids=self.question_model._shift_right(question_labels),
             labels=None,
         )
 
         log_question_p = -loss_fct(
             question_output.logits.view(-1, question_output.logits.size(-1)),
-            question_new_labels.view(-1),
+            question_labels.view(-1),
         )
 
         b, seq_len, v = question_output.logits.size()
         log_question_p = log_question_p.view(b, seq_len)
         good_log_question_p = log_question_p.masked_fill_(
-            question_new_labels == -100, 0.0
+            question_labels == -100, 0.0
         )
         question_log_p = torch.sum(good_log_question_p, dim=1).squeeze()
         question_log_p = question_log_p.view(b_sz, self.config.num_search_samples)
@@ -558,91 +528,48 @@ class REQA(torch.nn.Module):
 
         with torch.no_grad():
             self.init_question_model.eval()
-            final_sampled_question_predictions_str_reshaped = []
-            sample_masks = []
-            sample_log_ps = []
-            for i in range(b_sz):
-                temp_list = list()
-                sample_log_p = []
-                top_p = sample_p
-                counter = 0
-                while (
-                    len(temp_list) < (self.config.num_search_samples) and counter < 15
-                ):
-                    # Use top-p sampling to collect samples.
-                    sampled_question_outputs = self.init_question_model.generate(
-                        input_ids=question_input_ids[i, :].view(1, -1),
-                        do_sample=True,
-                        no_repeat_ngram_size=self.config.no_repeat_ngram_size,
-                        max_length=self.config.decoder_max_length,
-                        num_return_sequences=self.config.num_search_samples,
-                        top_p=min([top_p, 0.98]),
-                        output_scores=True,
-                        return_dict_in_generate=True,
-                        attention_mask=question_input_mask[i, :].view(1, -1),
-                    )
-                    sampled_questions, question_log_ps = prob_of_sampled_predictions(
-                        loss_fct, sampled_question_outputs
-                    )
+            sampled_question_outputs = self.init_question_model.generate(
+                input_ids=question_input_ids,
+                do_sample=True,
+                no_repeat_ngram_size=self.config.no_repeat_ngram_size,
+                max_length=self.config.decoder_max_length,
+                num_return_sequences=self.config.num_search_samples,
+                top_p=sample_p,
+                output_scores=True,
+                return_dict_in_generate=True,
+                attention_mask=question_input_mask,
+            )
+            sampled_questions, question_log_ps = prob_of_sampled_predictions(
+                loss_fct, sampled_question_outputs
+            )
 
-                    sampled_question_predictions_str = (
-                        self.init_question_tokenizer.batch_decode(
-                            sampled_questions, skip_special_tokens=True
-                        )
-                    )
+            sampled_question_predictions_str = (
+                self.init_question_tokenizer.batch_decode(
+                    sampled_questions, skip_special_tokens=True
+                )
+            )
 
-                    sampled_question_predictions_str = [
-                        remove_prefix(pred, "question: ")
-                        for pred in sampled_question_predictions_str
-                    ]
+            sampled_question_predictions_str = [
+                remove_prefix(pred, "question: ")
+                for pred in sampled_question_predictions_str
+            ]
 
-                    sampled_question_predictions_str_reshaped = [
-                        sampled_question_predictions_str[
-                            i
-                            * (self.config.num_search_samples) : (i + 1)
-                            * (self.config.num_search_samples)
-                        ]
-                        for i in range(1)
-                    ]
-                    for sample_i in range(self.config.num_search_samples):
-                        sample = sampled_question_predictions_str_reshaped[0][sample_i]
-                        if len(temp_list) < (self.config.num_search_samples) and (
-                            sample not in temp_list
-                        ):
-                            temp_list.append(sample)
-                            sample_log_p.append(question_log_ps[sample_i].item())
+            sampled_question_predictions_str_reshaped = [
+                sampled_question_predictions_str[
+                    i
+                    * (self.config.num_search_samples) : (i + 1)
+                    * (self.config.num_search_samples)
+                ]
+                for i in range(b_sz)
+            ]
 
-                    top_p += 0.002
-                    counter += 1
-
-                while len(temp_list) < self.config.num_search_samples:
-                    temp_list.append("This is a dummy question!")
-                    sample_log_p.append(0)
-
-                final_sampled_question_predictions_str_reshaped.append(temp_list)
-                sample_log_ps.append(torch.FloatTensor(sample_log_p))
-
-                mask = []
-                for sample in temp_list:
-                    if sample != "This is a dummy question!":
-                        mask.append(1)
-                    else:
-                        mask.append(0)
-
-                sample_masks.append(torch.LongTensor(mask))
-
-        sample_log_ps = torch.stack(sample_log_ps, 0)
-        sample_log_ps = sample_log_ps.to(current_device)
-
-        sample_masks = torch.stack(sample_masks, 0)
-        sample_masks = sample_masks.to(current_device)
-
+        sample_log_ps = question_log_ps.view(b_sz, self.config.num_search_samples)
         new_articles = []
         for i in range(b_sz):
             for j in range(self.config.num_search_samples):
                 new_article = (
                     "question: "
-                    + final_sampled_question_predictions_str_reshaped[i][j]
+                    + sampled_question_predictions_str_reshaped[i][j]
                     + " context: "
                     + batch["passages"][i]
                     + " </s>"
@@ -650,21 +577,19 @@ class REQA(torch.nn.Module):
                 new_articles.append(new_article)
 
         answer_log_p = self.response_mml_forward(
-            batch, new_articles, current_device, sample_masks, loss_fct
+            batch, new_articles, current_device, loss_fct
         )
 
         question_log_p, output_questions = self.question_mml_forward(
             current_device,
             question_input_ids,
             question_input_mask,
-            final_sampled_question_predictions_str_reshaped,
-            sample_masks,
+            sampled_question_predictions_str_reshaped,
             loss_fct,
         )
 
         # easier way to use MML objective.
         ratio_log = question_log_p - sample_log_ps + answer_log_p
-        ratio_log = ratio_log.masked_fill_((1.0 - sample_masks).bool(), -float("inf"))
         easier_mml_loss = -torch.mean(torch.logsumexp(ratio_log, dim=1), dim=0)
         return easier_mml_loss
 
