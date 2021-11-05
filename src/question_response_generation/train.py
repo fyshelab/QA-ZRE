@@ -122,8 +122,8 @@ def run_model(
                         step, loss, mean_loss
                     )
                 )
-                if step > 0 and save_always and (step % 100 == 0):
-                    model.save(str(epoch) + "_step_" + str(step))
+                # if step > 0 and save_always and (step % 100 == 0):
+                #    model.save(str(epoch) + "_step_" + str(step))
 
             if save_always:
                 model.save(str(epoch))

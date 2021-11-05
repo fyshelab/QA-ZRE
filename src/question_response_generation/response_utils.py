@@ -20,7 +20,14 @@ def read_narrative_dataset():
 
         article = row["document"]["summary"]["text"]
 
-        context = "question: " + question + " context: " + article + " </s>"
+        context = (
+            "relation: <UNK> <UNK>"
+            + " question: "
+            + question
+            + " context: "
+            + article
+            + " </s>"
+        )
 
         return {
             "article": white_space_fix(context),
@@ -68,7 +75,12 @@ def read_race_dataset():
         article = row["article"]
         return {
             "article": white_space_fix(
-                "question: " + question + " context: " + article + " </s>"
+                "relation: <UNK> <UNK>"
+                + " question: "
+                + question
+                + " context: "
+                + article
+                + " </s>"
             ),
             "answer": white_space_fix(answer + " </s>"),
         }
@@ -101,7 +113,12 @@ def read_squad_dataset():
             answ = "no_answer"
         return {
             "article": white_space_fix(
-                "question: " + question + " context: " + context + " </s>"
+                "relation: <UNK> <UNK>"
+                + " question: "
+                + question
+                + " context: "
+                + context
+                + " </s>"
             ),
             "answer": white_space_fix(answ + " </s>"),
         }
@@ -129,7 +146,12 @@ def read_drop_dataset():
             answ = "no_answer"
         return {
             "article": white_space_fix(
-                "question: " + question + " context: " + context + " </s>"
+                "relation: <UNK> <UNK>"
+                + " question: "
+                + question
+                + " context: "
+                + context
+                + " </s>"
             ),
             "answer": white_space_fix(answ + " </s>"),
         }
@@ -161,7 +183,12 @@ def read_boolq_dataset():
         question = row["question"]
         return {
             "article": white_space_fix(
-                "question: " + question + " context: " + context + " </s>"
+                "relation: <UNK> <UNK>"
+                + " question: "
+                + question
+                + " context: "
+                + context
+                + " </s>"
             ),
             "answer": white_space_fix(str(row["answer"]) + " </s>"),
         }
