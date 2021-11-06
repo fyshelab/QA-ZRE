@@ -1,13 +1,12 @@
 #!/bin/bash
-'
 
 #SBATCH --job-name=reqa_train_concat_fold_1
 #SBATCH --account=rrg-afyshe
 #SBATCH --nodes=1
 #SBATCH --tasks-per-node=1
 #SBATCH --gres=gpu:v100l:1
-#SBATCH --mem=12000M
-#SBATCH --time=0-12:00
+#SBATCH --mem=32000M
+#SBATCH --time=0-15:00
 #SBATCH --cpus-per-task=6
 #SBATCH --output=%N-%j.out
 
@@ -30,31 +29,14 @@ echo "All the allocated nodes: $SLURM_JOB_NODELIST"
 
 python src/re_gold_qa_train.py \
        --mode re_concat_qa_train \
-       --model_path $SCRATCH/re_concat_qa_models_without_unknowns/fold_1/ \
-       --checkpoint _response_pretrained_model \
-       --learning_rate 0.001 --max_epochs 1 \
-       --concat_questions True \
-       --batch_size 4  --gpu True \
-       --answer_training_steps 8000 \
-       --ignore_unknowns False \
-       --train ./zero-shot-extraction/relation_splits/train.1 \
-       --dev ./zero-shot-extraction/relation_splits/dev.1 \
-       --gpu_device 0 \
-       --seed 12321
-'
-
-source env/bin/activate
-
-python src/re_gold_qa_train.py \
-       --mode re_concat_qa_train \
-       --model_path $HOME/concat_fold_1/ \
+       --model_path $SCRATCH/t5-small-exps/concat_fold_1/ \
        --checkpoint _response_pretrained \
        --learning_rate 0.0005 --max_epochs 1 \
        --concat_questions True \
-       --batch_size 8  --gpu True \
-       --answer_training_steps 2000 \
+       --batch_size 64  --gpu True \
+       --answer_training_steps 13125 \
        --ignore_unknowns True \
-       --train ./zero-shot-extraction/relation_splits/train.very_small.0 \
+       --train ./zero-shot-extraction/relation_splits/train.0 \
        --dev ./zero-shot-extraction/relation_splits/dev.0 \
        --gpu_device 0 \
        --seed 12321
