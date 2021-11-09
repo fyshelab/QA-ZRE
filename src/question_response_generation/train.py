@@ -328,7 +328,7 @@ def run_second_q_pretrain(args):
 
     model = T5QA(config)
 
-    load_module(model.model.module, model.model_path, args.checkpoint)
+    # load_module(model.model.module, model.model_path, args.checkpoint)
 
     train_loader, _, _ = create_question_generation_dataset(
         question_tokenizer=model.tokenizer,
