@@ -18,9 +18,11 @@ def q_only_read_narrative_dataset():
         """Helper functions for NarrativeQA Dataset."""
         question = row["question"]["text"]
         article = row["document"]["summary"]["text"]
+        answer = random.choice(row["answers"])["text"]
         return {
             "article": white_space_fix(article),
             "question": white_space_fix(question),
+            "answer": white_space_fix(answer),
         }
 
     train_dataset = load_dataset("narrativeqa", split="train")
@@ -87,10 +89,13 @@ def q_only_read_squad_dataset():
     def process_squad_row(row):
         context = row["context"]
         question = row["question"]
-        return {
-            "article": white_space_fix(context),
-            "question": white_space_fix(question),
-        }
+        if row["answers"]["text"]:
+            answ = random.choice(row["answers"]["text"])
+            return {
+                "article": white_space_fix(context),
+                "question": white_space_fix(question),
+                "answer": white_space_fix(answ),
+            }
 
     train_dataset = load_dataset("squad_v2", split="train")
     train_dataset = train_dataset.map(
@@ -140,10 +145,13 @@ def q_only_read_drop_dataset():
     def process_drop_row(row):
         context = row["passage"]
         question = row["question"]
-        return {
-            "article": white_space_fix(context),
-            "question": white_space_fix(question),
-        }
+        if row["answers_spans"]["spans"]:
+            answ = random.choice(row["answers_spans"]["spans"])
+            return {
+                "article": white_space_fix(context),
+                "question": white_space_fix(question),
+                "answer": white_space_fix(answ),
+            }
 
     train_dataset = load_dataset("drop", split="train")
     train_dataset = train_dataset.map(
@@ -385,17 +393,21 @@ def create_data_for_question_generation():
 
     train_contexts = []
     train_questions = []
+    train_answers = []
     for row in nq_train_dataset:
         train_contexts.append(row["article"])
         train_questions.append(row["question"])
+        train_answers.append(row["answer"])
 
     for row in squad_train_dataset:
         train_contexts.append(row["article"])
         train_questions.append(row["question"])
+        train_answers.append(row["answer"])
 
     for row in drop_train_dataset:
         train_contexts.append(row["article"])
         train_questions.append(row["question"])
+        train_answers.append(row["answer"])
 
     nlp = spacy.load("en_core_web_sm")
     # Add these interrogative words into the stop lists.
@@ -446,7 +458,13 @@ def create_data_for_question_generation():
                     new_final_doc.append(token)
             if new_final_doc:
                 good_qs.append(
-                    (train_contexts[index], q, " ".join(new_final_doc), q_ents[0][0])
+                    (
+                        train_contexts[index],
+                        q,
+                        " ".join(new_final_doc),
+                        q_ents[0][0],
+                        train_answers[index],
+                    )
                 )
 
     contexts = []
@@ -454,6 +472,7 @@ def create_data_for_question_generation():
     for row in good_qs:
         context = row[0]
         question = row[1]
+        answer = row[4]
         tokens = row[2].split(" ")
         if len(tokens) > 0 and len(tokens) < 6:
             relation_signal = " ".join(tokens)
@@ -469,6 +488,8 @@ def create_data_for_question_generation():
             + white_space_fix(row[3])
             + " <SEP> "
             + white_space_fix(relation_signal)
+            + " "
+            + white_space_fix(answer)
             + " context: "
             + white_space_fix(context)
             + " </s>"
