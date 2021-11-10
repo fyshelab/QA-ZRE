@@ -33,10 +33,9 @@ source env/bin/activate
 python src/question_response_generation/train.py \
   --question_training True \
   --mode question_generation_second_pretrain \
-  --model_path $HOME/question_model/ \
-  --checkpoint _question_pretrained_first_stage \
+  --model_path $HOME/posterier_question_model/ \
   --learning_rate 0.0005 \
-  --max_epochs 1 \
+  --max_epochs 4 \
   --batch_size 64 \
   --gpu True \
   --gpu_device 0 \
