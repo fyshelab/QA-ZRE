@@ -96,6 +96,12 @@ def q_only_read_squad_dataset():
                 "question": white_space_fix(question),
                 "answer": white_space_fix(answ),
             }
+        else:
+            return {
+                "article": "NONE",
+                "answer": "NONE",
+                "question": "NONE",
+            }
 
     train_dataset = load_dataset("squad_v2", split="train")
     train_dataset = train_dataset.map(
@@ -151,6 +157,12 @@ def q_only_read_drop_dataset():
                 "article": white_space_fix(context),
                 "question": white_space_fix(question),
                 "answer": white_space_fix(answ),
+            }
+        else:
+            return {
+                "article": "NONE",
+                "answer": "NONE",
+                "question": "NONE",
             }
 
     train_dataset = load_dataset("drop", split="train")
