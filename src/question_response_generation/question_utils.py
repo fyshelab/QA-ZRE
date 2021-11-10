@@ -18,9 +18,11 @@ def q_only_read_narrative_dataset():
         """Helper functions for NarrativeQA Dataset."""
         question = row["question"]["text"]
         article = row["document"]["summary"]["text"]
+        answer = random.choice(row["answers"])["text"]
         return {
             "article": white_space_fix(article),
             "question": white_space_fix(question),
+            "answer": white_space_fix(answer),
         }
 
     train_dataset = load_dataset("narrativeqa", split="train")
@@ -87,10 +89,13 @@ def q_only_read_squad_dataset():
     def process_squad_row(row):
         context = row["context"]
         question = row["question"]
-        return {
-            "article": white_space_fix(context),
-            "question": white_space_fix(question),
-        }
+        if row["answers"]["text"]:
+            answ = random.choice(row["answers"]["text"])
+            return {
+                "article": white_space_fix(context),
+                "question": white_space_fix(question),
+                "answer": white_space_fix(answ),
+            }
 
     train_dataset = load_dataset("squad_v2", split="train")
     train_dataset = train_dataset.map(
@@ -140,10 +145,13 @@ def q_only_read_drop_dataset():
     def process_drop_row(row):
         context = row["passage"]
         question = row["question"]
-        return {
-            "article": white_space_fix(context),
-            "question": white_space_fix(question),
-        }
+        if row["answers_spans"]["spans"]:
+            answ = random.choice(row["answers_spans"]["spans"])
+            return {
+                "article": white_space_fix(context),
+                "question": white_space_fix(question),
+                "answer": white_space_fix(answ),
+            }
 
     train_dataset = load_dataset("drop", split="train")
     train_dataset = train_dataset.map(
@@ -385,17 +393,21 @@ def create_data_for_question_generation():
 
     train_contexts = []
     train_questions = []
+    train_answers = []
     for row in nq_train_dataset:
         train_contexts.append(row["article"])
         train_questions.append(row["question"])
+        train_answers.append(row["answer"])
 
     for row in squad_train_dataset:
         train_contexts.append(row["article"])
         train_questions.append(row["question"])
+        train_answers.append(row["answer"])
 
     for row in drop_train_dataset:
         train_contexts.append(row["article"])
         train_questions.append(row["question"])
+        train_answers.append(row["answer"])
 
     nlp = spacy.load("en_core_web_sm")
     # Add these interrogative words into the stop lists.
@@ -438,28 +450,37 @@ def create_data_for_question_generation():
             if token.is_stop != True and token.is_punct != True
         ]
         q_ents = [(e.text, e.label_) for e in q_doc.ents]
-        # to collect high precision data.
-        if len(q_ents) == 1:
+        if len(q_ents) > 0:
+            q_entity = random.choice(q_ents)[0]
+            all_entities = " ".join([ent[0] for ent in q_ents])
             new_final_doc = []
             for token in final_doc:
-                if token not in q_ents[0][0]:
+                if token not in all_entities:
                     new_final_doc.append(token)
             if new_final_doc:
                 good_qs.append(
-                    (train_contexts[index], q, " ".join(new_final_doc), q_ents[0][0])
+                    (
+                        train_contexts[index],
+                        q,
+                        " ".join(new_final_doc),
+                        q_entity,
+                        train_answers[index],
+                    )
                 )
 
+    print(len(good_qs))
     contexts = []
     questions = []
     for row in good_qs:
         context = row[0]
         question = row[1]
+        answer = row[4]
         tokens = row[2].split(" ")
-        if len(tokens) > 0 and len(tokens) < 6:
+        if len(tokens) > 0 and len(tokens) < 4:
             relation_signal = " ".join(tokens)
 
-        if len(tokens) >= 6:
-            token_num = random.randint(3, len(tokens))
+        if len(tokens) >= 4:
+            token_num = random.randint(1, 4)
             sampled_tokens = random.sample(tokens, token_num)
             relation_signal = " ".join(sampled_tokens)
         else:
@@ -469,6 +490,8 @@ def create_data_for_question_generation():
             + white_space_fix(row[3])
             + " <SEP> "
             + white_space_fix(relation_signal)
+            + " "
+            + white_space_fix(answer)
             + " context: "
             + white_space_fix(context)
             + " </s>"

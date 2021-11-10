@@ -16,6 +16,7 @@ def read_zero_re_qa(path, ignore_unknowns=True, gold_question=False, concat=Fals
     path = Path(path)
     with open(path, "r") as fd:
         contexts = []
+        posterier_contexts = []
         answers = []
         passages = []
         entities = []
@@ -55,8 +56,20 @@ def read_zero_re_qa(path, ignore_unknowns=True, gold_question=False, concat=Fals
                     + white_space_fix(passage)
                     + " </s>"
                 )
+                posterier_contexts.append(
+                    "answer: "
+                    + white_space_fix(line_arr[2])
+                    + " <SEP> "
+                    + white_space_fix(line_arr[0])
+                    + " "
+                    + white_space_fix(" and ".join(gold_answers))
+                    + " context: "
+                    + white_space_fix(passage)
+                    + " </s>"
+                )
+
             answers.append(white_space_fix(" and ".join(gold_answers)) + " </s>")
-    return passages, contexts, answers, entity_relations, entities
+    return passages, contexts, answers, entity_relations, entities, posterier_contexts
 
 
 def test_read_zero_re_qa():
@@ -138,13 +151,21 @@ def create_zero_re_qa_dataset(
             train_answers,
             train_entity_relations,
             train_entities,
+            train_posterier_contexts,
         ) = read_zero_re_qa(
             train_file,
             ignore_unknowns=ignore_unknowns,
             gold_question=gold_questions,
             concat=concat,
         )
-    val_passages, val_contexts, val_answers, val_entity_relations, _ = read_zero_re_qa(
+    (
+        val_passages,
+        val_contexts,
+        val_answers,
+        val_entity_relations,
+        _,
+        _,
+    ) = read_zero_re_qa(
         dev_file,
         ignore_unknowns=ignore_unknowns,
         gold_question=gold_questions,
@@ -186,6 +207,13 @@ def create_zero_re_qa_dataset(
             truncation=True,
             padding="max_length",
             max_length=decoder_max_length,
+            add_special_tokens=False,
+        )
+        train_posterier_encodings = question_tokenizer(
+            train_posterier_contexts,
+            truncation=True,
+            padding="max_length",
+            max_length=source_max_length,
             add_special_tokens=False,
         )
 
@@ -230,6 +258,12 @@ def create_zero_re_qa_dataset(
         if not for_evaluation:
             train_encodings["passages"] = train_passages
             train_encodings["entity_relations"] = train_entity_relations
+            train_encodings["posterier_input_ids"] = train_posterier_encodings.pop(
+                "input_ids"
+            )
+            train_encodings["posterier_attention_mask"] = train_posterier_encodings.pop(
+                "attention_mask"
+            )
             train_encodings["entity_input_ids"] = train_entity_encodings.pop(
                 "input_ids"
             )
