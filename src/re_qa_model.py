@@ -269,8 +269,6 @@ class REQA(torch.nn.Module):
             new_article = (
                 "question: "
                 + question_predictions_str[i]
-                + " "
-                + batch["entity_relations"]
                 + " context: "
                 + batch["passages"][i]
                 + " </s>"
@@ -523,12 +521,22 @@ class REQA(torch.nn.Module):
             question_input_ids = question_input_ids.to(current_device)
             question_input_mask = question_input_mask.to(current_device)
 
+        posterier_question_input_ids = batch["posterier_input_ids"]
+        posterier_question_input_mask = batch["posterier_attention_mask"]
+        if self.config.gpu:
+            posterier_question_input_ids = posterier_question_input_ids.to(
+                current_device
+            )
+            posterier_question_input_mask = posterier_question_input_mask.to(
+                current_device
+            )
+
         b_sz, _ = question_input_ids.size()
 
         with torch.no_grad():
             self.init_question_model.eval()
             sampled_question_outputs = self.init_question_model.generate(
-                input_ids=question_input_ids,
+                input_ids=posterier_question_input_ids,
                 do_sample=True,
                 no_repeat_ngram_size=self.config.no_repeat_ngram_size,
                 max_length=self.config.decoder_max_length,
@@ -536,7 +544,7 @@ class REQA(torch.nn.Module):
                 top_p=sample_p,
                 output_scores=True,
                 return_dict_in_generate=True,
-                attention_mask=question_input_mask,
+                attention_mask=posterier_question_input_mask,
             )
             sampled_questions, question_log_ps = prob_of_sampled_predictions(
                 loss_fct, sampled_question_outputs
@@ -569,8 +577,6 @@ class REQA(torch.nn.Module):
                 new_article = (
                     "question: "
                     + sampled_question_predictions_str_reshaped[i][j]
-                    + " "
-                    + batch["entity_relations"]
                     + " context: "
                     + batch["passages"][i]
                     + " </s>"
