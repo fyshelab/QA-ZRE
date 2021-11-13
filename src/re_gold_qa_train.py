@@ -77,7 +77,7 @@ def run_re_gold_qa(args):
 
 def run_re_concat_qa(args):
     """Run the relation-extraction qa models using the concat of head entity
-    and the relation."""
+    and the relation word."""
     if args.mode == "re_concat_qa_train":
         mode = "train"
         for_evaluation = False
