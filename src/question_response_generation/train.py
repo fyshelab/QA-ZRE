@@ -145,7 +145,7 @@ def run_model(
 
 
 def run_all(args):
-    """Run the T5 on multiple qa datasets."""
+    """Run the T5 on multiple qa datasets to pre-train the response generator"""
     config = HyperParameters(
         model_path=args.model_path,
         batch_size=args.batch_size,
@@ -160,38 +160,23 @@ def run_all(args):
     )
 
     set_random_seed(config.seed)
+
     model = T5QA(config)
 
-    if args.question_training:
-        (
-            train_loader,
-            val_loader,
-            test_loader,
-            train_dataset,
-            dev_dataset,
-            test_dataset,
-            train_sampler,
-        ) = create_question_dataset(
-            tokenizer=model.tokenizer,
-            batch_size=config.batch_size,
-            source_max_length=config.source_max_length,
-            decoder_max_length=config.decoder_max_length,
-        )
-    else:
-        (
-            train_loader,
-            val_loader,
-            test_loader,
-            train_dataset,
-            dev_dataset,
-            test_dataset,
-            train_sampler,
-        ) = create_response_dataset(
-            tokenizer=model.tokenizer,
-            batch_size=config.batch_size,
-            source_max_length=config.source_max_length,
-            decoder_max_length=config.decoder_max_length,
-        )
+    (
+        train_loader,
+        val_loader,
+        test_loader,
+        train_dataset,
+        dev_dataset,
+        test_dataset,
+        train_sampler,
+    ) = create_response_dataset(
+        tokenizer=model.tokenizer,
+        batch_size=config.batch_size,
+        source_max_length=config.source_max_length,
+        decoder_max_length=config.decoder_max_length,
+    )
 
     run_model(
         model,
@@ -204,68 +189,7 @@ def run_all(args):
 
 
 def run_squad_test(args):
-    """Test the T5 on squad v2 dev data."""
-    config = HyperParameters(
-        model_path=args.model_path,
-        batch_size=args.batch_size,
-        source_max_length=512,
-        decoder_max_length=128,
-        gpu=args.gpu,
-        learning_rate=args.learning_rate,
-        max_epochs=args.max_epochs,
-        mode="test",
-        prediction_file=args.prediction_file,
-        checkpoint=args.checkpoint,
-        seed=args.seed,
-    )
-
-    set_random_seed(config.seed)
-    model = T5QA(config)
-
-    if args.question_training:
-        (
-            train_loader,
-            val_loader,
-            test_loader,
-            train_dataset,
-            dev_dataset,
-            test_dataset,
-            train_sampler,
-        ) = create_question_dataset(
-            tokenizer=model.tokenizer,
-            batch_size=config.batch_size,
-            source_max_length=config.source_max_length,
-            decoder_max_length=config.decoder_max_length,
-            dataset="squad_v2",
-        )
-    else:
-        (
-            train_loader,
-            val_loader,
-            test_loader,
-            train_dataset,
-            dev_dataset,
-            test_dataset,
-            train_sampler,
-        ) = create_response_dataset(
-            tokenizer=model.tokenizer,
-            batch_size=config.batch_size,
-            source_max_length=config.source_max_length,
-            decoder_max_length=config.decoder_max_length,
-        )
-
-    run_model(
-        model,
-        config=config,
-        train_dataloader=train_loader,
-        dev_dataloader=val_loader,
-        test_dataloader=val_loader,
-        save_always=True,
-    )
-
-
-def run_narrativeqa_test(args):
-    """Test the trained T5 on narrative qa dataset."""
+    """Test the T5 for response generation on the squad v2 dev data."""
     config = HyperParameters(
         model_path=args.model_path,
         batch_size=args.batch_size,
@@ -296,7 +220,7 @@ def run_narrativeqa_test(args):
         batch_size=config.batch_size,
         source_max_length=config.source_max_length,
         decoder_max_length=config.decoder_max_length,
-        dataset="narrativeqa",
+        dataset="squad_v2",
     )
 
     run_model(
@@ -309,8 +233,8 @@ def run_narrativeqa_test(args):
     )
 
 
-def run_second_q_pretrain(args):
-    """Run the T5 to do the second pretraining of the question module."""
+def run_pretrain_question_generator(args):
+    """Run the T5 to do the pretraining of the question module."""
     config = HyperParameters(
         model_path=args.model_path,
         batch_size=args.batch_size,
@@ -327,8 +251,6 @@ def run_second_q_pretrain(args):
     set_random_seed(config.seed)
 
     model = T5QA(config)
-
-    # load_module(model.model.module, model.model_path, args.checkpoint)
 
     train_loader, _, _ = create_question_generation_dataset(
         question_tokenizer=model.tokenizer,
