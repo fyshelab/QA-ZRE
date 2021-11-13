@@ -13,8 +13,8 @@ from src.zero_extraction_utils import create_zero_re_qa_dataset
 
 
 def run_re_gold_qa(args):
-    """Run the relation-extraction qa models using the gold questions for the
-    head entity and the relation."""
+    """Run the relation-extraction qa models using the given gold questions for
+    the head entity and the relation."""
     if args.mode == "re_gold_qa_train":
         mode = "train"
         for_evaluation = False
@@ -37,6 +37,7 @@ def run_re_gold_qa(args):
     )
 
     set_random_seed(config.seed)
+
     model = T5QA(config)
 
     if not for_evaluation:
