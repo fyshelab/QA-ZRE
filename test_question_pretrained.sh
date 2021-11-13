@@ -20,10 +20,10 @@ do
 			--batch_size 64 --gpu True \
 			--ignore_unknowns True \
 			--train zero-shot-extraction/relation_splits/train.very_small.0 \
-			--dev zero-shot-extraction/relation_splits/dev.0 \
+			--dev zero-shot-extraction/relation_splits/dev.2 \
 			--gpu_device 0 \
 			--seed 12321 \
-			--prediction_file ${main_path}question_pretrained_with_best_response_pretrained.dev.predictions.${i}.step.${step}.csv
+			--prediction_file ${main_path}fold_3.question_pretrained_with_best_response_pretrained.dev.predictions.${i}.step.${step}.csv
 	done
 
 	printf "full epoch ${i}\r\n"
@@ -35,9 +35,9 @@ do
 		--batch_size 64 --gpu True \
 		--ignore_unknowns True \
 		--train zero-shot-extraction/relation_splits/train.very_small.0 \
-		--dev zero-shot-extraction/relation_splits/dev.0 \
+		--dev zero-shot-extraction/relation_splits/dev.2 \
 		--gpu_device 0 \
 		--seed 12321 \
-		--prediction_file ${main_path}question_pretrained_with_best_response_pretrained.dev.predictions.${i}.step.full.csv
+		--prediction_file ${main_path}fold_3.question_pretrained_with_best_response_pretrained.dev.predictions.${i}.step.full.csv
 
 done

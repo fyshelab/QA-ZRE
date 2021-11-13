@@ -210,14 +210,14 @@ def create_zero_re_qa_dataset(
             add_special_tokens=False,
         )
 
-    if not (gold_questions or concat):
-        train_posterier_encodings = question_tokenizer(
-            train_posterier_contexts,
-            truncation=True,
-            padding="max_length",
-            max_length=source_max_length,
-            add_special_tokens=False,
-        )
+        if not (gold_questions or concat):
+            train_posterier_encodings = question_tokenizer(
+                train_posterier_contexts,
+                truncation=True,
+                padding="max_length",
+                max_length=source_max_length,
+                add_special_tokens=False,
+            )
 
     if gold_questions or concat:
 

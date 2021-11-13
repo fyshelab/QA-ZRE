@@ -1,5 +1,7 @@
 #!/bin/bash
 
+source env/bin/activate
+
 main_path=$HOME/t5-small-exps/naacl-2022/
 
 python src/re_gold_qa_train.py \
