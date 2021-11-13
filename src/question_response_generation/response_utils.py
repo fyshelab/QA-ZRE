@@ -20,14 +20,7 @@ def read_narrative_dataset():
 
         article = row["document"]["summary"]["text"]
 
-        context = (
-            "relation: <UNK> <UNK>"
-            + " question: "
-            + question
-            + " context: "
-            + article
-            + " </s>"
-        )
+        context = "question: " + question + " context: " + article + " </s>"
 
         return {
             "article": white_space_fix(context),
@@ -75,12 +68,7 @@ def read_race_dataset():
         article = row["article"]
         return {
             "article": white_space_fix(
-                "relation: <UNK> <UNK>"
-                + " question: "
-                + question
-                + " context: "
-                + article
-                + " </s>"
+                "question: " + question + " context: " + article + " </s>"
             ),
             "answer": white_space_fix(answer + " </s>"),
         }
@@ -113,12 +101,7 @@ def read_squad_dataset():
             answ = "no_answer"
         return {
             "article": white_space_fix(
-                "relation: <UNK> <UNK>"
-                + " question: "
-                + question
-                + " context: "
-                + context
-                + " </s>"
+                "question: " + question + " context: " + context + " </s>"
             ),
             "answer": white_space_fix(answ + " </s>"),
         }
@@ -146,12 +129,7 @@ def read_drop_dataset():
             answ = "no_answer"
         return {
             "article": white_space_fix(
-                "relation: <UNK> <UNK>"
-                + " question: "
-                + question
-                + " context: "
-                + context
-                + " </s>"
+                "question: " + question + " context: " + context + " </s>"
             ),
             "answer": white_space_fix(answ + " </s>"),
         }
@@ -183,12 +161,7 @@ def read_boolq_dataset():
         question = row["question"]
         return {
             "article": white_space_fix(
-                "relation: <UNK> <UNK>"
-                + " question: "
-                + question
-                + " context: "
-                + context
-                + " </s>"
+                "question: " + question + " context: " + context + " </s>"
             ),
             "answer": white_space_fix(str(row["answer"]) + " </s>"),
         }
@@ -351,10 +324,10 @@ def create_response_dataset(
             ]
         )
 
-    elif dataset == "narrativeqa":
-        nq_train_dataset, nq_dev_dataset, nq_test_dataset = read_narrative_dataset()
+    elif dataset == "squad_v2":
+        sq_train_dataset, sq_dev_dataset, sq_test_dataset = read_squad_dataset()
         train_dataset, dev_dataset, test_dataset = dataset_to_pytorch(
-            nq_train_dataset, nq_dev_dataset, nq_test_dataset
+            sq_train_dataset, sq_dev_dataset, sq_test_dataset
         )
 
     # Training
