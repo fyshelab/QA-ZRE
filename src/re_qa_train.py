@@ -87,32 +87,34 @@ def iterative_run_model(
             total_loss = []
             mean_loss = 0.0
             while step < config.training_steps:
-                for inner_step in range(config.update_switch_steps):
-                    data_batch = next(data_iter)
-                    loss = model.iterative_train(
-                        data_batch,
-                        current_device,
-                        phase=train_method,
-                        sample_p=0.95,
+                data_batch = next(data_iter)
+                loss = model.train_objectives(
+                    data_batch,
+                    current_device,
+                    objective_type=train_method,
+                    sample_p=0.95,
+                )
+
+                if type(loss) == tuple:
+                    avg_loss = loss[0] + loss[1] / 2.0
+
+                if avg_loss and not math.isinf(avg_loss):
+                    total_loss.append(avg_loss)
+
+                if total_loss:
+                    mean_loss = np.mean(total_loss)
+
+                print(
+                    "\rRank:{0} | Batch:{1} | Loss:{2} | Mean Loss:{3} | GPU Usage:{4}\n".format(
+                        rank,
+                        step + 1,
+                        loss,
+                        mean_loss,
+                        torch.cuda.memory_allocated(device=current_device),
                     )
+                )
 
-                    if loss and not math.isinf(loss):
-                        total_loss.append(loss)
-
-                    if total_loss:
-                        mean_loss = np.mean(total_loss)
-
-                    print(
-                        "\rRank:{0} | Batch:{1} | Loss:{2} | Mean Loss:{3} | GPU Usage:{4}\n".format(
-                            rank,
-                            step + inner_step + 1,
-                            loss,
-                            mean_loss,
-                            torch.cuda.memory_allocated(device=current_device),
-                        )
-                    )
-
-                step += config.update_switch_steps
+                step += 1
                 if rank == 0 and save_always and step > 0 and (step % 100 == 0):
                     save(
                         model.question_model,

@@ -720,6 +720,7 @@ class REQA(torch.nn.Module):
                 sample_p=sample_p,
                 off_policy=False,
                 answer_training=True,
+                question_training=True,
             )
             loss_value = loss.item()
             if not math.isnan(loss_value):
@@ -740,6 +741,7 @@ class REQA(torch.nn.Module):
                 sample_p=sample_p,
                 off_policy=True,
                 answer_training=True,
+                question_training=True,
             )
             loss_value = loss.item()
             if not math.isnan(loss_value):
@@ -761,6 +763,7 @@ class REQA(torch.nn.Module):
                 sample_p=sample_p,
                 off_policy=True,
                 answer_training=False,
+                question_training=True,
             )
             loss_value = loss.item()
 
@@ -791,6 +794,7 @@ class REQA(torch.nn.Module):
                 sample_p=sample_p,
                 off_policy=False,
                 answer_training=False,
+                question_training=True,
             )
             loss_value = loss.item()
 
@@ -831,6 +835,7 @@ class REQA(torch.nn.Module):
                 sample_p=sample_p,
                 off_policy=True,
                 answer_training=False,
+                question_training=True,
             )
             loss_value = loss.item()
 
@@ -851,6 +856,7 @@ class REQA(torch.nn.Module):
                 sample_p=sample_p,
                 off_policy=False,
                 answer_training=False,
+                question_training=True,
             )
             loss_value = loss.item()
 
