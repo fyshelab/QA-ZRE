@@ -188,7 +188,6 @@ def run_re_qa(args):
             answer_checkpoint=args.answer_checkpoint,
             question_checkpoint=args.question_checkpoint,
             num_search_samples=int(args.num_search_samples),
-            update_switch_steps=int(args.update_switch_steps),
             seed=args.seed,
         )
         set_random_seed(config.seed)
@@ -351,12 +350,6 @@ def argument_parser():
     parser.add_argument("--num_beams", type=int, default=32, help="Number of beam size")
     parser.add_argument(
         "--num_search_samples", type=int, default=8, help="Number of search samples"
-    )
-    parser.add_argument(
-        "--update_switch_steps",
-        type=int,
-        default=10,
-        help="Number of steps to train each question or response module before switching to train the other one!",
     )
     parser.add_argument(
         "--num_beam_groups",
