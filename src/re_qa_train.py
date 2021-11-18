@@ -98,6 +98,9 @@ def iterative_run_model(
                 if type(loss) == tuple:
                     avg_loss = loss[0] + loss[1] / 2.0
 
+                else:
+                    avg_loss = loss
+
                 if avg_loss and not math.isinf(avg_loss):
                     total_loss.append(avg_loss)
 

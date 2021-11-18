@@ -3,9 +3,6 @@ from pathlib import Path
 import torch
 from torch.utils.data import DataLoader
 
-from src.question_response_generation.question_utils import \
-    create_data_for_question_generation
-
 
 def white_space_fix(text):
     return " ".join(text.split())

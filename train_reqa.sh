@@ -1,17 +1,16 @@
 #!/bin/bash
-'''
-#SBATCH --job-name=reqa_mml_mml_fold_0
-#SBATCH --account=rrg-afyshe
-#SBATCH --nodes=4
-#SBATCH --tasks-per-node=4
-#SBATCH --gres=gpu:v100l:4
-#SBATCH --mem=0
-#SBATCH --time=0-15:00
-#SBATCH --cpus-per-task=6
+
+#SBATCH --job-name=reqa+mml_iter_off_fold_0
+#SBATCH --account=def-afyshe-ab
+#SBATCH --nodes=1
+#SBATCH --tasks-per-node=1
+#SBATCH --gres=gpu:a100:1
+#SBATCH --mem=24000M
+#SBATCH --time=2-00:00
+#SBATCH --cpus-per-task=3
 #SBATCH --output=%N-%j.out
 
-module load python/3.8
-module load StdEnv/2020  gcc/9.3.0 arrow/2.0.0
+module load StdEnv/2020 gcc/9.3.0 cuda/11.4 arrow/5.0.0
 
 source env/bin/activate
 
@@ -31,43 +30,19 @@ srun python src/re_gold_qa_train.py \
     --init_method tcp://$MASTER_ADDR:3456 \
     --world_size $SLURM_NTASKS \
     --mode re_qa_train \
-    --model_path $SCRATCH/oct_11/ \
-    --answer_checkpoint _response_pretrained_model \
-    --question_checkpoint _question_second_pretrained_model \
-    --training_steps 840000 \
-    --update_switch_steps 1 \
-    --learning_rate 0.001 \
-    --max_epochs 2 \
+    --model_path $SCRATCH/small_fold_1/mml-off-iter+mml/ \
+    --answer_checkpoint _response_pretrained \
+    --question_checkpoint _0_mml_off_best_question \
+    --training_steps 26250 \
+    --learning_rate 0.0005 \
+    --max_epochs 1 \
     --num_search_samples 8 \
-    --batch_size 64 \
+    --batch_size 16 \
     --gpu True \
-    --num_workers 6 \
+    --num_workers 3 \
     --concat_questions False \
     --dev ./zero-shot-extraction/relation_splits/dev.0 \
     --train ./zero-shot-extraction/relation_splits/train.0 \
     --gpu_device 0 \
     --seed 12321 \
-    --train_method MML-MML
-'''
-
-source env/bin/activate
-
-python src/re_gold_qa_train.py \
-    --mode re_qa_train \
-    --model_path ./mml_tune/\
-    --answer_checkpoint _response_pretrained \
-    --question_checkpoint _question_pretrained_second_stage \
-    --training_steps 1000 \
-    --update_switch_steps 1 \
-    --learning_rate 0.0005 \
-    --max_epochs 1 \
-    --num_search_samples 8 \
-    --batch_size 2 \
-    --gpu True \
-    --num_workers 6 \
-    --concat_questions False \
-    --dev ./zero-shot-extraction/relation_splits/dev.0 \
-    --train ./zero-shot-extraction/relation_splits/train.very_small.0 \
-    --gpu_device 0 \
-    --seed 12321 \
-    --train_method MML
+    --train_method Answer-MML-Off
