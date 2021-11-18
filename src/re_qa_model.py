@@ -154,7 +154,7 @@ def prob_of_sampled_predictions(loss_fct, sample_outputs):
     return sampled_predictions, log_p
 
 
-MODEL_NAME = "t5-small"
+MODEL_NAME = "./t5-small"
 
 
 class REQA(torch.nn.Module):
@@ -169,23 +169,33 @@ class REQA(torch.nn.Module):
         self.model_path = os.path.join(cfg.model_path, "model")
 
         # Answer model
-        answer_tokenizer = T5Tokenizer.from_pretrained(MODEL_NAME)
+        answer_tokenizer = T5Tokenizer.from_pretrained(
+            MODEL_NAME, local_files_only=True
+        )
 
         # Construct the answer model
-        answer_model = T5ForConditionalGeneration.from_pretrained(MODEL_NAME)
+        answer_model = T5ForConditionalGeneration.from_pretrained(
+            MODEL_NAME, local_files_only=True
+        )
 
         # Question Model
-        question_tokenizer = T5Tokenizer.from_pretrained(MODEL_NAME)
+        question_tokenizer = T5Tokenizer.from_pretrained(
+            MODEL_NAME, local_files_only=True
+        )
 
         # Construct the Question model
-        question_model = T5ForConditionalGeneration.from_pretrained(MODEL_NAME)
+        question_model = T5ForConditionalGeneration.from_pretrained(
+            MODEL_NAME, local_files_only=True
+        )
 
         # pretrained question model
-        self.init_question_tokenizer = T5Tokenizer.from_pretrained(MODEL_NAME)
+        self.init_question_tokenizer = T5Tokenizer.from_pretrained(
+            MODEL_NAME, local_files_only=True
+        )
 
         # Construct the pretrained question model
         self.init_question_model = T5ForConditionalGeneration.from_pretrained(
-            MODEL_NAME
+            MODEL_NAME, local_files_only=True
         )
 
         if cfg.mode == "train":
@@ -771,7 +781,6 @@ class REQA(torch.nn.Module):
                 # BackProp
                 loss.backward()
                 # Optimize
-                self.question_optimizer.step()
 
             self.question_model.eval()
             pgg_loss, pgg_loss_value = self.pgg_answer_training(batch, current_device)
@@ -779,9 +788,10 @@ class REQA(torch.nn.Module):
                 # BackProp
                 pgg_loss.backward()
                 # Optimize
-                self.answer_optimizer.step()
 
-            return (loss_value, pgg_loss)
+            self.answer_optimizer.step()
+            self.question_optimizer.step()
+            return (loss_value, pgg_loss_value)
 
         if objective_type == "MML-PGG-On-Sim":
             self.answer_optimizer.zero_grad()
@@ -802,7 +812,6 @@ class REQA(torch.nn.Module):
                 # BackProp
                 loss.backward()
                 # Optimize
-                self.question_optimizer.step()
 
             self.question_model.eval()
             pgg_loss, pgg_loss_value = self.pgg_answer_training(batch, current_device)
@@ -810,9 +819,10 @@ class REQA(torch.nn.Module):
                 # BackProp
                 pgg_loss.backward()
                 # Optimize
-                self.answer_optimizer.step()
 
-            return (loss_value, pgg_loss)
+            self.answer_optimizer.step()
+            self.question_optimizer.step()
+            return (loss_value, pgg_loss_value)
 
         if objective_type == "Answer-PGG":
             self.answer_optimizer.zero_grad()
