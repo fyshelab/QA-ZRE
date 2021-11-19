@@ -1,6 +1,6 @@
 #!/bin/bash
 
-#SBATCH --job-name=reqa+mml_iter_off_fold_0
+#SBATCH --job-name=reqa_pg_iter_on_fold_0
 #SBATCH --account=def-afyshe-ab
 #SBATCH --nodes=1
 #SBATCH --tasks-per-node=1
@@ -30,9 +30,9 @@ srun python src/re_gold_qa_train.py \
     --init_method tcp://$MASTER_ADDR:3456 \
     --world_size $SLURM_NTASKS \
     --mode re_qa_train \
-    --model_path $SCRATCH/small_fold_1/mml-off-iter+mml/ \
+    --model_path $SCRATCH/fold_1/pg-on-iter/ \
     --answer_checkpoint _response_pretrained \
-    --question_checkpoint _0_mml_off_best_question \
+    --question_checkpoint _fold_1_question_pretrained \
     --training_steps 26250 \
     --learning_rate 0.0005 \
     --max_epochs 1 \
@@ -45,4 +45,4 @@ srun python src/re_gold_qa_train.py \
     --train ./zero-shot-extraction/relation_splits/train.0 \
     --gpu_device 0 \
     --seed 12321 \
-    --train_method Answer-MML-Off
+    --train_method Question-PG-On
