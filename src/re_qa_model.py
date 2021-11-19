@@ -379,7 +379,7 @@ class REQA(torch.nn.Module):
         loss_value = loss.item()
         return loss, loss_value
 
-    def response_mml_forward(
+    def response_forward(
         self, batch, new_articles, current_device, loss_fct, answer_training=False
     ):
         # Get output from the response module
@@ -464,7 +464,7 @@ class REQA(torch.nn.Module):
 
             return answer_log_p
 
-    def question_mml_forward(
+    def question_forward(
         self,
         current_device,
         question_input_ids,
@@ -579,7 +579,7 @@ class REQA(torch.nn.Module):
 
                 return question_log_p, output_questions
 
-    def mml_question_training(
+    def overall_training(
         self,
         batch,
         current_device,
@@ -587,6 +587,7 @@ class REQA(torch.nn.Module):
         off_policy=True,
         answer_training=False,
         question_training=True,
+        train_type="MML",
     ):
         loss_fct = torch.nn.CrossEntropyLoss(ignore_index=-100, reduction="none")
         if self.config.gpu:
@@ -682,7 +683,7 @@ class REQA(torch.nn.Module):
                 )
                 new_articles.append(new_article)
 
-        answer_log_p = self.response_mml_forward(
+        answer_log_p = self.response_forward(
             batch,
             new_articles,
             current_device,
@@ -690,7 +691,7 @@ class REQA(torch.nn.Module):
             answer_training=answer_training,
         )
 
-        question_log_p, output_questions = self.question_mml_forward(
+        question_log_p, output_questions = self.question_forward(
             current_device,
             question_input_ids,
             question_input_mask,
@@ -699,15 +700,40 @@ class REQA(torch.nn.Module):
             question_training=question_training,
         )
 
-        if off_policy:
-            # easier way to use MML objective with backpropogation.
-            ratio_log = question_log_p - sample_log_ps + answer_log_p
+        if train_type == "MML":
+            if off_policy:
+                # easier way to use MML objective with backpropogation.
+                ratio_log = question_log_p - sample_log_ps + answer_log_p
+            else:
+                ratio_log = question_log_p + answer_log_p
             easier_mml_loss = -torch.mean(torch.logsumexp(ratio_log, dim=1), dim=0)
             return easier_mml_loss
-        else:
-            ratio_log = question_log_p + answer_log_p
-            easier_mml_loss = -torch.mean(torch.logsumexp(ratio_log, dim=1), dim=0)
-            return easier_mml_loss
+
+        elif train_type == "PG":
+            if off_policy:
+                question_log_p_cpy = question_log_p.clone().detach()
+                answer_log_p_cpy = answer_log_p.clone().detach()
+                ratio_log = question_log_p_cpy - sample_log_ps
+
+                question_reward = question_log_p * answer_log_p_cpy
+                question_pg_loss = -torch.mean(
+                    torch.mean(torch.exp(ratio_log) * question_reward, dim=1), dim=0
+                )
+
+                answer_reward = answer_log_p
+                answer_pg_loss = -torch.mean(
+                    torch.mean(torch.exp(ratio_log) * answer_reward, dim=1), dim=0
+                )
+                pg_loss = question_pg_loss + answer_pg_loss
+            else:
+                question_log_p_cpy = question_log_p.clone().detach()
+                answer_log_p_cpy = answer_log_p.clone().detach()
+                question_pg_loss = -torch.mean(
+                    torch.mean(question_log_p * answer_log_p_cpy, dim=1), dim=0
+                )
+                answer_pg_loss = -torch.mean(torch.mean(answer_log_p, dim=1), dim=0)
+                pg_loss = question_pg_loss + answer_pg_loss
+            return pg_loss
 
     def train_objectives(
         self,
@@ -724,7 +750,7 @@ class REQA(torch.nn.Module):
             self.answer_optimizer.zero_grad()
             self.question_optimizer.zero_grad()
             self.answer_model.train()
-            loss = self.mml_question_training(
+            loss = self.overall_training(
                 batch,
                 current_device,
                 sample_p=sample_p,
@@ -745,7 +771,7 @@ class REQA(torch.nn.Module):
             self.answer_optimizer.zero_grad()
             self.question_optimizer.zero_grad()
             self.answer_model.train()
-            loss = self.mml_question_training(
+            loss = self.overall_training(
                 batch,
                 current_device,
                 sample_p=sample_p,
@@ -767,7 +793,7 @@ class REQA(torch.nn.Module):
             self.question_optimizer.zero_grad()
 
             self.answer_model.eval()
-            loss = self.mml_question_training(
+            loss = self.overall_training(
                 batch,
                 current_device,
                 sample_p=sample_p,
@@ -798,7 +824,7 @@ class REQA(torch.nn.Module):
             self.question_optimizer.zero_grad()
 
             self.answer_model.eval()
-            loss = self.mml_question_training(
+            loss = self.overall_training(
                 batch,
                 current_device,
                 sample_p=sample_p,
@@ -839,7 +865,7 @@ class REQA(torch.nn.Module):
         if objective_type == "Question-MML-Off":
             self.question_optimizer.zero_grad()
             self.answer_model.eval()
-            loss = self.mml_question_training(
+            loss = self.overall_training(
                 batch,
                 current_device,
                 sample_p=sample_p,
@@ -860,7 +886,7 @@ class REQA(torch.nn.Module):
         if objective_type == "Question-MML-On":
             self.question_optimizer.zero_grad()
             self.answer_model.eval()
-            loss = self.mml_question_training(
+            loss = self.overall_training(
                 batch,
                 current_device,
                 sample_p=sample_p,
@@ -882,7 +908,7 @@ class REQA(torch.nn.Module):
             self.answer_optimizer.zero_grad()
             self.question_model.eval()
             self.answer_model.train()
-            loss = self.mml_question_training(
+            loss = self.overall_training(
                 batch,
                 current_device,
                 sample_p=sample_p,
@@ -904,13 +930,211 @@ class REQA(torch.nn.Module):
             self.answer_optimizer.zero_grad()
             self.question_model.eval()
             self.answer_model.train()
-            loss = self.mml_question_training(
+            loss = self.overall_training(
                 batch,
                 current_device,
                 sample_p=sample_p,
                 off_policy=False,
                 answer_training=True,
                 question_training=False,
+            )
+            loss_value = loss.item()
+
+            if not math.isnan(loss_value) and not torch.isinf(loss):
+                # BackProp
+                loss.backward()
+                # Optimize
+                self.answer_optimizer.step()
+
+            return loss_value
+
+        if objective_type == "PG-PG-On-Sim":
+            self.answer_optimizer.zero_grad()
+            self.question_optimizer.zero_grad()
+            self.answer_model.train()
+            loss = self.overall_training(
+                batch,
+                current_device,
+                sample_p=sample_p,
+                off_policy=False,
+                answer_training=True,
+                question_training=True,
+                train_type="PG",
+            )
+            loss_value = loss.item()
+            if not math.isnan(loss_value):
+                # BackProp
+                loss.backward()
+                # Optimize
+                self.answer_optimizer.step()
+                self.question_optimizer.step()
+            return loss_value
+
+        if objective_type == "PG-PG-Off-Sim":
+            self.answer_optimizer.zero_grad()
+            self.question_optimizer.zero_grad()
+            self.answer_model.train()
+            loss = self.overall_training(
+                batch,
+                current_device,
+                sample_p=sample_p,
+                off_policy=True,
+                answer_training=True,
+                question_training=True,
+                train_type="PG",
+            )
+            loss_value = loss.item()
+            if not math.isnan(loss_value):
+                # BackProp
+                loss.backward()
+                # Optimize
+                self.answer_optimizer.step()
+                self.question_optimizer.step()
+            return loss_value
+
+        if objective_type == "PG-PGG-Off-Sim":
+            self.answer_optimizer.zero_grad()
+            self.question_optimizer.zero_grad()
+
+            self.answer_model.eval()
+            loss = self.overall_training(
+                batch,
+                current_device,
+                sample_p=sample_p,
+                off_policy=True,
+                answer_training=False,
+                question_training=True,
+                train_type="PG",
+            )
+            loss_value = loss.item()
+
+            if not math.isnan(loss_value):
+                # BackProp
+                loss.backward()
+                # Optimize
+
+            self.question_model.eval()
+            pgg_loss, pgg_loss_value = self.pgg_answer_training(batch, current_device)
+            if not math.isnan(pgg_loss_value):
+                # BackProp
+                pgg_loss.backward()
+                # Optimize
+
+            self.answer_optimizer.step()
+            self.question_optimizer.step()
+            return (loss_value, pgg_loss_value)
+
+        if objective_type == "PG-PGG-On-Sim":
+            self.answer_optimizer.zero_grad()
+            self.question_optimizer.zero_grad()
+
+            self.answer_model.eval()
+            loss = self.overall_training(
+                batch,
+                current_device,
+                sample_p=sample_p,
+                off_policy=False,
+                answer_training=False,
+                question_training=True,
+                train_type="PG",
+            )
+            loss_value = loss.item()
+
+            if not math.isnan(loss_value):
+                # BackProp
+                loss.backward()
+                # Optimize
+
+            self.question_model.eval()
+            pgg_loss, pgg_loss_value = self.pgg_answer_training(batch, current_device)
+            if not math.isnan(pgg_loss_value):
+                # BackProp
+                pgg_loss.backward()
+                # Optimize
+
+            self.answer_optimizer.step()
+            self.question_optimizer.step()
+            return (loss_value, pgg_loss_value)
+
+        if objective_type == "Question-PG-Off":
+            self.question_optimizer.zero_grad()
+            self.answer_model.eval()
+            loss = self.overall_training(
+                batch,
+                current_device,
+                sample_p=sample_p,
+                off_policy=True,
+                answer_training=False,
+                question_training=True,
+                train_type="PG",
+            )
+            loss_value = loss.item()
+
+            if not math.isnan(loss_value) and not torch.isinf(loss):
+                # BackProp
+                loss.backward()
+                # Optimize
+                self.question_optimizer.step()
+
+            return loss_value
+
+        if objective_type == "Question-PG-On":
+            self.question_optimizer.zero_grad()
+            self.answer_model.eval()
+            loss = self.overall_training(
+                batch,
+                current_device,
+                sample_p=sample_p,
+                off_policy=False,
+                answer_training=False,
+                question_training=True,
+                train_type="PG",
+            )
+            loss_value = loss.item()
+
+            if not math.isnan(loss_value) and not torch.isinf(loss):
+                # BackProp
+                loss.backward()
+                # Optimize
+                self.question_optimizer.step()
+
+            return loss_value
+
+        if objective_type == "Answer-PG-Off":
+            self.answer_optimizer.zero_grad()
+            self.question_model.eval()
+            self.answer_model.train()
+            loss = self.overall_training(
+                batch,
+                current_device,
+                sample_p=sample_p,
+                off_policy=True,
+                answer_training=True,
+                question_training=False,
+                train_type="PG",
+            )
+            loss_value = loss.item()
+
+            if not math.isnan(loss_value) and not torch.isinf(loss):
+                # BackProp
+                loss.backward()
+                # Optimize
+                self.answer_optimizer.step()
+
+            return loss_value
+
+        if objective_type == "Answer-PG-On":
+            self.answer_optimizer.zero_grad()
+            self.question_model.eval()
+            self.answer_model.train()
+            loss = self.overall_training(
+                batch,
+                current_device,
+                sample_p=sample_p,
+                off_policy=False,
+                answer_training=True,
+                question_training=False,
+                train_type="PG",
             )
             loss_value = loss.item()
 
