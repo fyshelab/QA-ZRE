@@ -5,13 +5,12 @@ import torch
 import torch.distributed as dist
 import torch.utils.data.distributed
 
-# from src.question_response_generation.t5_model import T5QA
-# from src.question_response_generation.train import run_model
+from src.question_response_generation.t5_model import T5QA
+from src.question_response_generation.train import run_model
 from src.re_qa_model import REQA, HyperParameters, load_module, set_random_seed
 from src.re_qa_train import iterative_run_model
 from src.zero_extraction_utils import create_zero_re_qa_dataset
 
-'''
 def run_re_gold_qa(args):
     """Run the relation-extraction qa models using the given gold questions for
     the head entity and the relation."""
@@ -59,7 +58,7 @@ def run_re_gold_qa(args):
         dev_file=args.dev,
         distributed=False,
         num_workers=1,
-        ignore_unknowns=True,
+        ignore_unknowns=False,
         concat=False,
         gold_questions=True,
         for_evaluation=for_evaluation,
@@ -120,7 +119,7 @@ def run_re_concat_qa(args):
         dev_file=args.dev,
         distributed=False,
         num_workers=1,
-        ignore_unknowns=True,
+        ignore_unknowns=False,
         concat=True,
         gold_questions=False,
         for_evaluation=for_evaluation,
@@ -134,7 +133,6 @@ def run_re_concat_qa(args):
         test_dataloader=val_loaders,
         save_always=True,
     )
-'''
 
 
 def run_re_qa(args):
@@ -217,7 +215,7 @@ def run_re_qa(args):
             dev_file=args.dev,
             distributed=False,
             num_workers=args.num_workers,
-            ignore_unknowns=True,
+            ignore_unknowns=False,
             concat=False,
             gold_questions=False,
         )
@@ -263,7 +261,7 @@ def run_re_qa(args):
             dev_file=args.dev,
             distributed=False,
             num_workers=args.num_workers,
-            ignore_unknowns=True,
+            ignore_unknowns=False,
             concat=False,
             gold_questions=False,
             for_evaluation=True,
