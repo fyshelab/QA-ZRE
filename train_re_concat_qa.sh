@@ -1,19 +1,41 @@
 #!/bin/bash
 
+#SBATCH --job-name=reqa_concat_fold_5
+#SBATCH --account=def-afyshe-ab
+#SBATCH --nodes=1
+#SBATCH --tasks-per-node=1
+#SBATCH --gres=gpu:a100:1
+#SBATCH --mem=24000M
+#SBATCH --time=1-00:00
+#SBATCH --cpus-per-task=3
+#SBATCH --output=%N-%j.out
+
+module load StdEnv/2020 gcc/9.3.0 cuda/11.4 arrow/5.0.0
+
 source env/bin/activate
 
-main_path=$HOME/t5-small-exps/naacl-2022/
+export NCCL_BLOCKING_WAIT=1  #Set this environment variable if you wish to use the NCCL backend for inter-GPU communication.
 
-python src/re_gold_qa_train.py \
+export MASTER_ADDR=$(hostname) #Store the master node’s IP address in the MASTER_ADDR environment variable.
+
+echo "r$SLURM_NODEID master: $MASTER_ADDR"
+
+echo "r$SLURM_NODEID Launching python script"
+
+echo "All the allocated nodes: $SLURM_JOB_NODELIST"
+
+srun python src/re_gold_qa_train.py \
+       --init_method tcp://$MASTER_ADDR:3456 \
+       --world_size $SLURM_NTASKS \
        --mode re_concat_qa_train \
-       --model_path ${main_path}concat_fold_1/ \
+       --model_path /home/saeednjf/scratch/fold_5/concat/ \
        --checkpoint _response_pretrained \
        --learning_rate 0.0005 --max_epochs 1 \
-       --concat_questions True \
+       --concat_questions False \
        --batch_size 16  --gpu True \
        --answer_training_steps 26250 \
        --ignore_unknowns True \
-       --train ./zero-shot-extraction/relation_splits/train.0 \
-       --dev ./zero-shot-extraction/relation_splits/dev.0 \
+       --train ./zero-shot-extraction/relation_splits/train.4 \
+       --dev ./zero-shot-extraction/relation_splits/dev.4 \
        --gpu_device 0 \
        --seed 12321
