@@ -12,9 +12,9 @@ from typing import Generator, Optional
 import numpy as np
 import torch
 
-#from src.question_response_generation.question_utils import (
+# from src.question_response_generation.question_utils import (
 #    create_question_dataset, create_question_generation_dataset)
-#from src.question_response_generation.response_utils import \
+# from src.question_response_generation.response_utils import \
 #    create_response_dataset
 from src.question_response_generation.t5_model import T5QA, HyperParameters
 from src.re_qa_model import load_module, set_random_seed
@@ -143,6 +143,7 @@ def run_model(
         msg = "\nTotal prediction time:{} seconds\n".format(time.time() - start)
         print(msg)
 
+
 '''
 def run_all(args):
     """Run the T5 on multiple qa datasets to pre-train the response generator"""
@@ -270,6 +271,7 @@ def run_pretrain_question_generator(args):
     )
 
 '''
+
 
 def run_main(args):
     """Decides what to do in the code."""

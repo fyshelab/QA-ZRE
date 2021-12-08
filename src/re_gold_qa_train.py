@@ -9,7 +9,9 @@ from src.question_response_generation.t5_model import T5QA
 from src.question_response_generation.train import run_model
 from src.re_qa_model import REQA, HyperParameters, load_module, set_random_seed
 from src.re_qa_train import iterative_run_model
-from src.zero_extraction_utils import create_zero_re_qa_dataset
+from src.zero_extraction_utils import (create_fewrl_dataset,
+                                       create_zero_re_qa_dataset)
+
 
 def run_re_gold_qa(args):
     """Run the relation-extraction qa models using the given gold questions for
@@ -275,6 +277,84 @@ def run_re_qa(args):
         )
 
 
+def run_fewrl(args):
+    """Run the relation-extraction qa models using the question generator and
+    the response generator explored with some search algorithm."""
+    if args.mode == "fewrl_train":
+        mode = "train"
+    elif args.mode == "fewrl_dev":
+        mode = "test"
+    elif args.mode == "fewrl_test":
+        mode = "test"
+
+    config = HyperParameters(
+        model_path=args.model_path,
+        batch_size=args.batch_size,
+        source_max_length=256,
+        decoder_max_length=32,
+        gpu=args.gpu,
+        learning_rate=args.learning_rate,
+        max_epochs=args.max_epochs,
+        mode=mode,
+        prediction_file=args.prediction_file,
+        training_steps=int(args.training_steps),
+        answer_checkpoint=args.answer_checkpoint,
+        question_checkpoint=args.question_checkpoint,
+        num_search_samples=int(args.num_search_samples),
+        seed=args.seed,
+    )
+    set_random_seed(config.seed)
+    model = REQA(config)
+    model = model.to("cuda:0")
+
+    (
+        train_loader,
+        val_loader,
+        test_loader,
+        train_dataset,
+        val_dataset,
+        test_loader,
+    ) = create_fewrl_dataset(
+        question_tokenizer=model.question_tokenizer,
+        answer_tokenizer=model.answer_tokenizer,
+        batch_size=config.batch_size,
+        source_max_length=config.source_max_length,
+        decoder_max_length=config.decoder_max_length,
+        fewrl_path="./fewrel_all.json",
+        m=5,
+    )
+
+    if args.mode == "fewrl_train":
+        iterative_run_model(
+            model,
+            config=config,
+            train_dataloader=train_loader,
+            dev_dataloader=val_loader,
+            test_dataloader=test_loader,
+            save_always=True,
+            rank=0,
+            train_samplers=None,
+            current_device=0,
+            train_method=args.train_method,
+        )
+
+    if args.mode == "fewrl_dev":
+        iterative_run_model(
+            model,
+            config=config,
+            test_dataloader=val_loader,
+            current_device=0,
+        )
+
+    if args.mode == "fewrl_test":
+        iterative_run_model(
+            model,
+            config=config,
+            test_dataloader=test_loader,
+            current_device=0,
+        )
+
+
 def run_main(args):
     """Decides what to do in the code."""
     if args.mode in ["re_gold_qa_train", "re_gold_qa_test"]:
@@ -283,6 +363,8 @@ def run_main(args):
         run_re_concat_qa(args)
     if args.mode in ["re_qa_train", "re_qa_test"]:
         run_re_qa(args)
+    if args.mode in ["fewrl_train", "fewrl_test", "fewrl_dev"]:
+        run_fewrl(args)
 
 
 def argument_parser():
