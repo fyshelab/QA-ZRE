@@ -1,7 +1,9 @@
 import json
+import os
 import random
 from pathlib import Path
 
+import pandas as pd
 import torch
 # from datasets import load_dataset
 from torch.utils.data import DataLoader
@@ -678,6 +680,36 @@ def create_fewrl_dataset(
         test_posterier_contexts,
     ) = test_tuples
 
+    test_ref_df = pd.DataFrame(
+        {
+            "passages": test_passages,
+            "answers": test_answers,
+            "contexts": test_contexts,
+        }
+    )
+    test_ref_df.to_csv(
+        os.path.join(
+            "/tmp/test_ref.csv",
+        ),
+        sep="\t",
+        header=True,
+        index=False,
+    )
+    dev_ref_df = pd.DataFrame(
+        {
+            "passages": val_passages,
+            "answers": val_answers,
+            "contexts": val_contexts,
+        }
+    )
+    dev_ref_df.to_csv(
+        os.path.join(
+            "/tmp/dev_ref.csv",
+        ),
+        sep="\t",
+        header=True,
+        index=False,
+    )
     val_encodings = question_tokenizer(
         val_contexts,
         truncation=True,
