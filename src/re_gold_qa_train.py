@@ -60,7 +60,7 @@ def run_re_gold_qa(args):
         dev_file=args.dev,
         distributed=False,
         num_workers=1,
-        ignore_unknowns=False,
+        ignore_unknowns=True,
         concat=False,
         gold_questions=True,
         for_evaluation=for_evaluation,
@@ -121,7 +121,7 @@ def run_re_concat_qa(args):
         dev_file=args.dev,
         distributed=False,
         num_workers=1,
-        ignore_unknowns=False,
+        ignore_unknowns=True,
         concat=True,
         gold_questions=False,
         for_evaluation=for_evaluation,
@@ -217,7 +217,7 @@ def run_re_qa(args):
             dev_file=args.dev,
             distributed=False,
             num_workers=args.num_workers,
-            ignore_unknowns=False,
+            ignore_unknowns=True,
             concat=False,
             gold_questions=False,
         )
@@ -263,7 +263,7 @@ def run_re_qa(args):
             dev_file=args.dev,
             distributed=False,
             num_workers=args.num_workers,
-            ignore_unknowns=False,
+            ignore_unknowns=True,
             concat=False,
             gold_questions=False,
             for_evaluation=True,
@@ -320,7 +320,7 @@ def run_fewrl(args):
         batch_size=config.batch_size,
         source_max_length=config.source_max_length,
         decoder_max_length=config.decoder_max_length,
-        fewrl_path="./fewrel_all.json",
+        fewrel_path="./fewrel_all.json",
         m=5,
     )
 
@@ -347,12 +347,8 @@ def run_fewrl(args):
         )
 
     if args.mode == "fewrl_test":
-        iterative_run_model(
-            model,
-            config=config,
-            test_dataloader=test_loader,
-            current_device=0,
-        )
+        """iterative_run_model( model, config=config,
+        test_dataloader=test_loader, current_device=0, )"""
 
 
 def run_main(args):
