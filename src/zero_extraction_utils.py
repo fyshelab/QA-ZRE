@@ -650,66 +650,36 @@ def create_fewrl_dataset(
     batch_size,
     source_max_length,
     decoder_max_length,
-    fewrel_path,
-    m=15,
+    train_fewrel_path=None,
+    dev_fewrel_path=None,
+    test_fewrel_path=None,
 ):
     """Function to create the fewrl dataset."""
-    train_tuples, val_tuples, test_tuples = read_fewrl_dataset(fewrel_path, m=m)
-    (
-        train_passages,
-        train_contexts,
-        train_answers,
-        train_entity_relations,
-        train_entities,
-        train_posterier_contexts,
-    ) = train_tuples
-    (
-        val_passages,
-        val_contexts,
-        val_answers,
-        val_entity_relations,
-        val_entities,
-        val_posterier_contexts,
-    ) = val_tuples
-    (
-        test_passages,
-        test_contexts,
-        test_answers,
-        test_entity_relations,
-        test_entities,
-        test_posterier_contexts,
-    ) = test_tuples
+    train_df = pd.read_csv(train_fewrel_path, sep="\t")
+    dev_df = pd.read_csv(dev_fewrel_path, sep="\t")
+    test_df = pd.read_csv(test_fewrel_path, sep="\t")
 
-    test_ref_df = pd.DataFrame(
-        {
-            "passages": test_passages,
-            "answers": test_answers,
-            "contexts": test_contexts,
-        }
-    )
-    test_ref_df.to_csv(
-        os.path.join(
-            "/tmp/test_ref.csv",
-        ),
-        sep="\t",
-        header=True,
-        index=False,
-    )
-    dev_ref_df = pd.DataFrame(
-        {
-            "passages": val_passages,
-            "answers": val_answers,
-            "contexts": val_contexts,
-        }
-    )
-    dev_ref_df.to_csv(
-        os.path.join(
-            "/tmp/dev_ref.csv",
-        ),
-        sep="\t",
-        header=True,
-        index=False,
-    )
+    train_passages = train_df["passages"].tolist()
+    train_contexts = train_df["contexts"].tolist()
+    train_answers = train_df["answers"].tolist()
+    train_entity_relations = train_df["entity_relations"].tolist()
+    train_entities = train_df["entities"].tolist()
+    train_posterier_contexts = train_df["posterier_contexts"].tolist()
+
+    val_passages = dev_df["passages"].tolist()
+    val_contexts = dev_df["contexts"].tolist()
+    val_answers = dev_df["answers"].tolist()
+    val_entity_relations = dev_df["entity_relations"].tolist()
+    val_entities = dev_df["entities"].tolist()
+    val_posterier_contexts = dev_df["posterier_contexts"].tolist()
+
+    test_passages = test_df["passages"].tolist()
+    test_contexts = test_df["contexts"].tolist()
+    test_answers = test_df["answers"].tolist()
+    test_entity_relations = test_df["entity_relations"].tolist()
+    test_entities = test_df["entities"].tolist()
+    test_posterier_contexts = test_df["posterier_contexts"].tolist()
+
     val_encodings = question_tokenizer(
         val_contexts,
         truncation=True,

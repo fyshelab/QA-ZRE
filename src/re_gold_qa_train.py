@@ -320,8 +320,9 @@ def run_fewrl(args):
         batch_size=config.batch_size,
         source_max_length=config.source_max_length,
         decoder_max_length=config.decoder_max_length,
-        fewrel_path="./fewrel_all.json",
-        m=5,
+        train_fewrel_path=args.train,
+        dev_fewrel_path=args.dev,
+        test_fewrel_path=args.test,
     )
 
     if args.mode == "fewrl_train":
@@ -347,8 +348,9 @@ def run_fewrl(args):
         )
 
     if args.mode == "fewrl_test":
-        """iterative_run_model( model, config=config,
-        test_dataloader=test_loader, current_device=0, )"""
+        iterative_run_model(
+            model, config=config, test_dataloader=test_loader, current_device=0
+        )
 
 
 def run_main(args):
