@@ -353,6 +353,84 @@ def run_fewrl(args):
         )
 
 
+def run_concat_fewrl(args):
+    """Run the relation-extraction qa models using the question generator and
+    the response generator explored with some search algorithm."""
+    if args.mode == "concat_fewrl_train":
+        mode = "train"
+    elif args.mode == "concat_fewrl_dev":
+        mode = "test"
+    elif args.mode == "concat_fewrl_test":
+        mode = "test"
+
+    config = HyperParameters(
+        model_path=args.model_path,
+        batch_size=args.batch_size,
+        source_max_length=256,
+        decoder_max_length=32,
+        gpu=args.gpu,
+        learning_rate=args.learning_rate,
+        max_epochs=args.max_epochs,
+        mode=mode,
+        prediction_file=args.prediction_file,
+        checkpoint=args.checkpoint,
+        answer_training_steps=args.answer_training_steps,
+        seed=args.seed,
+    )
+
+    set_random_seed(config.seed)
+    model = T5QA(config)
+
+    (
+        train_loader,
+        val_loader,
+        test_loader,
+        train_dataset,
+        val_dataset,
+        test_loader,
+    ) = create_fewrl_dataset(
+        question_tokenizer=model.question_tokenizer,
+        answer_tokenizer=model.answer_tokenizer,
+        batch_size=config.batch_size,
+        source_max_length=config.source_max_length,
+        decoder_max_length=config.decoder_max_length,
+        train_fewrel_path=args.train,
+        dev_fewrel_path=args.dev,
+        test_fewrel_path=args.test,
+        concat=True,
+    )
+
+    if args.mode == "concat_fewrl_train":
+        run_model(
+            model,
+            config=config,
+            train_dataloader=train_loader,
+            dev_dataloader=val_loader,
+            test_dataloader=test_loader,
+            save_always=True,
+        )
+
+    if args.mode == "concat_fewrl_dev":
+        run_model(
+            model,
+            config=config,
+            train_dataloader=train_loader,
+            dev_dataloader=val_loader,
+            test_dataloader=val_loader,
+            save_always=True,
+        )
+
+    if args.mode == "concat_fewrl_test":
+        run_model(
+            model,
+            config=config,
+            train_dataloader=train_loader,
+            dev_dataloader=val_loader,
+            test_dataloader=test_loader,
+            save_always=True,
+        )
+
+
 def run_main(args):
     """Decides what to do in the code."""
     if args.mode in ["re_gold_qa_train", "re_gold_qa_test"]:
@@ -363,6 +441,8 @@ def run_main(args):
         run_re_qa(args)
     if args.mode in ["fewrl_train", "fewrl_test", "fewrl_dev"]:
         run_fewrl(args)
+    if args.mode in ["concat_fewrl_train", "concat_fewrl_test", "concat_fewrl_dev"]:
+        run_concat_fewrl(args)
 
 
 def argument_parser():
