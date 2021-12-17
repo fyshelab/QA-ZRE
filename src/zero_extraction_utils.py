@@ -653,6 +653,7 @@ def create_fewrl_dataset(
     train_fewrel_path=None,
     dev_fewrel_path=None,
     test_fewrel_path=None,
+    concat=False,
 ):
     """Function to create the fewrl dataset."""
     train_df = pd.read_csv(train_fewrel_path, sep="\t")
@@ -679,6 +680,13 @@ def create_fewrl_dataset(
     test_entity_relations = test_df["entity_relations"].tolist()
     test_entities = test_df["entities"].tolist()
     test_posterier_contexts = test_df["posterier_contexts"].tolist()
+
+    if concat:
+        train_contexts = [
+            ctx.replace("answer: ", "question: ") for ctx in train_contexts
+        ]
+        val_contexts = [ctx.replace("answer: ", "question: ") for ctx in val_contexts]
+        test_contexts = [ctx.replace("answer: ", "question: ") for ctx in test_contexts]
 
     val_encodings = question_tokenizer(
         val_contexts,
@@ -750,17 +758,16 @@ def create_fewrl_dataset(
         "attention_mask"
     )
 
-    train_encodings["entity_relation_passage_input_ids"] = train_encodings.pop(
-        "input_ids"
-    )
-    train_encodings["entity_relation_passage_attention_mask"] = train_encodings.pop(
+    train_encodings["entity_relation_passage_input_ids"] = train_encodings["input_ids"]
+    train_encodings["entity_relation_passage_attention_mask"] = train_encodings[
         "attention_mask"
-    )
+    ]
 
-    train_encodings["second_entity_labels"] = train_answer_encodings.pop("input_ids")
-    train_encodings["second_entity_attention_mask"] = train_answer_encodings.pop(
+    train_encodings["target_attention_mask"] = train_answer_encodings["attention_mask"]
+    train_encodings["second_entity_labels"] = train_answer_encodings["input_ids"]
+    train_encodings["second_entity_attention_mask"] = train_answer_encodings[
         "attention_mask"
-    )
+    ]
 
     # because HuggingFace automatically shifts the labels, the labels correspond exactly to `target_ids`.
     # We have to make sure that the PAD token is ignored
@@ -770,18 +777,21 @@ def create_fewrl_dataset(
         for labels in train_encodings["second_entity_labels"]
     ]
     train_encodings["second_entity_labels"] = train_labels
+    train_encodings["labels"] = train_labels
 
     val_encodings["passages"] = val_passages
     val_encodings["entity_relations"] = val_entity_relations
-    val_encodings["entity_relation_passage_input_ids"] = val_encodings.pop("input_ids")
-    val_encodings["entity_relation_passage_attention_mask"] = val_encodings.pop(
-        "attention_mask"
-    )
 
-    val_encodings["second_entity_labels"] = val_answer_encodings.pop("input_ids")
-    val_encodings["second_entity_attention_mask"] = val_answer_encodings.pop(
+    val_encodings["entity_relation_passage_input_ids"] = val_encodings["input_ids"]
+    val_encodings["entity_relation_passage_attention_mask"] = val_encodings[
         "attention_mask"
-    )
+    ]
+    val_encodings["target_attention_mask"] = val_answer_encodings["attention_mask"]
+
+    val_encodings["second_entity_labels"] = val_answer_encodings["input_ids"]
+    val_encodings["second_entity_attention_mask"] = val_answer_encodings[
+        "attention_mask"
+    ]
 
     # because Huggingface automatically shifts the labels, the labels correspond exactly to `target_ids`.
     # We have to make sure that the PAD token is ignored.
@@ -791,6 +801,7 @@ def create_fewrl_dataset(
         for labels in val_encodings["second_entity_labels"]
     ]
     val_encodings["second_entity_labels"] = val_labels
+    val_encodings["labels"] = val_labels
 
     test_encodings["passages"] = test_passages
     test_encodings["entity_relations"] = test_entity_relations
@@ -801,10 +812,11 @@ def create_fewrl_dataset(
         "attention_mask"
     )
 
-    test_encodings["second_entity_labels"] = test_answer_encodings.pop("input_ids")
-    test_encodings["second_entity_attention_mask"] = test_answer_encodings.pop(
+    test_encodings["target_attention_mask"] = test_answer_encodings["attention_mask"]
+    test_encodings["second_entity_labels"] = test_answer_encodings["input_ids"]
+    test_encodings["second_entity_attention_mask"] = test_answer_encodings[
         "attention_mask"
-    )
+    ]
 
     # because Huggingface automatically shifts the labels, the labels correspond exactly to `target_ids`.
     # We have to make sure that the PAD token is ignored.
@@ -814,6 +826,7 @@ def create_fewrl_dataset(
         for labels in test_encodings["second_entity_labels"]
     ]
     test_encodings["second_entity_labels"] = test_labels
+    test_encodings["labels"] = test_labels
 
     class HelperDataset(torch.utils.data.Dataset):
         def __init__(self, encodings):
