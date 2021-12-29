@@ -277,7 +277,9 @@ class REQA(torch.nn.Module):
         new_articles = []
         for i in range(len(batch["passages"])):
             new_article = (
-                "question: "
+                "relation: "
+                + batch["entity_relations"][i]
+                + " question: "
                 + question_predictions_str[i]
                 + " context: "
                 + batch["passages"][i]
@@ -675,7 +677,9 @@ class REQA(torch.nn.Module):
         for i in range(b_sz):
             for j in range(self.config.num_search_samples):
                 new_article = (
-                    "question: "
+                    "relation: "
+                    + batch["entity_relations"][i]
+                    + " question: "
                     + sampled_question_predictions_str_reshaped[i][j]
                     + " context: "
                     + batch["passages"][i]

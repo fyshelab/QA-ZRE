@@ -16,6 +16,22 @@ def white_space_fix(text):
 def read_zero_re_qa(path, ignore_unknowns=True, gold_question=False, concat=False):
     """Main function to read the zero re qa dataset."""
     path = Path(path)
+
+    rel_dict = {}
+    with open("./props.json", "r") as fd:
+        re_desc_data = json.load(fd)
+        sentence_delimiters = [". ", ".\n", "? ", "?\n", "! ", "!\n"]
+        for row in re_desc_data:
+            desc = row["description"]
+            if desc == {}:
+                continue
+            desc = desc.strip(".") + ". "
+            pos = [desc.find(delimiter) for delimiter in sentence_delimiters]
+            pos = min([p for p in pos if p >= 0])
+            re_desc = desc[:pos]
+            re_id = row["label"]
+            rel_dict[white_space_fix(re_id).lower()] = white_space_fix(re_desc)
+
     with open(path, "r") as fd:
         contexts = []
         posterier_contexts = []
@@ -49,26 +65,52 @@ def read_zero_re_qa(path, ignore_unknowns=True, gold_question=False, concat=Fals
                     + " </s>"
                 )
             else:
-                contexts.append(
-                    "answer: "
-                    + white_space_fix(line_arr[2])
-                    + " <SEP> "
-                    + white_space_fix(line_arr[0])
-                    + " context: "
-                    + white_space_fix(passage)
-                    + " </s>"
-                )
-                posterier_contexts.append(
-                    "answer: "
-                    + white_space_fix(line_arr[2])
-                    + " <SEP> "
-                    + white_space_fix(line_arr[0])
-                    + " "
-                    + white_space_fix(" and ".join(gold_answers))
-                    + " context: "
-                    + white_space_fix(passage)
-                    + " </s>"
-                )
+                if False:  # white_space_fix(line_arr[0]).lower() in rel_dict:
+                    contexts.append(
+                        "answer: "
+                        + white_space_fix(line_arr[2])
+                        + " <SEP> "
+                        + white_space_fix(line_arr[0])
+                        + " "
+                        + rel_dict[white_space_fix(line_arr[0]).lower()]
+                        + " context: "
+                        + white_space_fix(passage)
+                        + " </s>"
+                    )
+                    posterier_contexts.append(
+                        "answer: "
+                        + white_space_fix(line_arr[2])
+                        + " <SEP> "
+                        + white_space_fix(line_arr[0])
+                        + " "
+                        + rel_dict[white_space_fix(line_arr[0]).lower()]
+                        + " "
+                        + white_space_fix(" and ".join(gold_answers))
+                        + " context: "
+                        + white_space_fix(passage)
+                        + " </s>"
+                    )
+                else:
+                    contexts.append(
+                        "answer: "
+                        + white_space_fix(line_arr[2])
+                        + " <SEP> "
+                        + white_space_fix(line_arr[0])
+                        + " context: "
+                        + white_space_fix(passage)
+                        + " </s>"
+                    )
+                    posterier_contexts.append(
+                        "answer: "
+                        + white_space_fix(line_arr[2])
+                        + " <SEP> "
+                        + white_space_fix(line_arr[0])
+                        + " "
+                        + white_space_fix(" and ".join(gold_answers))
+                        + " context: "
+                        + white_space_fix(passage)
+                        + " </s>"
+                    )
 
             answers.append(white_space_fix(" and ".join(gold_answers)) + " </s>")
     return passages, contexts, answers, entity_relations, entities, posterier_contexts
@@ -805,13 +847,11 @@ def create_fewrl_dataset(
 
     test_encodings["passages"] = test_passages
     test_encodings["entity_relations"] = test_entity_relations
-    test_encodings["entity_relation_passage_input_ids"] = test_encodings.pop(
-        "input_ids"
-    )
-    test_encodings["entity_relation_passage_attention_mask"] = test_encodings.pop(
-        "attention_mask"
-    )
+    test_encodings["entity_relation_passage_input_ids"] = test_encodings["input_ids"]
 
+    test_encodings["entity_relation_passage_attention_mask"] = test_encodings[
+        "attention_mask"
+    ]
     test_encodings["target_attention_mask"] = test_answer_encodings["attention_mask"]
     test_encodings["second_entity_labels"] = test_answer_encodings["input_ids"]
     test_encodings["second_entity_attention_mask"] = test_answer_encodings[
