@@ -1,12 +1,12 @@
 #!/bin/bash
 
-#SBATCH --job-name=test_fewrl_run_1
+#SBATCH --job-name=test+reqa_mml_off_iter_fold_2
 #SBATCH --account=def-afyshe-ab
 #SBATCH --nodes=1
 #SBATCH --tasks-per-node=1
 #SBATCH --gres=gpu:a100:1
 #SBATCH --mem=24000M
-#SBATCH --time=0-00:30
+#SBATCH --time=0-06:00
 #SBATCH --cpus-per-task=3
 #SBATCH --output=%N-%j.out
 
@@ -24,73 +24,56 @@ echo "r$SLURM_NODEID Launching python script"
 
 echo "All the allocated nodes: $SLURM_JOB_NODELIST"
 
-'''
 # The SLURM_NTASKS variable tells the script how many processes are available for this execution. “srun” executes the script <tasks-per-node * nodes> times
+
+'''
 srun python src/re_gold_qa_train.py \
     --init_method tcp://$MASTER_ADDR:3456 \
     --world_size $SLURM_NTASKS \
-    --mode fewrl_train \
-    --model_path $SCRATCH/fewrl/run_1/ \
+    --mode re_qa_train \
+    --model_path $SCRATCH/fold_5/mml-off-iter/ \
     --answer_checkpoint _response_pretrained \
-    --question_checkpoint _fold_1_question_pretrained \
-    --training_steps 2600 \
+    --question_checkpoint _fold_5_question_pretrained \
+    --training_steps 26250 \
     --learning_rate 0.0005 \
     --max_epochs 1 \
     --num_search_samples 8 \
     --batch_size 16 \
     --gpu True \
     --num_workers 3 \
-    --train ./fewrl_data/train_ref_12321.csv \
-    --dev ./fewrl_data/dev_ref_12321.csv \
-    --test ./fewrl_data/test_ref_12321.csv \
+    --concat_questions False \
+    --dev ./zero-shot-extraction/relation_splits/dev.4 \
+    --train ./zero-shot-extraction/relation_splits/train.4 \
     --gpu_device 0 \
     --seed 12321 \
-    --train_method MML-PGG-Off-Sim 
+    --train_method Question-MML-Off
 '''
 
-for (( i=26; i<=26; i++ ))
+for (( i=172; i<=172; i++ ))
 do
         step=$((i * 100))
         printf "step ${step} on epoch ${i}\r\n"
         python src/re_gold_qa_train.py \
-                --mode fewrl_test \
-		--model_path $SCRATCH/fewrl/run_1/ \
-                --answer_checkpoint _0_answer_step_${step} \
+                --mode re_qa_test \
+		--model_path $SCRATCH/fold_2/mml-off-iter/ \
+                --answer_checkpoint _response_pretrained \
                 --question_checkpoint _0_question_step_${step} \
-		--training_steps 2600 \
-		--learning_rate 0.0005 \
-		--max_epochs 1 \
 		--num_search_samples 8 \
                 --batch_size 64 --gpu True \
                 --ignore_unknowns True \
-		--train ./fewrl_data/train_ref_12321.csv \
-	        --dev ./fewrl_data/dev_ref_12321.csv \
-	        --test ./fewrl_data/test_ref_12321.csv \
+                --train zero-shot-extraction/relation_splits/train.very_small.0 \
+                --dev zero-shot-extraction/relation_splits/test.1 \
                 --gpu_device 0 \
                 --seed 12321 \
-                --prediction_file $SCRATCH/fewrl/run_1/mml_pgg_off_sim.run.1.test.predictions.step.${step}.csv
+                --prediction_file $SCRATCH/fold_2/mml-off-iter/mml_off_iter.test.predictions.step.${step}.csv
 done
 
 '''
 python src/re_gold_qa_train.py \
 	--mode re_qa_test \
-	--model_path $SCRATCH/fold_1/mml-pgg-off-sim/ \
-	--answer_checkpoint _0_answer_full \
-	--question_checkpoint _0_question_full \
-	--num_search_samples 8 \
-	--batch_size 64 --gpu True \
-	--ignore_unknowns True \
-	--train zero-shot-extraction/relation_splits/train.very_small.0 \
-	--dev zero-shot-extraction/relation_splits/dev.0 \
-	--gpu_device 0 \
-	--seed 12321 \
-	--prediction_file $SCRATCH/fold_1/mml-pgg-off-sim/mml_pgg_off_sim.dev.predictions.step.${step}.csv
-
-python src/re_gold_qa_train.py \
-	--mode re_qa_test \
-	--model_path $SCRATCH/fold_1/mml-pgg-off-sim/ \
-	--answer_checkpoint _0_answer_step_500 \
-	--question_checkpoint _0_question_step_500 \
+	--model_path $SCRATCH/fold_2/mml-off-iter/ \
+	--answer_checkpoint _response_pretrained \
+	--question_checkpoint _question_best_mml_off \
 	--num_search_samples 8 \
 	--batch_size 64 --gpu True \
 	--ignore_unknowns True \
@@ -98,5 +81,5 @@ python src/re_gold_qa_train.py \
 	--dev zero-shot-extraction/relation_splits/test.0 \
 	--gpu_device 0 \
 	--seed 12321 \
-	--prediction_file $SCRATCH/fold_1/mml-pgg-off-sim/mml_pgg_off_sim.test.predictions.step.500.csv
+	--prediction_file $SCRATCH/fold_1/mml-off-iter/mml_off_iter.test.predictions.step.base.csv
 '''

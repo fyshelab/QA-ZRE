@@ -380,6 +380,8 @@ def run_concat_fewrl(args):
 
     set_random_seed(config.seed)
     model = T5QA(config)
+    if mode != "test":
+        load_module(model.model.module, model.model_path, args.checkpoint)
 
     (
         train_loader,
@@ -389,8 +391,8 @@ def run_concat_fewrl(args):
         val_dataset,
         test_loader,
     ) = create_fewrl_dataset(
-        question_tokenizer=model.question_tokenizer,
-        answer_tokenizer=model.answer_tokenizer,
+        question_tokenizer=model.tokenizer,
+        answer_tokenizer=model.tokenizer,
         batch_size=config.batch_size,
         source_max_length=config.source_max_length,
         decoder_max_length=config.decoder_max_length,

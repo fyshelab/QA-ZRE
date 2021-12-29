@@ -1,12 +1,12 @@
 #!/bin/bash
 
-#SBATCH --job-name=test_fewrl_run_1
+#SBATCH --job-name=test_mml_pgg_sim_off_fold_5
 #SBATCH --account=def-afyshe-ab
 #SBATCH --nodes=1
 #SBATCH --tasks-per-node=1
 #SBATCH --gres=gpu:a100:1
 #SBATCH --mem=24000M
-#SBATCH --time=0-00:30
+#SBATCH --time=0-01:00
 #SBATCH --cpus-per-task=3
 #SBATCH --output=%N-%j.out
 
@@ -29,46 +29,42 @@ echo "All the allocated nodes: $SLURM_JOB_NODELIST"
 srun python src/re_gold_qa_train.py \
     --init_method tcp://$MASTER_ADDR:3456 \
     --world_size $SLURM_NTASKS \
-    --mode fewrl_train \
-    --model_path $SCRATCH/fewrl/run_1/ \
+    --mode re_qa_train \
+    --model_path $SCRATCH/dec_25/fold_5/mml-pgg-off-sim/ \
     --answer_checkpoint _response_pretrained \
-    --question_checkpoint _fold_1_question_pretrained \
-    --training_steps 2600 \
+    --question_checkpoint _question_pretrained_model \
+    --training_steps 26200 \
     --learning_rate 0.0005 \
     --max_epochs 1 \
     --num_search_samples 8 \
     --batch_size 16 \
     --gpu True \
     --num_workers 3 \
-    --train ./fewrl_data/train_ref_12321.csv \
-    --dev ./fewrl_data/dev_ref_12321.csv \
-    --test ./fewrl_data/test_ref_12321.csv \
+    --concat_questions False \
+    --dev ./zero-shot-extraction/relation_splits/dev.4 \
+    --train ./zero-shot-extraction/relation_splits/train.4 \
     --gpu_device 0 \
     --seed 12321 \
-    --train_method MML-PGG-Off-Sim 
+    --train_method MML-PGG-Off-Sim
 '''
 
-for (( i=26; i<=26; i++ ))
+for (( i=43; i<=43; i++ ))
 do
         step=$((i * 100))
         printf "step ${step} on epoch ${i}\r\n"
         python src/re_gold_qa_train.py \
-                --mode fewrl_test \
-		--model_path $SCRATCH/fewrl/run_1/ \
+                --mode re_qa_test \
+		--model_path $SCRATCH/dec_25/fold_5/mml-pgg-off-sim/ \
                 --answer_checkpoint _0_answer_step_${step} \
                 --question_checkpoint _0_question_step_${step} \
-		--training_steps 2600 \
-		--learning_rate 0.0005 \
-		--max_epochs 1 \
 		--num_search_samples 8 \
                 --batch_size 64 --gpu True \
                 --ignore_unknowns True \
-		--train ./fewrl_data/train_ref_12321.csv \
-	        --dev ./fewrl_data/dev_ref_12321.csv \
-	        --test ./fewrl_data/test_ref_12321.csv \
+                --train zero-shot-extraction/relation_splits/train.very_small.0 \
+                --dev zero-shot-extraction/relation_splits/test.4 \
                 --gpu_device 0 \
                 --seed 12321 \
-                --prediction_file $SCRATCH/fewrl/run_1/mml_pgg_off_sim.run.1.test.predictions.step.${step}.csv
+                --prediction_file $SCRATCH/dec_25/fold_5/mml-pgg-off-sim/mml_pgg_off_sim.fold.5.test.predictions.step.${step}.csv
 done
 
 '''
