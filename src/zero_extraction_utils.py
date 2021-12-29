@@ -65,13 +65,13 @@ def read_zero_re_qa(path, ignore_unknowns=True, gold_question=False, concat=Fals
                     + " </s>"
                 )
             else:
-                if False:  # white_space_fix(line_arr[0]).lower() in rel_dict:
+                if white_space_fix(line_arr[0]).lower() in rel_dict:
                     contexts.append(
                         "answer: "
                         + white_space_fix(line_arr[2])
                         + " <SEP> "
                         + white_space_fix(line_arr[0])
-                        + " "
+                        + " ; "
                         + rel_dict[white_space_fix(line_arr[0]).lower()]
                         + " context: "
                         + white_space_fix(passage)
@@ -82,7 +82,7 @@ def read_zero_re_qa(path, ignore_unknowns=True, gold_question=False, concat=Fals
                         + white_space_fix(line_arr[2])
                         + " <SEP> "
                         + white_space_fix(line_arr[0])
-                        + " "
+                        + " ; "
                         + rel_dict[white_space_fix(line_arr[0]).lower()]
                         + " "
                         + white_space_fix(" and ".join(gold_answers))
