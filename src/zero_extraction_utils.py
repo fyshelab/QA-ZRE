@@ -5,8 +5,10 @@ from pathlib import Path
 
 import pandas as pd
 import torch
-# from datasets import load_dataset
+from datasets import load_dataset
 from torch.utils.data import DataLoader
+
+from src.re_qa_model import set_random_seed
 
 
 def white_space_fix(text):
@@ -513,8 +515,91 @@ rel_dict = {
     "P921": "main subject",
 }
 
+rel_desc = {
+    "P931": "territorial entity or entities served by this transport hub (airport, train station, etc.)",
+    "P4552": "range or subrange to which the geographical item belongs",
+    "P140": "religion of a person, organization or religious building, or associated with this subject",
+    "P1923": "Like 'Participant' (P710) but for teams. For an event like a cycle race or a football match you can use this property to list the teams and P710 to list the individuals (with 'member of sports team' (P54) as a qualifier for the individuals)",
+    "P150": "(list of) direct subdivisions of an administrative territorial entity",
+    "P6": "head of the executive power of this town, city, municipality, state, country, or other governmental body",
+    "P27": "the object is a country that recognizes the subject as its citizen",
+    "P449": "network(s) the radio or television show was originally aired on, not including later re-runs or additional syndication",
+    "P1435": "heritage designation of a cultural or natural site",
+    "P175": "actor, musician, band or other performer associated with this role or musical work",
+    "P1344": "event a person or an organization was/is a participant in, inverse of P710 or P1923",
+    "P39": "subject currently or formerly holds the object position or public office",
+    "P527": 'part of this subject; inverse property of "part of" (P361). See also "has parts of the class" (P2670).',
+    "P740": "location where a group or organization was formed",
+    "P706": "located on the specified landform. Should not be used when the value is only political/administrative (P131) or a mountain range (P4552).",
+    "P84": "person or architectural firm that designed this building",
+    "P495": "country of origin of this item (creative work, food, phrase, product, etc.)",
+    "P123": "organization or person responsible for publishing books, periodicals, games or software",
+    "P57": "director(s) of film, TV-series, stageplay, video game or similar",
+    "P22": 'male parent of the subject. For stepfather, use "stepparent" (P3448)',
+    "P178": "organisation or person that developed the item",
+    "P241": "branch to which this military unit, award, office, or person belongs, e.g. Royal Navy",
+    "P403": "the body of water to which the watercourse drains",
+    "P1411": 'award nomination received by a person, organisation or creative work (inspired from "award received" (Property:P166))',
+    "P135": "literary, artistic, scientific or philosophical movement associated with this person or work",
+    "P991": "person(s) elected after the election",
+    "P156": 'immediately following item in a series of which the subject is a part [if the subject has been replaced, e.g. political offices, use "replaced by" (P1366)]',
+    "P176": "manufacturer or producer of this product",
+    "P31": "that class of which this subject is a particular example and member (subject typically an individual member with a proper name label); different from P279; using this property as a qualifier is deprecated—use P2868 or P3831 instead",
+    "P1877": "artist whose work strongly inspired/ was copied in this item",
+    "P102": "the political party of which this politician is or has been a member",
+    "P1408": "place that a radio/TV station is licensed/required to broadcast to",
+    "P159": 'specific location where an organization\'s headquarters is or has been situated. Inverse property of "occupant" (P466).',
+    "P3373": 'the subject has the object as their sibling (brother, sister, etc.). Use "relative" (P1038) for siblings-in-law (brother-in-law, sister-in-law, etc.) and step-siblings (step-brothers, step-sisters, etc.)',
+    "P1303": "musical instrument that a person plays",
+    "P17": "sovereign state of this item; don't use on humans",
+    "P106": 'occupation of a person; see also "field of work" (Property:P101), "position held" (Property:P39)',
+    "P551": "the place where the person is or has been, resident",
+    "P937": "location where persons were active",
+    "P355": "subsidiary of a company or organization, opposite of parent organization (P749)",
+    "P710": 'person, group of people or organization (object) that actively takes/took part in an event or process (subject).  Preferably qualify with "object has role" (P3831). Use P1923 for participants that are teams.',
+    "P137": "person, profession, or organization that operates the equipment, facility, or service; use country for diplomatic missions",
+    "P674": "characters which appear in this item (like plays, operas, operettas, books, comics, films, TV series, video games)",
+    "P466": "a person or organization occupying property",
+    "P136": "creative work's genre or an artist's field of work (P101). Use main subject (P921) to relate creative works to their topic",
+    "P306": "operating system (OS) on which a software works or the OS installed on hardware",
+    "P127": "owner of the subject",
+    "P400": "platform for which a work was developed or released, or the specific platform version of a software product",
+    "P974": "stream or river that flows into this main stem (or parent) river",
+    "P1346": "winner of an event - do not use for awards (use P166 instead), nor for wars or battles",
+    "P460": "this item is said to be the same as that item, but the statement is disputed",
+    "P86": 'person(s) who wrote the music [for lyricist, use "lyrics by" (P676)]',
+    "P118": "league in which team or player plays or has played in",
+    "P264": "brand and trademark associated with the marketing of subject music recordings and music videos",
+    "P750": "distributor of a creative work; distributor for a record label",
+    "P58": "person(s) who wrote the script for subject item",
+    "P3450": 'property that shows the competition of which the item is a season. Use P5138 for "season of club or team".',
+    "P105": "level in a taxonomic hierarchy",
+    "P276": "location of the item, physical object or event is within. In case of an administrative entity use P131. In case of a distinct terrain feature use P706.",
+    "P101": "specialization of a person or organization; see P106 for the occupation",
+    "P407": "language associated with this creative work (such as books, shows, songs, or websites) or a name (for persons use P103 and P1412)",
+    "P1001": "the item (an institution, law, public office ...) or statement belongs to or has power over or applies to the value (a territorial jurisdiction: a country, state, municipality, ...)",
+    "P800": "notable scientific, artistic or literary work, or other work of significance among subject's works",
+    "P131": "the item is located on the territory of the following administrative entity. Use P276 (location) for specifying the location of non-administrative places and for items about events",
+    "P177": "obstacle (body of water, road, ...) which this bridge crosses over or this tunnel goes under",
+    "P364": 'language in which a film or a performance work was originally created. Deprecated for written works; use P407 ("language of work or name") instead.',
+    "P2094": "official classification by a regulating body under which the subject (events, teams, participants, or equipment) qualifies for inclusion",
+    "P361": 'object of which the subject is a part (it\'s not useful to link objects which are themselves parts of other objects already listed as parts of the subject). Inverse property of "has part" (P527, see also "has parts of the class" (P2670)).',
+    "P641": "sport in which the subject participates or belongs to",
+    "P59": "the area of the celestial sphere of which the subject is a part (from a scientific standpoint, not an astrological one)",
+    "P413": "position or specialism of a player on a team, e.g. Small Forward",
+    "P206": "sea, lake or river",
+    "P412": "person's voice type. expected values: soprano, mezzo-soprano, contralto, countertenor, tenor, baritone, bass (and derivatives)",
+    "P155": 'immediately prior item in a series of which the subject is a part [if the subject has replaced the preceding item, e.g. political offices, use "replaces" (P1365)]',
+    "P26": 'the subject has the object as their spouse (husband, wife, partner, etc.). Use "partner" (P451) for non-married companions',
+    "P410": 'military rank achieved by a person (should usually have a "start time" qualifier), or military rank associated with a position',
+    "P25": 'female parent of the subject. For stepmother, use "stepparent" (P3448)',
+    "P463": "organization or club to which the subject belongs. Do not use for membership in ethnic or social groups, nor for holding a position such as a member of parliament (use P39 for that).",
+    "P40": "subject has object as biological, foster, and/or adoptive child",
+    "P921": "primary topic of a work (see also P180: depicts)",
+}
 
-def read_fewrl_dataset(fewrel_path, m=5):
+
+def read_fewrl_dataset(fewrel_path, seed=10, m=5):
     # rel_dict = {}
     # rel_names = read_fewrl_names("train_wiki")
     # for row in rel_names:
@@ -523,6 +608,10 @@ def read_fewrl_dataset(fewrel_path, m=5):
     # rel_names = read_fewrl_names("val_wiki")
     # for row in rel_names:
     #    rel_dict[row["r_id"]] = row["r_name"]
+
+    sentence_delimiters = [". ", ".\n", "? ", "?\n", "! ", "!\n"]
+
+    set_random_seed(seed)
 
     train_contexts = []
     train_posterier_contexts = []
@@ -549,11 +638,31 @@ def read_fewrl_dataset(fewrel_path, m=5):
         r_ids = list(data.keys())
         random.shuffle(r_ids)
         val_r_ids = r_ids[:m]
-        test_r_ids = r_ids[m : 3 * m]
-        train_r_ids = r_ids[3 * m :]
+        test_r_ids = r_ids[m : 4 * m]
+        train_r_ids = r_ids[4 * m :]
+
+        train_id_df = pd.DataFrame(train_r_ids, columns=["relation_ids"])
+        train_id_df.to_csv(
+            "./train_ids_" + str(seed) + ".csv", sep=",", header=True, index=False
+        )
+
+        val_id_df = pd.DataFrame(val_r_ids, columns=["relation_ids"])
+        val_id_df.to_csv(
+            "./val_ids_" + str(seed) + ".csv", sep=",", header=True, index=False
+        )
+
+        test_id_df = pd.DataFrame(test_r_ids, columns=["relation_ids"])
+        test_id_df.to_csv(
+            "./test_ids_" + str(seed) + ".csv", sep=",", header=True, index=False
+        )
 
         for r_id in val_r_ids:
-            r_name = rel_dict[r_id]
+            r_name = rel_desc[r_id]
+            desc = r_name.strip(".") + ". "
+            pos = [desc.find(delimiter) for delimiter in sentence_delimiters]
+            pos = min([p for p in pos if p >= 0])
+            re_desc = desc[:pos]
+
             for sent in data[r_id]:
                 sentence = " ".join(sent["tokens"])
                 head_entity = sent["h"][0]
@@ -567,6 +676,8 @@ def read_fewrl_dataset(fewrel_path, m=5):
                     + white_space_fix(head_entity)
                     + " <SEP> "
                     + white_space_fix(r_name)
+                    + " ; "
+                    + white_space_fix(re_desc)
                     + " context: "
                     + white_space_fix(sentence)
                     + " </s>"
@@ -576,6 +687,8 @@ def read_fewrl_dataset(fewrel_path, m=5):
                     + white_space_fix(head_entity)
                     + " <SEP> "
                     + white_space_fix(r_name)
+                    + " ; "
+                    + white_space_fix(re_desc)
                     + " "
                     + white_space_fix(" and ".join(gold_answers))
                     + " context: "
@@ -587,7 +700,12 @@ def read_fewrl_dataset(fewrel_path, m=5):
                 )
 
         for r_id in test_r_ids:
-            r_name = rel_dict[r_id]
+            r_name = rel_desc[r_id]
+            desc = r_name.strip(".") + ". "
+            pos = [desc.find(delimiter) for delimiter in sentence_delimiters]
+            pos = min([p for p in pos if p >= 0])
+            re_desc = desc[:pos]
+
             for sent in data[r_id]:
                 sentence = " ".join(sent["tokens"])
                 head_entity = sent["h"][0]
@@ -603,6 +721,8 @@ def read_fewrl_dataset(fewrel_path, m=5):
                     + white_space_fix(head_entity)
                     + " <SEP> "
                     + white_space_fix(r_name)
+                    + " ; "
+                    + white_space_fix(re_desc)
                     + " context: "
                     + white_space_fix(sentence)
                     + " </s>"
@@ -612,6 +732,8 @@ def read_fewrl_dataset(fewrel_path, m=5):
                     + white_space_fix(head_entity)
                     + " <SEP> "
                     + white_space_fix(r_name)
+                    + " ; "
+                    + white_space_fix(re_desc)
                     + " "
                     + white_space_fix(" and ".join(gold_answers))
                     + " context: "
@@ -623,7 +745,12 @@ def read_fewrl_dataset(fewrel_path, m=5):
                 )
 
         for r_id in train_r_ids:
-            r_name = rel_dict[r_id]
+            r_name = rel_desc[r_id]
+            desc = r_name.strip(".") + ". "
+            pos = [desc.find(delimiter) for delimiter in sentence_delimiters]
+            pos = min([p for p in pos if p >= 0])
+            re_desc = desc[:pos]
+
             for sent in data[r_id]:
                 sentence = " ".join(sent["tokens"])
                 head_entity = sent["h"][0]
@@ -639,6 +766,8 @@ def read_fewrl_dataset(fewrel_path, m=5):
                     + white_space_fix(head_entity)
                     + " <SEP> "
                     + white_space_fix(r_name)
+                    + " ; "
+                    + white_space_fix(re_desc)
                     + " context: "
                     + white_space_fix(sentence)
                     + " </s>"
@@ -648,6 +777,8 @@ def read_fewrl_dataset(fewrel_path, m=5):
                     + white_space_fix(head_entity)
                     + " <SEP> "
                     + white_space_fix(r_name)
+                    + " ; "
+                    + white_space_fix(re_desc)
                     + " "
                     + white_space_fix(" and ".join(gold_answers))
                     + " context: "
@@ -657,6 +788,47 @@ def read_fewrl_dataset(fewrel_path, m=5):
                 train_answers.append(
                     white_space_fix(" and ".join(gold_answers)) + " </s>"
                 )
+
+    train_df = pd.DataFrame(
+        {
+            "passages": train_passages,
+            "contexts": train_contexts,
+            "answers": train_answers,
+            "entity_relations": train_entity_relations,
+            "entities": train_entities,
+            "posterier_contexts": train_posterier_contexts,
+        }
+    )
+
+    val_df = pd.DataFrame(
+        {
+            "passages": val_passages,
+            "contexts": val_contexts,
+            "answers": val_answers,
+            "entity_relations": val_entity_relations,
+            "entities": val_entities,
+            "posterier_contexts": val_posterier_contexts,
+        }
+    )
+
+    test_df = pd.DataFrame(
+        {
+            "passages": test_passages,
+            "contexts": test_contexts,
+            "answers": test_answers,
+            "entity_relations": test_entity_relations,
+            "entities": test_entities,
+            "posterier_contexts": test_posterier_contexts,
+        }
+    )
+
+    train_df.to_csv(
+        "./train_data_" + str(seed) + ".csv", sep=",", header=True, index=False
+    )
+    val_df.to_csv("./val_data_" + str(seed) + ".csv", sep=",", header=True, index=False)
+    test_df.to_csv(
+        "./test_data_" + str(seed) + ".csv", sep=",", header=True, index=False
+    )
 
     return (
         (
