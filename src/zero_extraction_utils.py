@@ -633,6 +633,7 @@ def read_fewrl_dataset(fewrel_path, seed=10, m=5):
     test_passages = []
     test_entities = []
     test_entity_relations = []
+
     with open(fewrel_path, "r") as json_file:
         data = json.load(json_file)
         r_ids = list(data.keys())
@@ -657,8 +658,9 @@ def read_fewrl_dataset(fewrel_path, seed=10, m=5):
         )
 
         for r_id in val_r_ids:
-            r_name = rel_desc[r_id]
-            desc = r_name.strip(".") + ". "
+            r_name = rel_dict[r_id]
+            r_desc = rel_desc[r_id]
+            desc = r_desc.strip(".") + ". "
             pos = [desc.find(delimiter) for delimiter in sentence_delimiters]
             pos = min([p for p in pos if p >= 0])
             re_desc = desc[:pos]
@@ -700,8 +702,9 @@ def read_fewrl_dataset(fewrel_path, seed=10, m=5):
                 )
 
         for r_id in test_r_ids:
-            r_name = rel_desc[r_id]
-            desc = r_name.strip(".") + ". "
+            r_name = rel_dict[r_id]
+            r_desc = rel_desc[r_id]
+            desc = r_desc.strip(".") + ". "
             pos = [desc.find(delimiter) for delimiter in sentence_delimiters]
             pos = min([p for p in pos if p >= 0])
             re_desc = desc[:pos]
@@ -745,8 +748,9 @@ def read_fewrl_dataset(fewrel_path, seed=10, m=5):
                 )
 
         for r_id in train_r_ids:
-            r_name = rel_desc[r_id]
-            desc = r_name.strip(".") + ". "
+            r_name = rel_dict[r_id]
+            r_desc = rel_desc[r_id]
+            desc = r_desc.strip(".") + ". "
             pos = [desc.find(delimiter) for delimiter in sentence_delimiters]
             pos = min([p for p in pos if p >= 0])
             re_desc = desc[:pos]
