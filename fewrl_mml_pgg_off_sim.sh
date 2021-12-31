@@ -1,12 +1,12 @@
 #!/bin/bash
 
-#SBATCH --job-name=test_fewrl_run_1
+#SBATCH --job-name=train_fewrl_run_1
 #SBATCH --account=def-afyshe-ab
 #SBATCH --nodes=1
 #SBATCH --tasks-per-node=1
 #SBATCH --gres=gpu:a100:1
 #SBATCH --mem=24000M
-#SBATCH --time=0-00:30
+#SBATCH --time=1-12:00
 #SBATCH --cpus-per-task=3
 #SBATCH --output=%N-%j.out
 
@@ -24,7 +24,6 @@ echo "r$SLURM_NODEID Launching python script"
 
 echo "All the allocated nodes: $SLURM_JOB_NODELIST"
 
-'''
 # The SLURM_NTASKS variable tells the script how many processes are available for this execution. “srun” executes the script <tasks-per-node * nodes> times
 srun python src/re_gold_qa_train.py \
     --init_method tcp://$MASTER_ADDR:3456 \
@@ -35,19 +34,19 @@ srun python src/re_gold_qa_train.py \
     --question_checkpoint _fold_1_question_pretrained \
     --training_steps 2600 \
     --learning_rate 0.0005 \
-    --max_epochs 1 \
+    --max_epochs 4 \
     --num_search_samples 8 \
     --batch_size 16 \
     --gpu True \
     --num_workers 3 \
-    --train ./fewrl_data/train_ref_12321.csv \
-    --dev ./fewrl_data/dev_ref_12321.csv \
-    --test ./fewrl_data/test_ref_12321.csv \
+    --train ./fewrl_data/train_data_12321.csv \
+    --dev ./fewrl_data/dev_data_12321.csv \
+    --test ./fewrl_data/test_data_12321.csv \
     --gpu_device 0 \
     --seed 12321 \
-    --train_method MML-PGG-Off-Sim 
-'''
+    --train_method MML-PGG-Off-Sim
 
+'''
 for (( i=26; i<=26; i++ ))
 do
         step=$((i * 100))
@@ -71,7 +70,6 @@ do
                 --prediction_file $SCRATCH/fewrl/run_1/mml_pgg_off_sim.run.1.test.predictions.step.${step}.csv
 done
 
-'''
 python src/re_gold_qa_train.py \
 	--mode re_qa_test \
 	--model_path $SCRATCH/fold_1/mml-pgg-off-sim/ \
