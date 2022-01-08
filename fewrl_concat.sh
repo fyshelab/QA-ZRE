@@ -1,12 +1,12 @@
 #!/bin/bash
 
-#SBATCH --job-name=test_concat_fewrl_run_1
+#SBATCH --job-name=test_concat_fewrl_run_5
 #SBATCH --account=def-afyshe-ab
 #SBATCH --nodes=1
 #SBATCH --tasks-per-node=1
 #SBATCH --gres=gpu:a100:1
 #SBATCH --mem=24000M
-#SBATCH --time=0-08:00
+#SBATCH --time=00-01:00
 #SBATCH --cpus-per-task=3
 #SBATCH --output=%N-%j.out
 
@@ -25,27 +25,51 @@ echo "r$SLURM_NODEID Launching python script"
 echo "All the allocated nodes: $SLURM_JOB_NODELIST"
 
 '''
-
 # The SLURM_NTASKS variable tells the script how many processes are available for this execution. “srun” executes the script <tasks-per-node * nodes> times
 srun python src/re_gold_qa_train.py \
     --init_method tcp://$MASTER_ADDR:3456 \
     --world_size $SLURM_NTASKS \
     --mode concat_fewrl_train \
-    --model_path $SCRATCH/fewrl/concat_run_3/ \
+    --model_path $SCRATCH/fewrl/concat_run_5/ \
     --checkpoint _response_pretrained \
     --training_steps 2600 \
     --learning_rate 0.0005 \
-    --max_epochs 1 \
+    --max_epochs 4 \
     --num_search_samples 8 \
     --batch_size 16 \
     --gpu True \
     --num_workers 3 \
-    --train ./fewrl_data/train_ref_111.csv \
-    --dev ./fewrl_data/dev_ref_111.csv \
-    --test ./fewrl_data/test_ref_111.csv \
+    --train ./fewrl_data/train_data_1300.csv \
+    --dev ./fewrl_data/val_data_1300.csv \
+    --test ./fewrl_data/test_data_1300.csv \
     --gpu_device 0 \
-    --seed 111 \
+    --seed 1300 \
+'''
 
+for (( e=3; e<=3; e++ ))
+do
+	for (( i=17; i<=17; i++ ))
+	do
+		step=$((i * 100))
+		printf "step ${step} on epoch ${i}\r\n"
+		python src/re_gold_qa_train.py \
+			--mode concat_fewrl_test \
+			--model_path $SCRATCH/fewrl/concat_run_5/ \
+			--checkpoint _${e}_step_${step}_model \
+			--training_steps 2600 \
+			--learning_rate 0.0005 \
+			--max_epochs 1 \
+			--num_search_samples 8 \
+			--batch_size 64 --gpu True \
+			--ignore_unknowns True \
+			--train ./fewrl_data/train_data_1300.csv \
+			--dev ./fewrl_data/val_data_1300.csv \
+			--test ./fewrl_data/test_data_1300.csv \
+			--gpu_device 0 \
+			--seed 1300 \
+			--prediction_file $SCRATCH/fewrl/concat_run_5/concat.run.${e}.test.predictions.step.${step}.csv
+	done
+done
 '''
 
 for (( i=26; i<=26; i++ ))
@@ -70,7 +94,6 @@ do
                 --prediction_file $SCRATCH/fewrl/concat_run_1/concat.run.1.train.predictions.step.${step}.csv
 done
 
-'''
 python src/re_gold_qa_train.py \
 	--mode re_qa_test \
 	--model_path $SCRATCH/fold_1/mml-pgg-off-sim/ \

@@ -1,12 +1,12 @@
 #!/bin/bash
 
-#SBATCH --job-name=train_fewrl_run_1
+#SBATCH --job-name=dev_fewrl_run_4
 #SBATCH --account=def-afyshe-ab
 #SBATCH --nodes=1
 #SBATCH --tasks-per-node=1
 #SBATCH --gres=gpu:a100:1
 #SBATCH --mem=24000M
-#SBATCH --time=1-12:00
+#SBATCH --time=0-12:00
 #SBATCH --cpus-per-task=3
 #SBATCH --output=%N-%j.out
 
@@ -24,12 +24,13 @@ echo "r$SLURM_NODEID Launching python script"
 
 echo "All the allocated nodes: $SLURM_JOB_NODELIST"
 
+'''
 # The SLURM_NTASKS variable tells the script how many processes are available for this execution. “srun” executes the script <tasks-per-node * nodes> times
 srun python src/re_gold_qa_train.py \
     --init_method tcp://$MASTER_ADDR:3456 \
     --world_size $SLURM_NTASKS \
     --mode fewrl_train \
-    --model_path $SCRATCH/fewrl/run_1/ \
+    --model_path $SCRATCH/fewrl/run_5/ \
     --answer_checkpoint _response_pretrained \
     --question_checkpoint _fold_1_question_pretrained \
     --training_steps 2600 \
@@ -39,37 +40,40 @@ srun python src/re_gold_qa_train.py \
     --batch_size 16 \
     --gpu True \
     --num_workers 3 \
-    --train ./fewrl_data/train_data_12321.csv \
-    --dev ./fewrl_data/dev_data_12321.csv \
-    --test ./fewrl_data/test_data_12321.csv \
+    --train ./fewrl_data/train_data_1300.csv \
+    --dev ./fewrl_data/val_data_1300.csv \
+    --test ./fewrl_data/test_data_1300.csv \
     --gpu_device 0 \
-    --seed 12321 \
+    --seed 1300 \
     --train_method MML-PGG-Off-Sim
 
 '''
-for (( i=26; i<=26; i++ ))
+for (( e=0; e<=3; e++ ))
 do
-        step=$((i * 100))
-        printf "step ${step} on epoch ${i}\r\n"
-        python src/re_gold_qa_train.py \
-                --mode fewrl_test \
-		--model_path $SCRATCH/fewrl/run_1/ \
-                --answer_checkpoint _0_answer_step_${step} \
-                --question_checkpoint _0_question_step_${step} \
-		--training_steps 2600 \
-		--learning_rate 0.0005 \
-		--max_epochs 1 \
-		--num_search_samples 8 \
-                --batch_size 64 --gpu True \
-                --ignore_unknowns True \
-		--train ./fewrl_data/train_ref_12321.csv \
-	        --dev ./fewrl_data/dev_ref_12321.csv \
-	        --test ./fewrl_data/test_ref_12321.csv \
-                --gpu_device 0 \
-                --seed 12321 \
-                --prediction_file $SCRATCH/fewrl/run_1/mml_pgg_off_sim.run.1.test.predictions.step.${step}.csv
+	for (( i=1; i<=26; i++ ))
+	do
+		step=$((i * 100))
+		printf "step ${step} on epoch ${i}\r\n"
+		python src/re_gold_qa_train.py \
+			--mode fewrl_dev \
+			--model_path $SCRATCH/fewrl/run_4/ \
+			--answer_checkpoint _${e}_answer_step_${step} \
+			--question_checkpoint _${e}_question_step_${step} \
+			--training_steps 2600 \
+			--learning_rate 0.0005 \
+			--max_epochs 1 \
+			--num_search_samples 8 \
+			--batch_size 64 --gpu True \
+			--ignore_unknowns True \
+			--train ./fewrl_data/train_data_300.csv \
+			--dev ./fewrl_data/val_data_300.csv \
+			--test ./fewrl_data/test_data_300.csv \
+			--gpu_device 0 \
+			--seed 300 \
+			--prediction_file $SCRATCH/fewrl/run_4/mml-pgg-off-sim.run.${e}.dev.predictions.step.${step}.csv
+	done
 done
-
+'''
 python src/re_gold_qa_train.py \
 	--mode re_qa_test \
 	--model_path $SCRATCH/fold_1/mml-pgg-off-sim/ \
