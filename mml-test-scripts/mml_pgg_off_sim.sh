@@ -1,12 +1,12 @@
 #!/bin/bash
 
-#SBATCH --job-name=train_mml_pgg_sim_off_fold_1
+#SBATCH --job-name=test_mml_mml_sim_off_fold_1
 #SBATCH --account=def-afyshe-ab
 #SBATCH --nodes=1
 #SBATCH --tasks-per-node=1
 #SBATCH --gres=gpu:a100:1
 #SBATCH --mem=24000M
-#SBATCH --time=2-12:00
+#SBATCH --time=0-01:00
 #SBATCH --cpus-per-task=3
 #SBATCH --output=%N-%j.out
 
@@ -24,12 +24,14 @@ echo "r$SLURM_NODEID Launching python script"
 
 echo "All the allocated nodes: $SLURM_JOB_NODELIST"
 
+'''
+
 # The SLURM_NTASKS variable tells the script how many processes are available for this execution. “srun” executes the script <tasks-per-node * nodes> times
 srun python src/re_gold_qa_train.py \
     --init_method tcp://$MASTER_ADDR:3456 \
     --world_size $SLURM_NTASKS \
     --mode re_qa_train \
-    --model_path $SCRATCH/dec_29/fold_1/mml-pgg-off-sim/ \
+    --model_path $SCRATCH/dec_29/fold_1/mml-pgg-on-sim/ \
     --answer_checkpoint _response_pretrained \
     --question_checkpoint _fold_1_question_pretrained \
     --training_steps 26200 \
@@ -44,27 +46,29 @@ srun python src/re_gold_qa_train.py \
     --train ./zero-shot-extraction/relation_splits/train.0 \
     --gpu_device 0 \
     --seed 12321 \
-    --train_method MML-PGG-Off-Sim
-
+    --train_method MML-PGG-On-Sim
 '''
-for (( i=43; i<=43; i++ ))
+
+for (( i=16; i<=16; i++ ))
 do
         step=$((i * 100))
         printf "step ${step} on epoch ${i}\r\n"
         python src/re_gold_qa_train.py \
                 --mode re_qa_test \
-		--model_path $SCRATCH/dec_25/fold_5/mml-pgg-off-sim/ \
-                --answer_checkpoint _0_answer_step_${step} \
+		--model_path $SCRATCH/dec_29/fold_1/mml-mml-off-sim/ \
+		--answer_checkpoint _0_answer_step_${step} \
                 --question_checkpoint _0_question_step_${step} \
 		--num_search_samples 8 \
                 --batch_size 64 --gpu True \
                 --ignore_unknowns True \
                 --train zero-shot-extraction/relation_splits/train.very_small.0 \
-                --dev zero-shot-extraction/relation_splits/test.4 \
+                --dev zero-shot-extraction/relation_splits/test.0 \
                 --gpu_device 0 \
                 --seed 12321 \
-                --prediction_file $SCRATCH/dec_25/fold_5/mml-pgg-off-sim/mml_pgg_off_sim.fold.5.test.predictions.step.${step}.csv
+                --prediction_file $SCRATCH/dec_29/fold_1/mml-mml-off-sim/mml-mml-off-sim.fold.1.test.predictions.step.${step}.csv
 done
+
+'''
 
 python src/re_gold_qa_train.py \
 	--mode re_qa_test \

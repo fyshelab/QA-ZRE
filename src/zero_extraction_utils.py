@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pandas as pd
 import torch
-from datasets import load_dataset
+#from datasets import load_dataset
 from torch.utils.data import DataLoader
 
 from src.re_qa_model import set_random_seed
@@ -874,9 +874,9 @@ def create_fewrl_dataset(
     concat=False,
 ):
     """Function to create the fewrl dataset."""
-    train_df = pd.read_csv(train_fewrel_path, sep="\t")
-    dev_df = pd.read_csv(dev_fewrel_path, sep="\t")
-    test_df = pd.read_csv(test_fewrel_path, sep="\t")
+    train_df = pd.read_csv(train_fewrel_path, sep=",")
+    dev_df = pd.read_csv(dev_fewrel_path, sep=",")
+    test_df = pd.read_csv(test_fewrel_path, sep=",")
 
     train_passages = train_df["passages"].tolist()
     train_contexts = train_df["contexts"].tolist()
@@ -900,11 +900,26 @@ def create_fewrl_dataset(
     test_posterier_contexts = test_df["posterier_contexts"].tolist()
 
     if concat:
-        train_contexts = [
-            ctx.replace("answer: ", "question: ") for ctx in train_contexts
-        ]
-        val_contexts = [ctx.replace("answer: ", "question: ") for ctx in val_contexts]
-        test_contexts = [ctx.replace("answer: ", "question: ") for ctx in test_contexts]
+        for i in range(len(train_contexts)):
+            ctx = train_contexts[i]
+            ctx_str = ctx.split("context: ")[1]
+            ent_rel_str = train_entity_relations[i]
+            new_train_context = white_space_fix("answer: " + ent_rel_str + " context: " + ctx_str)
+            train_contexts[i] = new_train_context
+
+        for i in range(len(val_contexts)):
+            ctx = val_contexts[i]
+            ctx_str = ctx.split("context: ")[1]
+            ent_rel_str = val_entity_relations[i]
+            new_val_context = white_space_fix("answer: " + ent_rel_str + " context: " + ctx_str)
+            val_contexts[i] = new_val_context
+
+        for i in range(len(test_contexts)):
+            ctx = test_contexts[i]
+            ctx_str = ctx.split("context: ")[1]
+            ent_rel_str = test_entity_relations[i]
+            new_test_context = white_space_fix("answer: " + ent_rel_str + " context: " + ctx_str)
+            test_contexts[i] = new_test_context
 
     val_encodings = question_tokenizer(
         val_contexts,
