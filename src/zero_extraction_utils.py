@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pandas as pd
 import torch
-#from datasets import load_dataset
+# from datasets import load_dataset
 from torch.utils.data import DataLoader
 
 from src.re_qa_model import set_random_seed
@@ -904,21 +904,27 @@ def create_fewrl_dataset(
             ctx = train_contexts[i]
             ctx_str = ctx.split("context: ")[1]
             ent_rel_str = train_entity_relations[i]
-            new_train_context = white_space_fix("answer: " + ent_rel_str + " context: " + ctx_str)
+            new_train_context = white_space_fix(
+                "answer: " + ent_rel_str + " context: " + ctx_str
+            )
             train_contexts[i] = new_train_context
 
         for i in range(len(val_contexts)):
             ctx = val_contexts[i]
             ctx_str = ctx.split("context: ")[1]
             ent_rel_str = val_entity_relations[i]
-            new_val_context = white_space_fix("answer: " + ent_rel_str + " context: " + ctx_str)
+            new_val_context = white_space_fix(
+                "answer: " + ent_rel_str + " context: " + ctx_str
+            )
             val_contexts[i] = new_val_context
 
         for i in range(len(test_contexts)):
             ctx = test_contexts[i]
             ctx_str = ctx.split("context: ")[1]
             ent_rel_str = test_entity_relations[i]
-            new_test_context = white_space_fix("answer: " + ent_rel_str + " context: " + ctx_str)
+            new_test_context = white_space_fix(
+                "answer: " + ent_rel_str + " context: " + ctx_str
+            )
             test_contexts[i] = new_test_context
 
     val_encodings = question_tokenizer(
