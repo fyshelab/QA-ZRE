@@ -310,13 +310,6 @@ def argument_parser():
     parser.add_argument("--input_file_name", type=str, help="input file name")
 
     # Hyper-Parameters
-    parser.add_argument("--dim_model", type=int, default=100, help="dim of model units")
-
-    parser.add_argument(
-        "--dropout", type=float, default=0.1, help="the probability of zeroing a link"
-    )
-
-    parser.add_argument("--dim_embedding", type=int, default=100, help="embedding size")
 
     parser.add_argument("--learning_rate", type=float, default=0.0005)
 
