@@ -1,11 +1,10 @@
 import json
-import os
 import random
 from pathlib import Path
 
 import pandas as pd
 import torch
-# from datasets import load_dataset
+from datasets import load_dataset
 from torch.utils.data import DataLoader
 
 from src.re_qa_model import set_random_seed
@@ -124,12 +123,20 @@ def test_read_zero_re_qa():
     The function tests three modes: gold questions! concat questions!
     question generator data!
     """
-    passages, contexts, answers, entity_relations = read_zero_re_qa(
+    (
+        passages,
+        contexts,
+        answers,
+        entity_relations,
+        entities,
+        posterier_contexts,
+    ) = read_zero_re_qa(
         "./zero-shot-extraction/relation_splits/train.very_small.0",
         ignore_unknowns=True,
         gold_question=True,
         concat=False,
     )
+
     assert len(contexts) == len(passages) == len(answers) == 8445
 
     expected_context = "question: Which is the body of water by Świecie ? context: Świecie is located on the west bank of river Vistula at the mouth of river Wda, approximately 40 kilometers north-east of Bydgoszcz, 105 kilometers south of Gdańsk and 190 kilometers south-west of Kaliningrad. </s>"
@@ -140,7 +147,14 @@ def test_read_zero_re_qa():
         == "Świecie is located on the west bank of river Vistula at the mouth of river Wda, approximately 40 kilometers north-east of Bydgoszcz, 105 kilometers south of Gdańsk and 190 kilometers south-west of Kaliningrad."
     )
 
-    passages, contexts, answers, entity_relations = read_zero_re_qa(
+    (
+        passages,
+        contexts,
+        answers,
+        entity_relations,
+        entities,
+        posterier_contexts,
+    ) = read_zero_re_qa(
         "./zero-shot-extraction/relation_splits/train.very_small.0",
         ignore_unknowns=False,
         gold_question=True,
@@ -153,7 +167,14 @@ def test_read_zero_re_qa():
         == "question: What olympics was Shakira ? context: Shakira released her first studio albums, Magia and Peligro, in the early 1990s, failing to attain commercial success; however, she rose to prominence in Latin America with her major-label debut, Pies Descalzos (1996), and her fourth album, Dónde Están los Ladrones? (1998). </s>"
     )
 
-    passages, contexts, answers, entity_relations = read_zero_re_qa(
+    (
+        passages,
+        contexts,
+        answers,
+        entity_relations,
+        entities,
+        posterier_contexts,
+    ) = read_zero_re_qa(
         "./zero-shot-extraction/relation_splits/train.very_small.0",
         ignore_unknowns=True,
         gold_question=False,
@@ -163,15 +184,26 @@ def test_read_zero_re_qa():
     expected_context = "question: Świecie <SEP> located next to body of water context: Świecie is located on the west bank of river Vistula at the mouth of river Wda, approximately 40 kilometers north-east of Bydgoszcz, 105 kilometers south of Gdańsk and 190 kilometers south-west of Kaliningrad. </s>"
     assert contexts[100] == expected_context
 
-    passages, contexts, answers, entity_relations = read_zero_re_qa(
+    (
+        passages,
+        contexts,
+        answers,
+        entity_relations,
+        entities,
+        posterier_contexts,
+    ) = read_zero_re_qa(
         "./zero-shot-extraction/relation_splits/train.very_small.0",
         ignore_unknowns=True,
         gold_question=False,
         concat=False,
     )
+
     assert len(contexts) == len(passages) == len(answers) == 8445
     expected_answer = "answer: Świecie <SEP> located next to body of water context: Świecie is located on the west bank of river Vistula at the mouth of river Wda, approximately 40 kilometers north-east of Bydgoszcz, 105 kilometers south of Gdańsk and 190 kilometers south-west of Kaliningrad. </s>"
     assert contexts[100] == expected_answer
+
+    expected_posterier_contexts = "answer: IEEE Centennial Medal <SEP> conferred by ; person or organization who awards a prize to or bestows an honor upon a recipient Institute of Electrical and Electronics Engineers context: The IEEE Centennial Medal was a medal minted and awarded in 1984 to persons deserving of special recognition for extraordinary achievement to celebrate the Centennial of the founding of the Institute of Electrical and Electronics Engineers (IEEE) in 1884. </s>"
+    assert posterier_contexts[-1] == expected_posterier_contexts
 
 
 def create_zero_re_qa_dataset(
@@ -182,8 +214,6 @@ def create_zero_re_qa_dataset(
     decoder_max_length,
     train_file=None,
     dev_file=None,
-    distributed=True,
-    num_workers=1,
     ignore_unknowns=True,
     concat=False,
     gold_questions=False,
@@ -391,29 +421,15 @@ def create_zero_re_qa_dataset(
                 return len(self.encodings.input_ids)
 
     train_dataset = None
-    train_sampler = None
     train_loader = None
     if not for_evaluation:
         train_dataset = HelperDataset(train_encodings)
     val_dataset = HelperDataset(val_encodings)
 
-    if distributed:
-        train_sampler = torch.utils.data.distributed.DistributedSampler(train_dataset)
-        train_loader = DataLoader(
-            train_dataset,
-            batch_size=batch_size,
-            num_workers=num_workers,
-            sampler=train_sampler,
-        )
-        val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False)
-        return train_loader, val_loader, train_dataset, val_dataset, train_sampler
-    if not distributed:
-        if not for_evaluation:
-            train_loader = DataLoader(
-                train_dataset, batch_size=batch_size, shuffle=True
-            )
-        val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False)
-        return train_loader, val_loader, train_dataset, val_dataset, None
+    if not for_evaluation:
+        train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
+    val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False)
+    return train_loader, val_loader, train_dataset, val_dataset
 
 
 def read_fewrl_names(split):
