@@ -28,7 +28,7 @@ def run_re_gold_qa(args):
         mode=mode,
         prediction_file=args.prediction_file,
         checkpoint=args.checkpoint,
-        answer_training_steps=args.answer_training_steps,
+        training_steps=args.training_steps,
         seed=args.seed,
     )
 
@@ -87,7 +87,7 @@ def run_re_concat_qa(args):
         mode=mode,
         prediction_file=args.prediction_file,
         checkpoint=args.checkpoint,
-        answer_training_steps=args.answer_training_steps,
+        training_steps=args.training_steps,
         seed=args.seed,
     )
 
