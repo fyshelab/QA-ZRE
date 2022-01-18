@@ -529,6 +529,7 @@ rel_dict = {
     "P463": "member of",
     "P40": "child",
     "P921": "main subject",
+    "P1056": "product or material produced",
 }
 
 rel_desc = {
@@ -612,7 +613,262 @@ rel_desc = {
     "P463": "organization or club to which the subject belongs. Do not use for membership in ethnic or social groups, nor for holding a position such as a member of parliament (use P39 for that).",
     "P40": "subject has object as biological, foster, and/or adoptive child",
     "P921": "primary topic of a work (see also P180: depicts)",
+    "P1056": "material or product produced by a government agency, business, industry, facility, or process",
 }
+
+
+def read_wikizsl_dataset(zsl_path, seed=10, m=5):
+    rel_names = {}
+    rel_descs = {}
+    with open("./props.json", "r") as fd:
+        re_desc_data = json.load(fd)
+        sentence_delimiters = [". ", ".\n", "? ", "?\n", "! ", "!\n"]
+        for row in re_desc_data:
+            desc = row["description"]
+            if desc == {}:
+                desc = "no relation description"
+            desc = desc.strip(".") + ". "
+            pos = [desc.find(delimiter) for delimiter in sentence_delimiters]
+            pos = min([p for p in pos if p >= 0])
+            re_desc = desc[:pos]
+            re_id = row["id"]
+            rel_names[re_id] = white_space_fix(row["label"]).lower()
+            rel_descs[re_id] = white_space_fix(re_desc)
+
+    set_random_seed(seed)
+
+    train_contexts = []
+    train_posterier_contexts = []
+    train_answers = []
+    train_passages = []
+    train_entities = []
+    train_entity_relations = []
+
+    val_contexts = []
+    val_posterier_contexts = []
+    val_answers = []
+    val_passages = []
+    val_entities = []
+    val_entity_relations = []
+
+    test_contexts = []
+    test_posterier_contexts = []
+    test_answers = []
+    test_passages = []
+    test_entities = []
+    test_entity_relations = []
+
+    with open(zsl_path, "r") as json_file:
+        data = json.load(json_file)
+        r_ids = set()
+        for row in data:
+            relation_id = row["edgeSet"][0]["kbID"]
+            r_ids.add(relation_id)
+
+        r_ids = list(r_ids)
+        random.shuffle(r_ids)
+        val_r_ids = r_ids[:m]
+        test_r_ids = r_ids[m : 4 * m]
+        train_r_ids = r_ids[4 * m :]
+
+        set_val_r_ids = set(val_r_ids)
+        set_test_r_ids = set(test_r_ids)
+        set_train_r_ids = set(train_r_ids)
+
+        train_id_df = pd.DataFrame(train_r_ids, columns=["relation_ids"])
+        train_id_df.to_csv(
+            "./train_ids_" + str(seed) + ".csv", sep=",", header=True, index=False
+        )
+
+        val_id_df = pd.DataFrame(val_r_ids, columns=["relation_ids"])
+        val_id_df.to_csv(
+            "./val_ids_" + str(seed) + ".csv", sep=",", header=True, index=False
+        )
+
+        test_id_df = pd.DataFrame(test_r_ids, columns=["relation_ids"])
+        test_id_df.to_csv(
+            "./test_ids_" + str(seed) + ".csv", sep=",", header=True, index=False
+        )
+
+        for row in data:
+            sentence = " ".join(row["tokens"])
+            relation_id = row["edgeSet"][0]["kbID"]
+            head_entity = " ".join(
+                [row["tokens"][int(i)] for i in row["edgeSet"][0]["left"]]
+            )
+            tail_entity = " ".join(
+                [row["tokens"][int(i)] for i in row["edgeSet"][0]["right"]]
+            )
+            r_name = rel_names[relation_id]
+            re_desc = rel_descs[relation_id]
+            gold_answers = [tail_entity]
+            if relation_id in set_val_r_ids:
+                val_passages.append(sentence)
+                val_entity_relations.append(white_space_fix(head_entity + " " + r_name))
+                val_entities.append(white_space_fix(head_entity))
+                val_contexts.append(
+                    "answer: "
+                    + white_space_fix(head_entity)
+                    + " <SEP> "
+                    + white_space_fix(r_name)
+                    + " ; "
+                    + white_space_fix(re_desc)
+                    + " context: "
+                    + white_space_fix(sentence)
+                    + " </s>"
+                )
+                val_posterier_contexts.append(
+                    "answer: "
+                    + white_space_fix(head_entity)
+                    + " <SEP> "
+                    + white_space_fix(r_name)
+                    + " ; "
+                    + white_space_fix(re_desc)
+                    + " "
+                    + white_space_fix(" and ".join(gold_answers))
+                    + " context: "
+                    + white_space_fix(sentence)
+                    + " </s>"
+                )
+                val_answers.append(
+                    white_space_fix(" and ".join(gold_answers)) + " </s>"
+                )
+
+            elif relation_id in set_test_r_ids:
+                test_passages.append(sentence)
+                test_entity_relations.append(
+                    white_space_fix(head_entity + " " + r_name)
+                )
+                test_entities.append(white_space_fix(head_entity))
+                test_contexts.append(
+                    "answer: "
+                    + white_space_fix(head_entity)
+                    + " <SEP> "
+                    + white_space_fix(r_name)
+                    + " ; "
+                    + white_space_fix(re_desc)
+                    + " context: "
+                    + white_space_fix(sentence)
+                    + " </s>"
+                )
+                test_posterier_contexts.append(
+                    "answer: "
+                    + white_space_fix(head_entity)
+                    + " <SEP> "
+                    + white_space_fix(r_name)
+                    + " ; "
+                    + white_space_fix(re_desc)
+                    + " "
+                    + white_space_fix(" and ".join(gold_answers))
+                    + " context: "
+                    + white_space_fix(sentence)
+                    + " </s>"
+                )
+                test_answers.append(
+                    white_space_fix(" and ".join(gold_answers)) + " </s>"
+                )
+
+            elif relation_id in set_train_r_ids:
+                train_passages.append(sentence)
+                train_entity_relations.append(
+                    white_space_fix(head_entity + " " + r_name)
+                )
+                train_entities.append(white_space_fix(head_entity))
+                train_contexts.append(
+                    "answer: "
+                    + white_space_fix(head_entity)
+                    + " <SEP> "
+                    + white_space_fix(r_name)
+                    + " ; "
+                    + white_space_fix(re_desc)
+                    + " context: "
+                    + white_space_fix(sentence)
+                    + " </s>"
+                )
+                train_posterier_contexts.append(
+                    "answer: "
+                    + white_space_fix(head_entity)
+                    + " <SEP> "
+                    + white_space_fix(r_name)
+                    + " ; "
+                    + white_space_fix(re_desc)
+                    + " "
+                    + white_space_fix(" and ".join(gold_answers))
+                    + " context: "
+                    + white_space_fix(sentence)
+                    + " </s>"
+                )
+                train_answers.append(
+                    white_space_fix(" and ".join(gold_answers)) + " </s>"
+                )
+
+    train_df = pd.DataFrame(
+        {
+            "passages": train_passages,
+            "contexts": train_contexts,
+            "answers": train_answers,
+            "entity_relations": train_entity_relations,
+            "entities": train_entities,
+            "posterier_contexts": train_posterier_contexts,
+        }
+    )
+
+    val_df = pd.DataFrame(
+        {
+            "passages": val_passages,
+            "contexts": val_contexts,
+            "answers": val_answers,
+            "entity_relations": val_entity_relations,
+            "entities": val_entities,
+            "posterier_contexts": val_posterier_contexts,
+        }
+    )
+
+    test_df = pd.DataFrame(
+        {
+            "passages": test_passages,
+            "contexts": test_contexts,
+            "answers": test_answers,
+            "entity_relations": test_entity_relations,
+            "entities": test_entities,
+            "posterier_contexts": test_posterier_contexts,
+        }
+    )
+
+    train_df.to_csv(
+        "./train_data_" + str(seed) + ".csv", sep=",", header=True, index=False
+    )
+    val_df.to_csv("./val_data_" + str(seed) + ".csv", sep=",", header=True, index=False)
+    test_df.to_csv(
+        "./test_data_" + str(seed) + ".csv", sep=",", header=True, index=False
+    )
+
+    return (
+        (
+            train_passages,
+            train_contexts,
+            train_answers,
+            train_entity_relations,
+            train_entities,
+            train_posterier_contexts,
+        ),
+        (
+            val_passages,
+            val_contexts,
+            val_answers,
+            val_entity_relations,
+            val_entities,
+            val_posterier_contexts,
+        ),
+        (
+            test_passages,
+            test_contexts,
+            test_answers,
+            test_entity_relations,
+            test_entities,
+            test_posterier_contexts,
+        ),
+    )
 
 
 def read_fewrl_dataset(fewrel_path, seed=10, m=5):
