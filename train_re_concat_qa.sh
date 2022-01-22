@@ -1,6 +1,6 @@
 #!/bin/bash
 
-#SBATCH --job-name=reqa_concat_fold_5
+#SBATCH --job-name=dev_concat_fold_10
 #SBATCH --account=def-afyshe-ab
 #SBATCH --nodes=1
 #SBATCH --tasks-per-node=1
@@ -24,18 +24,38 @@ echo "r$SLURM_NODEID Launching python script"
 
 echo "All the allocated nodes: $SLURM_JOB_NODELIST"
 
+for (( i=1; i<=525; i++ ))
+do
+        step=$((i * 100))
+        printf "step ${step} on epoch ${i}\r\n"
+        python src/re_gold_qa_train.py \
+	        --mode re_concat_qa_test \
+	        --model_path /home/saeednjf/scratch/feb-15-2022-arr/fold_10/concat/ \
+                --checkpoint _0_step_${step}_model \
+		--num_search_samples 8 \
+                --batch_size 64 --gpu True \
+                --ignore_unknowns False \
+                --train zero-shot-extraction/relation_splits/train.9 \
+                --dev zero-shot-extraction/relation_splits/dev.9 \
+                --gpu_device 0 \
+                --seed 12321 \
+                --prediction_file $SCRATCH/feb-15-2022-arr/fold_10/concat/concat_fold.10.dev.predictions.step.${step}.csv
+done
+
+'''
 srun python src/re_gold_qa_train.py \
        --init_method tcp://$MASTER_ADDR:3456 \
        --world_size $SLURM_NTASKS \
        --mode re_concat_qa_train \
-       --model_path /home/saeednjf/scratch/fold_5/concat/ \
+       --model_path /home/saeednjf/scratch/feb-15-2022-arr/fold_10/concat/ \
        --checkpoint _response_pretrained \
        --learning_rate 0.0005 --max_epochs 1 \
-       --concat_questions False \
+       --concat_questions True \
        --batch_size 16  --gpu True \
-       --answer_training_steps 26250 \
-       --ignore_unknowns True \
-       --train ./zero-shot-extraction/relation_splits/train.4 \
-       --dev ./zero-shot-extraction/relation_splits/dev.4 \
+       --answer_training_steps 52400 \
+       --ignore_unknowns False \
+       --train ./zero-shot-extraction/relation_splits/train.9 \
+       --dev ./zero-shot-extraction/relation_splits/dev.9 \
        --gpu_device 0 \
        --seed 12321
+'''
