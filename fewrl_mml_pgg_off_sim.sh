@@ -1,12 +1,12 @@
 #!/bin/bash
 
-#SBATCH --job-name=dev_fewrl_run_4
+#SBATCH --job-name=test_base_fewrl_run_3
 #SBATCH --account=def-afyshe-ab
 #SBATCH --nodes=1
 #SBATCH --tasks-per-node=1
 #SBATCH --gres=gpu:a100:1
 #SBATCH --mem=24000M
-#SBATCH --time=0-12:00
+#SBATCH --time=0-01:00
 #SBATCH --cpus-per-task=3
 #SBATCH --output=%N-%j.out
 
@@ -48,29 +48,29 @@ srun python src/re_gold_qa_train.py \
     --train_method MML-PGG-Off-Sim
 
 '''
-for (( e=0; e<=3; e++ ))
+for (( e=0; e<=0; e++ ))
 do
-	for (( i=1; i<=26; i++ ))
+	for (( i=0; i<=0; i++ ))
 	do
 		step=$((i * 100))
 		printf "step ${step} on epoch ${i}\r\n"
 		python src/re_gold_qa_train.py \
-			--mode fewrl_dev \
-			--model_path $SCRATCH/fewrl/run_4/ \
-			--answer_checkpoint _${e}_answer_step_${step} \
-			--question_checkpoint _${e}_question_step_${step} \
+			--mode fewrl_test \
+			--model_path $SCRATCH/fewrl/run_3/ \
+			--answer_checkpoint _response_pretrained \
+			--question_checkpoint _fold_1_question_pretrained \
 			--training_steps 2600 \
 			--learning_rate 0.0005 \
 			--max_epochs 1 \
 			--num_search_samples 8 \
 			--batch_size 64 --gpu True \
 			--ignore_unknowns True \
-			--train ./fewrl_data/train_data_300.csv \
-			--dev ./fewrl_data/val_data_300.csv \
-			--test ./fewrl_data/test_data_300.csv \
+			--train ./fewrl_data/train_data_111.csv \
+			--dev ./fewrl_data/val_data_111.csv \
+			--test ./fewrl_data/test_data_111.csv \
 			--gpu_device 0 \
-			--seed 300 \
-			--prediction_file $SCRATCH/fewrl/run_4/mml-pgg-off-sim.run.${e}.dev.predictions.step.${step}.csv
+			--seed 111 \
+			--prediction_file $SCRATCH/fewrl/run_3/base-base.run.${e}.test.predictions.step.${step}.csv
 	done
 done
 '''
