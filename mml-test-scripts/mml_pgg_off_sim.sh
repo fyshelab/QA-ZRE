@@ -1,12 +1,12 @@
 #!/bin/bash
 
-#SBATCH --job-name=train_mml_mml_sim_off_fold_1
+#SBATCH --job-name=train_mml_pgg_sim_off_fold_10
 #SBATCH --account=def-afyshe-ab
 #SBATCH --nodes=1
 #SBATCH --tasks-per-node=1
 #SBATCH --gres=gpu:a100:1
 #SBATCH --mem=24000M
-#SBATCH --time=5-00:00
+#SBATCH --time=6-00:00
 #SBATCH --cpus-per-task=3
 #SBATCH --output=%N-%j.out
 
@@ -29,7 +29,7 @@ srun python src/re_gold_qa_train.py \
     --init_method tcp://$MASTER_ADDR:3456 \
     --world_size $SLURM_NTASKS \
     --mode re_qa_train \
-    --model_path /home/saeednjf/scratch/feb-15-2022-arr/fold_1/mml-mml-off-sim/ \
+    --model_path /home/saeednjf/scratch/feb-15-2022-arr/fold_10/mml-pgg-off-sim/ \
     --answer_checkpoint _response_pretrained \
     --question_checkpoint _fold_1_question_pretrained \
     --training_steps 52400 \
@@ -40,11 +40,11 @@ srun python src/re_gold_qa_train.py \
     --gpu True \
     --num_workers 3 \
     --concat_questions False \
-    --dev ./zero-shot-extraction/relation_splits/dev.0 \
-    --train ./zero-shot-extraction/relation_splits/train.0 \
+    --dev ./zero-shot-extraction/relation_splits/dev.9 \
+    --train ./zero-shot-extraction/relation_splits/train.9 \
     --gpu_device 0 \
     --seed 12321 \
-    --train_method MML-MML-Off-Sim
+    --train_method MML-PGG-Off-Sim
 
 '''
 

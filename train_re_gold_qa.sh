@@ -1,12 +1,12 @@
 #!/bin/bash
 
-#SBATCH --job-name=dev_gold_fold_9
+#SBATCH --job-name=dev_concat_fold_1
 #SBATCH --account=def-afyshe-ab
 #SBATCH --nodes=1
 #SBATCH --tasks-per-node=1
 #SBATCH --gres=gpu:a100:1
 #SBATCH --mem=24000M
-#SBATCH --time=1-00:00
+#SBATCH --time=0-12:00
 #SBATCH --cpus-per-task=3
 #SBATCH --output=%N-%j.out
 
@@ -29,17 +29,17 @@ do
         step=$((i * 100))
         printf "step ${step} on epoch ${i}\r\n"
         python src/re_gold_qa_train.py \
-	        --mode re_gold_qa_test \
-	        --model_path /home/saeednjf/scratch/feb-15-2022-arr/fold_9/gold/ \
+	        --mode re_concat_qa_test \
+	        --model_path /home/saeednjf/scratch/feb-15-2022-arr/fold_1/concat/ \
                 --checkpoint _0_step_${step}_model \
 		--num_search_samples 8 \
                 --batch_size 64 --gpu True \
                 --ignore_unknowns False \
-                --train zero-shot-extraction/relation_splits/train.8 \
-                --dev zero-shot-extraction/relation_splits/dev.8 \
+                --train zero-shot-extraction/relation_splits/train.0 \
+                --dev zero-shot-extraction/relation_splits/dev.0 \
                 --gpu_device 0 \
                 --seed 12321 \
-                --prediction_file $SCRATCH/feb-15-2022-arr/fold_9/gold/gold_fold.9.dev.predictions.step.${step}.csv
+                --prediction_file $SCRATCH/feb-15-2022-arr/fold_1/concat/concat_fold.1.dev.predictions.step.${step}.csv
 done
 
 '''
