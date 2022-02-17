@@ -12,8 +12,8 @@ from typing import Generator, Optional
 import numpy as np
 import torch
 
-from src.question_response_generation.question_utils import (
-    create_question_dataset, create_question_generation_dataset)
+from src.question_response_generation.question_utils import \
+    create_question_pretrain_dataset
 from src.question_response_generation.response_utils import \
     create_response_dataset
 from src.question_response_generation.t5_model import T5QA, HyperParameters
@@ -87,7 +87,6 @@ def run_model(
     model,
     config,
     train_dataloader=None,
-    dev_dataloader=None,
     test_dataloader=None,
     save_always: Optional[bool] = False,
 ) -> None:
@@ -252,7 +251,7 @@ def run_pretrain_question_generator(args):
 
     model = T5QA(config)
 
-    train_loader, _, _ = create_question_generation_dataset(
+    train_loader, _, _ = create_question_pretrain_dataset(
         question_tokenizer=model.tokenizer,
         batch_size=config.batch_size,
         source_max_length=config.source_max_length,
@@ -276,10 +275,8 @@ def run_main(args):
         run_all(args)
     if args.mode in ["squad_test"]:
         run_squad_test(args)
-    if args.mode in ["narrativeqa_test"]:
-        run_narrativeqa_test(args)
-    if args.mode in ["question_generation_second_pretrain"]:
-        run_second_q_pretrain(args)
+    if args.mode in ["question_generation_pretrain"]:
+        run_pretrain_question_generator(args)
 
 
 def argument_parser():
@@ -313,13 +310,6 @@ def argument_parser():
     parser.add_argument("--input_file_name", type=str, help="input file name")
 
     # Hyper-Parameters
-    parser.add_argument("--dim_model", type=int, default=100, help="dim of model units")
-
-    parser.add_argument(
-        "--dropout", type=float, default=0.1, help="the probability of zeroing a link"
-    )
-
-    parser.add_argument("--dim_embedding", type=int, default=100, help="embedding size")
 
     parser.add_argument("--learning_rate", type=float, default=0.0005)
 
@@ -339,13 +329,6 @@ def argument_parser():
 
     parser.add_argument(
         "--config_file", type=str, default="config.ini", help="config.ini file"
-    )
-
-    parser.add_argument(
-        "--question_training",
-        type=bool,
-        default=False,
-        help="for question generation or not? True or False",
     )
 
     # GPU or CPU

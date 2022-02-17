@@ -1,5 +1,31 @@
 #!/bin/bash
 
+#SBATCH --job-name=reqa_gold_fold_4
+#SBATCH --account=def-afyshe-ab
+#SBATCH --nodes=1
+#SBATCH --tasks-per-node=1
+#SBATCH --gres=gpu:a100:1
+#SBATCH --mem=24000M
+#SBATCH --time=1-00:00
+#SBATCH --cpus-per-task=3
+#SBATCH --output=%N-%j.out
+
+module load StdEnv/2020 gcc/9.3.0 cuda/11.4 arrow/5.0.0
+
+source env/bin/activate
+
+export NCCL_BLOCKING_WAIT=1  #Set this environment variable if you wish to use the NCCL backend for inter-GPU communication.
+
+export MASTER_ADDR=$(hostname) #Store the master node’s IP address in the MASTER_ADDR environment variable.
+
+echo "r$SLURM_NODEID master: $MASTER_ADDR"
+
+echo "r$SLURM_NODEID Launching python script"
+
+echo "All the allocated nodes: $SLURM_JOB_NODELIST"
+
+source env/bin/activate
+
 source env/bin/activate
 printf "fold 1, epoch 2\r\n"
 for (( i=1; i<=10; i++ ))

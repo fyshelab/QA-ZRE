@@ -1,20 +1,16 @@
 import argparse
-import os
-
-import torch
-import torch.distributed as dist
-import torch.utils.data.distributed
 
 from src.question_response_generation.t5_model import T5QA
 from src.question_response_generation.train import run_model
 from src.re_qa_model import REQA, HyperParameters, load_module, set_random_seed
 from src.re_qa_train import iterative_run_model
-from src.zero_extraction_utils import create_zero_re_qa_dataset
+from src.zero_extraction_utils import (create_fewrl_dataset,
+                                       create_zero_re_qa_dataset)
 
 
 def run_re_gold_qa(args):
-    """Run the relation-extraction qa models using the gold questions for the
-    head entity and the relation."""
+    """Run the relation-extraction qa models using the given gold questions for
+    the head entity and the relation."""
     if args.mode == "re_gold_qa_train":
         mode = "train"
         for_evaluation = False
@@ -32,11 +28,12 @@ def run_re_gold_qa(args):
         mode=mode,
         prediction_file=args.prediction_file,
         checkpoint=args.checkpoint,
-        answer_training_steps=args.answer_training_steps,
+        training_steps=args.training_steps,
         seed=args.seed,
     )
 
     set_random_seed(config.seed)
+
     model = T5QA(config)
 
     if not for_evaluation:
@@ -47,7 +44,6 @@ def run_re_gold_qa(args):
         val_loaders,
         train_dataset,
         val_dataset,
-        train_sample,
     ) = create_zero_re_qa_dataset(
         question_tokenizer=model.tokenizer,
         answer_tokenizer=model.tokenizer,
@@ -56,9 +52,7 @@ def run_re_gold_qa(args):
         decoder_max_length=config.decoder_max_length,
         train_file=args.train,
         dev_file=args.dev,
-        distributed=False,
-        num_workers=1,
-        ignore_unknowns=True,
+        ignore_unknowns=False,
         concat=False,
         gold_questions=True,
         for_evaluation=for_evaluation,
@@ -68,7 +62,6 @@ def run_re_gold_qa(args):
         model,
         config=config,
         train_dataloader=train_loaders,
-        dev_dataloader=val_loaders,
         test_dataloader=val_loaders,
         save_always=True,
     )
@@ -76,7 +69,7 @@ def run_re_gold_qa(args):
 
 def run_re_concat_qa(args):
     """Run the relation-extraction qa models using the concat of head entity
-    and the relation."""
+    and the relation word."""
     if args.mode == "re_concat_qa_train":
         mode = "train"
         for_evaluation = False
@@ -94,7 +87,7 @@ def run_re_concat_qa(args):
         mode=mode,
         prediction_file=args.prediction_file,
         checkpoint=args.checkpoint,
-        answer_training_steps=args.answer_training_steps,
+        training_steps=args.training_steps,
         seed=args.seed,
     )
 
@@ -108,7 +101,6 @@ def run_re_concat_qa(args):
         val_loaders,
         train_dataset,
         val_dataset,
-        train_sample,
     ) = create_zero_re_qa_dataset(
         question_tokenizer=model.tokenizer,
         answer_tokenizer=model.tokenizer,
@@ -117,9 +109,7 @@ def run_re_concat_qa(args):
         decoder_max_length=config.decoder_max_length,
         train_file=args.train,
         dev_file=args.dev,
-        distributed=False,
-        num_workers=1,
-        ignore_unknowns=True,
+        ignore_unknowns=False,
         concat=True,
         gold_questions=False,
         for_evaluation=for_evaluation,
@@ -129,7 +119,6 @@ def run_re_concat_qa(args):
         model,
         config=config,
         train_dataloader=train_loaders,
-        dev_dataloader=val_loaders,
         test_dataloader=val_loaders,
         save_always=True,
     )
@@ -140,39 +129,6 @@ def run_re_qa(args):
     the response generator explored with some search algorithm."""
     if args.mode == "re_qa_train":
         mode = "train"
-        '''
-        ngpus_per_node = torch.cuda.device_count()
-
-        """ This next line is the key to getting DistributedDataParallel working on SLURM:
-            SLURM_NODEID is 0 or 1 in this example, SLURM_LOCALID is the id of the 
-            current process inside a node and is also 0 or 1 in this example."""
-
-        local_rank = int(os.environ.get("SLURM_LOCALID"))
-
-        rank = int(os.environ.get("SLURM_NODEID")) * ngpus_per_node + local_rank
-
-        """ This next block parses CUDA_VISIBLE_DEVICES to find out which GPUs 
-        have been allocated to the job, then sets torch.device to the GPU corresponding
-        to the local rank (local rank 0 gets the first GPU, local rank 1 gets the second GPU etc) """
-
-        available_gpus = list(os.environ.get("CUDA_VISIBLE_DEVICES").replace(",", ""))
-
-        current_device = int(available_gpus[local_rank])
-        torch.cuda.set_device(current_device)
-
-        print("From Rank: {}, ==> Initializing Process Group...".format(rank))
-
-        # init the process group
-        dist.init_process_group(
-            backend=args.dist_backend,
-            init_method=args.init_method,
-            world_size=args.world_size,
-            rank=rank,
-        )
-        print("process group ready!")
-
-        print("From Rank: {}, ==> Making model..".format(rank))
-        '''
         config = HyperParameters(
             model_path=args.model_path,
             batch_size=args.batch_size,
@@ -187,25 +143,17 @@ def run_re_qa(args):
             answer_checkpoint=args.answer_checkpoint,
             question_checkpoint=args.question_checkpoint,
             num_search_samples=int(args.num_search_samples),
-            update_switch_steps=int(args.update_switch_steps),
             seed=args.seed,
         )
         set_random_seed(config.seed)
         model = REQA(config)
         model = model.to("cuda:0")
 
-        # model = torch.nn.parallel.DistributedDataParallel(
-        #    model, device_ids=[current_device]
-        # )
-
-        # print("From Rank: {}, ==> Preparing data..".format(rank))
-
         (
             train_loaders,
             val_loaders,
             train_dataset,
             val_dataset,
-            train_sampler,
         ) = create_zero_re_qa_dataset(
             question_tokenizer=model.question_tokenizer,
             answer_tokenizer=model.answer_tokenizer,
@@ -214,9 +162,7 @@ def run_re_qa(args):
             decoder_max_length=config.decoder_max_length,
             train_file=args.train,
             dev_file=args.dev,
-            distributed=False,
-            num_workers=args.num_workers,
-            ignore_unknowns=True,
+            ignore_unknowns=False,
             concat=False,
             gold_questions=False,
         )
@@ -224,13 +170,9 @@ def run_re_qa(args):
             model,
             config=config,
             train_dataloader=train_loaders,
-            dev_dataloader=val_loaders,
             test_dataloader=val_loaders,
             save_always=True,
-            rank=0,
-            train_samplers=[train_sampler],
             current_device=0,
-            gold_eval_file=args.dev,
             train_method=args.train_method,
         )
 
@@ -260,9 +202,7 @@ def run_re_qa(args):
             source_max_length=config.source_max_length,
             decoder_max_length=config.decoder_max_length,
             dev_file=args.dev,
-            distributed=False,
-            num_workers=args.num_workers,
-            ignore_unknowns=True,
+            ignore_unknowns=False,
             concat=False,
             gold_questions=False,
             for_evaluation=True,
@@ -276,6 +216,155 @@ def run_re_qa(args):
         )
 
 
+def run_fewrl(args):
+    """Run the relation-extraction qa models using the question generator and
+    the response generator explored with some search algorithm."""
+    if args.mode == "fewrl_train":
+        mode = "train"
+    elif args.mode == "fewrl_dev":
+        mode = "test"
+    elif args.mode == "fewrl_test":
+        mode = "test"
+
+    config = HyperParameters(
+        model_path=args.model_path,
+        batch_size=args.batch_size,
+        source_max_length=256,
+        decoder_max_length=32,
+        gpu=args.gpu,
+        learning_rate=args.learning_rate,
+        max_epochs=args.max_epochs,
+        mode=mode,
+        prediction_file=args.prediction_file,
+        training_steps=int(args.training_steps),
+        answer_checkpoint=args.answer_checkpoint,
+        question_checkpoint=args.question_checkpoint,
+        num_search_samples=int(args.num_search_samples),
+        seed=args.seed,
+    )
+    set_random_seed(config.seed)
+    model = REQA(config)
+    model = model.to("cuda:0")
+
+    (
+        train_loader,
+        val_loader,
+        test_loader,
+        train_dataset,
+        val_dataset,
+        test_loader,
+    ) = create_fewrl_dataset(
+        question_tokenizer=model.question_tokenizer,
+        answer_tokenizer=model.answer_tokenizer,
+        batch_size=config.batch_size,
+        source_max_length=config.source_max_length,
+        decoder_max_length=config.decoder_max_length,
+        train_fewrel_path=args.train,
+        dev_fewrel_path=args.dev,
+        test_fewrel_path=args.test,
+    )
+
+    if args.mode == "fewrl_train":
+        iterative_run_model(
+            model,
+            config=config,
+            train_dataloader=train_loader,
+            test_dataloader=test_loader,
+            save_always=True,
+            current_device=0,
+            train_method=args.train_method,
+        )
+
+    if args.mode == "fewrl_dev":
+        iterative_run_model(
+            model,
+            config=config,
+            test_dataloader=val_loader,
+            current_device=0,
+        )
+
+    if args.mode == "fewrl_test":
+        iterative_run_model(
+            model, config=config, test_dataloader=test_loader, current_device=0
+        )
+
+
+def run_concat_fewrl(args):
+    """Run concat model on the fewrl dataset."""
+    if args.mode == "concat_fewrl_train":
+        mode = "train"
+    elif args.mode == "concat_fewrl_dev":
+        mode = "test"
+    elif args.mode == "concat_fewrl_test":
+        mode = "test"
+
+    config = HyperParameters(
+        model_path=args.model_path,
+        batch_size=args.batch_size,
+        source_max_length=256,
+        decoder_max_length=32,
+        gpu=args.gpu,
+        learning_rate=args.learning_rate,
+        max_epochs=args.max_epochs,
+        mode=mode,
+        prediction_file=args.prediction_file,
+        checkpoint=args.checkpoint,
+        answer_training_steps=args.answer_training_steps,
+        seed=args.seed,
+    )
+
+    set_random_seed(config.seed)
+    model = T5QA(config)
+    if mode != "test":
+        load_module(model.model.module, model.model_path, args.checkpoint)
+
+    (
+        train_loader,
+        val_loader,
+        test_loader,
+        train_dataset,
+        val_dataset,
+        test_loader,
+    ) = create_fewrl_dataset(
+        question_tokenizer=model.tokenizer,
+        answer_tokenizer=model.tokenizer,
+        batch_size=config.batch_size,
+        source_max_length=config.source_max_length,
+        decoder_max_length=config.decoder_max_length,
+        train_fewrel_path=args.train,
+        dev_fewrel_path=args.dev,
+        test_fewrel_path=args.test,
+        concat=True,
+    )
+
+    if args.mode == "concat_fewrl_train":
+        run_model(
+            model,
+            config=config,
+            train_dataloader=train_loader,
+            test_dataloader=test_loader,
+            save_always=True,
+        )
+
+    if args.mode == "concat_fewrl_dev":
+        run_model(
+            model,
+            config=config,
+            train_dataloader=train_loader,
+            test_dataloader=val_loader,
+            save_always=True,
+        )
+
+    if args.mode == "concat_fewrl_test":
+        run_model(
+            model,
+            config=config,
+            train_dataloader=train_loader,
+            test_dataloader=test_loader,
+            save_always=True,
+        )
+
+
 def run_main(args):
     """Decides what to do in the code."""
     if args.mode in ["re_gold_qa_train", "re_gold_qa_test"]:
@@ -284,6 +373,10 @@ def run_main(args):
         run_re_concat_qa(args)
     if args.mode in ["re_qa_train", "re_qa_test"]:
         run_re_qa(args)
+    if args.mode in ["fewrl_train", "fewrl_test", "fewrl_dev"]:
+        run_fewrl(args)
+    if args.mode in ["concat_fewrl_train", "concat_fewrl_test", "concat_fewrl_dev"]:
+        run_concat_fewrl(args)
 
 
 def argument_parser():
@@ -298,7 +391,7 @@ def argument_parser():
     parser.add_argument(
         "--train_method",
         type=str,
-        help="MML-MML | PGG",
+        help="MML-PGG-Off-Sim",
     )
     parser.add_argument(
         "--model_path",
@@ -311,10 +404,6 @@ def argument_parser():
     parser.add_argument("--train", type=str, help="file for train data.")
 
     parser.add_argument("--dev", type=str, help="file for validation data.")
-
-    parser.add_argument("--concat_questions", type=bool, default=False)
-
-    parser.add_argument("--ignore_unknowns", type=bool, default=False)
 
     # Test specific
     parser.add_argument("--test", type=str, help="file for test data.")
@@ -347,27 +436,8 @@ def argument_parser():
     parser.add_argument(
         "--checkpoint", type=str, help="checkpoint of the trained model."
     )
-    parser.add_argument("--num_beams", type=int, default=32, help="Number of beam size")
     parser.add_argument(
         "--num_search_samples", type=int, default=8, help="Number of search samples"
-    )
-    parser.add_argument(
-        "--update_switch_steps",
-        type=int,
-        default=10,
-        help="Number of steps to train each question or response module before switching to train the other one!",
-    )
-    parser.add_argument(
-        "--num_beam_groups",
-        type=int,
-        default=4,
-        help="Number of beam groups for diverse beam.",
-    )
-    parser.add_argument(
-        "--beam_diversity_penalty",
-        type=float,
-        default=0.5,
-        help="Diversity penalty in diverse beam.",
     )
     parser.add_argument(
         "--answer_checkpoint", type=str, help="checkpoint of the trained answer model."
@@ -378,41 +448,10 @@ def argument_parser():
         help="checkpoint of the trained question model.",
     )
     parser.add_argument(
-        "--partition_checkpoint",
-        type=str,
-        help="checkpoint of the trained partition model.",
-    )
-    parser.add_argument(
-        "--answer_training_steps",
-        type=int,
-        help="number of training steps over the train data for the answer model.",
-    )
-    parser.add_argument(
         "--training_steps",
         type=int,
         help="number of training steps over the train data.",
     )
-    parser.add_argument(
-        "--question_training_steps",
-        type=int,
-        help="number of training steps over the train data for the question model.",
-    )
-    parser.add_argument(
-        "--init_method",
-        default="tcp://127.0.0.1:3456",
-        type=str,
-        help="I guess the address of the master",
-    )
-    parser.add_argument("--dist-backend", default="nccl", type=str, help="")
-    parser.add_argument("--world_size", default=1, type=int, help="")
-    parser.add_argument(
-        "--num_workers",
-        default=1,
-        type=int,
-        help="number of sub processes per main process of gpu to load data",
-    )
-    parser.add_argument("--distributed", action="store_true", help="")
-
     args, _ = parser.parse_known_args()
     return args
 
