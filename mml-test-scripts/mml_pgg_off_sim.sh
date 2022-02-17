@@ -1,15 +1,12 @@
 #!/bin/bash
 
-source env/bin/activate
-
-'''
-#SBATCH --job-name=test_base_fewrl_run_3
+#SBATCH --job-name=train_mml_pgg_sim_off_fold_10
 #SBATCH --account=def-afyshe-ab
 #SBATCH --nodes=1
 #SBATCH --tasks-per-node=1
 #SBATCH --gres=gpu:a100:1
 #SBATCH --mem=24000M
-#SBATCH --time=0-01:00
+#SBATCH --time=6-00:00
 #SBATCH --cpus-per-task=3
 #SBATCH --output=%N-%j.out
 
@@ -26,54 +23,50 @@ echo "r$SLURM_NODEID master: $MASTER_ADDR"
 echo "r$SLURM_NODEID Launching python script"
 
 echo "All the allocated nodes: $SLURM_JOB_NODELIST"
-'''
 
-'''
 # The SLURM_NTASKS variable tells the script how many processes are available for this execution. “srun” executes the script <tasks-per-node * nodes> times
-python src/re_gold_qa_train.py \
-    --mode fewrl_train \
-    --model_path ~/wikizsl/run_3/ \
+srun python src/re_gold_qa_train.py \
+    --init_method tcp://$MASTER_ADDR:3456 \
+    --world_size $SLURM_NTASKS \
+    --mode re_qa_train \
+    --model_path /home/saeednjf/scratch/feb-15-2022-arr/fold_10/mml-pgg-off-sim/ \
     --answer_checkpoint _response_pretrained \
     --question_checkpoint _fold_1_question_pretrained \
-    --training_steps 4682 \
+    --training_steps 52400 \
     --learning_rate 0.0005 \
-    --max_epochs 4 \
+    --max_epochs 1 \
     --num_search_samples 8 \
     --batch_size 16 \
     --gpu True \
     --num_workers 3 \
-    --train ./wikizsl_data/train_data_2022.csv \
-    --dev ./wikizsl_data/val_data_2022.csv \
-    --test ./wikizsl_data/test_data_2022.csv \
+    --concat_questions False \
+    --dev ./zero-shot-extraction/relation_splits/dev.9 \
+    --train ./zero-shot-extraction/relation_splits/train.9 \
     --gpu_device 0 \
-    --seed 2022 \
+    --seed 12321 \
     --train_method MML-PGG-Off-Sim
+
 '''
 
-for (( e=0; e<=3; e++ ))
+for (( i=16; i<=16; i++ ))
 do
-	for (( i=1; i<=46; i++ ))
-	do
-		step=$((i * 100))
-		printf "step ${step} on epoch ${i}\r\n"
-		python src/re_gold_qa_train.py \
-			--mode fewrl_dev \
-			--model_path $HOME/wikizsl/run_5/ \
-			--answer_checkpoint _${e}_answer_step_${step} \
-			--question_checkpoint _${e}_question_step_${step} \
-			--num_search_samples 8 \
-			--training_steps 4682 \
-			--batch_size 64 --gpu True \
-			--train ./wikizsl_data/train_data_1.csv \
-			--dev ./wikizsl_data/val_data_1.csv \
-			--test ./wikizsl_data/test_data_1.csv \
-			--gpu_device 0 \
-			--seed 1 \
-			--prediction_file $HOME/wikizsl/run_5/mml-pgg-off-sim.run.${e}.dev.predictions.step.${step}.csv
-	done
+        step=$((i * 100))
+        printf "step ${step} on epoch ${i}\r\n"
+        python src/re_gold_qa_train.py \
+                --mode re_qa_test \
+		--model_path $SCRATCH/dec_29/fold_1/mml-mml-off-sim/ \
+		--answer_checkpoint _0_answer_step_${step} \
+                --question_checkpoint _0_question_step_${step} \
+		--num_search_samples 8 \
+                --batch_size 64 --gpu True \
+                --ignore_unknowns True \
+                --train zero-shot-extraction/relation_splits/train.very_small.0 \
+                --dev zero-shot-extraction/relation_splits/test.0 \
+                --gpu_device 0 \
+                --seed 12321 \
+                --prediction_file $SCRATCH/dec_29/fold_1/mml-mml-off-sim/mml-mml-off-sim.fold.1.test.predictions.step.${step}.csv
 done
 
-'''
 python src/re_gold_qa_train.py \
 	--mode re_qa_test \
 	--model_path $SCRATCH/fold_1/mml-pgg-off-sim/ \

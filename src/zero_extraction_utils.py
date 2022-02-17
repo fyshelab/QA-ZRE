@@ -1065,7 +1065,7 @@ def create_fewrl_dataset(
     train_contexts = train_df["contexts"].tolist()
     train_answers = train_df["answers"].tolist()
     train_entity_relations = train_df["entity_relations"].tolist()
-    train_entities = train_df["entities"].tolist()
+    train_entities = [str(row) for row in train_df["entities"].tolist()]
     train_posterier_contexts = train_df["posterier_contexts"].tolist()
 
     val_passages = dev_df["passages"].tolist()
