@@ -170,7 +170,7 @@ def create_data_for_question_pretrain():
     for index, q in enumerate(train_questions):
         q_doc = nlp(q)
         new_q_doc = [token.lemma_ for token in q_doc if token.lemma_ != "-PRON-"]
-        new_q = u" ".join(new_q_doc)
+        new_q = " ".join(new_q_doc)
         doc_to_remove_stop = nlp.make_doc(new_q)
         final_doc = [
             token.text
@@ -211,8 +211,7 @@ def create_data_for_question_pretrain():
             token_num = random.randint(1, 4)
             sampled_tokens = random.sample(tokens, token_num)
             relation_signal = " ".join(sampled_tokens)
-        else:
-            continue
+
         contexts.append(
             "answer: "
             + white_space_fix(row[3])
