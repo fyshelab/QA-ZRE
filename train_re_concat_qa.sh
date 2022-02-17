@@ -6,7 +6,7 @@
 #SBATCH --tasks-per-node=1
 #SBATCH --gres=gpu:a100:1
 #SBATCH --mem=24000M
-#SBATCH --time=1-00:00
+#SBATCH --time=4-00:00
 #SBATCH --cpus-per-task=3
 #SBATCH --output=%N-%j.out
 
@@ -44,8 +44,6 @@ done
 
 '''
 srun python src/re_gold_qa_train.py \
-       --init_method tcp://$MASTER_ADDR:3456 \
-       --world_size $SLURM_NTASKS \
        --mode re_concat_qa_train \
        --model_path /home/saeednjf/scratch/feb-15-2022-arr/fold_10/concat/ \
        --checkpoint _response_pretrained \

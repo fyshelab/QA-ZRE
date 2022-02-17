@@ -50,7 +50,6 @@ srun python src/re_gold_qa_train.py \
        --model_path /home/saeednjf/scratch/feb-15-2022-arr/fold_10/gold/ \
        --checkpoint _response_pretrained \
        --learning_rate 0.0005 --max_epochs 1 \
-       --concat_questions False \
        --batch_size 16  --gpu True \
        --answer_training_steps 52400 \
        --ignore_unknowns False \
