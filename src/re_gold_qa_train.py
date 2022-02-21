@@ -195,7 +195,7 @@ def run_re_qa(args):
         model = REQA(config)
         model = model.to("cuda:0")
 
-        (_, val_loaders, _, val_dataset, _,) = create_zero_re_qa_dataset(
+        (_, val_loaders, _, val_dataset) = create_zero_re_qa_dataset(
             question_tokenizer=model.question_tokenizer,
             answer_tokenizer=model.answer_tokenizer,
             batch_size=config.batch_size,
