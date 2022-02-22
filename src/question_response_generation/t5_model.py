@@ -75,6 +75,59 @@ class T5QA(object):
         path = self.model_path + "_" + checkpoint_name
         save(self.model, path + "_model")
 
+    def relation_extraction_predict(self, batch):
+        clear_cache()
+        # disable dropout
+        self.model.eval()
+
+        loss_fct = torch.nn.CrossEntropyLoss(ignore_index=-100, reduction="none")
+        if self.config.gpu:
+            loss_fct = loss_fct.to(self.device)
+
+        input_ids = batch["input_ids"]
+        input_mask = batch["attention_mask"]
+        target_mask = batch["target_attention_mask"]
+        labels = batch["labels"]
+        if self.config.gpu:
+            input_ids = input_ids.to(self.device)
+            input_mask = input_mask.to(self.device)
+            target_mask = target_mask.to(self.device)
+            labels = labels.to(self.device)
+
+        output = self.model(
+            input_ids=input_ids,
+            attention_mask=input_mask,
+            decoder_attention_mask=target_mask,
+            decoder_input_ids=self.model._shift_right(labels),
+            labels=None,
+        )
+
+        log_p = -loss_fct(
+            output.logits.view(-1, output.logits.size(-1)),
+            labels.view(-1),
+        )
+
+        # b: batch size * num_unseen_relations
+        # sz: sequence size
+        # v: vocab size
+        b, sz, v = output.logits.size()
+        log_p = log_p.view(b, sz)
+        good_log_p = log_p.masked_fill_(labels == -100, 0.0)
+        answer_log_p = torch.sum(good_log_p, dim=1).squeeze()
+
+        dynamic_batch_size = b // self.config.num_unseen_relations
+        relation_log_p = answer_log_p.view(
+            dynamic_batch_size, self.config.num_unseen_relations
+        )
+        predicted_relation_indices = torch.argmax(relation_log_p, dim=1)
+
+        for index in range(dynamic_batch_size):
+            relation_id = predicted_relation_indices[index]
+            output_batch = {
+                "predicted_relation_offsets": relation_id,
+            }
+            yield output_batch
+
     def predict(self, batch):
         clear_cache()
         # disable dropout

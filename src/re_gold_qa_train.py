@@ -242,6 +242,7 @@ def run_fewrl(args):
         num_search_samples=int(args.num_search_samples),
         seed=args.seed,
         num_unseen_relations=args.num_unseen_relations,
+        prediction_type="relation",
     )
     set_random_seed(config.seed)
     model = REQA(config)

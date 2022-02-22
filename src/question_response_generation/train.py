@@ -52,7 +52,9 @@ def run_train_epoch(
         yield step, loss_values["loss_value"]
 
 
-def run_predict(model, dev_dataloader, prediction_file: str) -> None:
+def run_predict(
+    model, dev_dataloader, prediction_file: str, prediction_type="entity"
+) -> None:
     """Read the 'dev_dataset' and predict results with the model, and save the
     results in the prediction_file."""
     writerparams = {"quotechar": '"', "quoting": csv.QUOTE_ALL}
@@ -60,12 +62,21 @@ def run_predict(model, dev_dataloader, prediction_file: str) -> None:
         writer = csv.writer(out_fp, **writerparams)
         header_written = False
         for batch in dev_dataloader:
-            for ret_row in model.predict(batch):
-                if not header_written:
-                    headers = ret_row.keys()
-                    writer.writerow(headers)
-                    header_written = True
-                writer.writerow(list(ret_row.values()))
+            if prediction_type == "entity":
+                for ret_row in model.predict(batch):
+                    if not header_written:
+                        headers = ret_row.keys()
+                        writer.writerow(headers)
+                        header_written = True
+                    writer.writerow(list(ret_row.values()))
+
+            elif prediction_type == "relation":
+                for ret_row in model.relation_extraction_predict(batch):
+                    if not header_written:
+                        headers = ret_row.keys()
+                        writer.writerow(headers)
+                        header_written = True
+                    writer.writerow(list(ret_row.values()))
 
 
 def save_config(config: HyperParameters, path: str) -> None:
@@ -138,7 +149,12 @@ def run_model(
     elif mode == "test":
         print("Predicting...")
         start = time.time()
-        run_predict(model, test_dataloader, config.prediction_file)
+        run_predict(
+            model,
+            test_dataloader,
+            config.prediction_file,
+            prediction_type=config.prediction_type,
+        )
         msg = "\nTotal prediction time:{} seconds\n".format(time.time() - start)
         print(msg)
 
