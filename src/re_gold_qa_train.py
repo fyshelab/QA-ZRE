@@ -241,6 +241,7 @@ def run_fewrl(args):
         question_checkpoint=args.question_checkpoint,
         num_search_samples=int(args.num_search_samples),
         seed=args.seed,
+        num_unseen_relations=args.num_unseen_relations,
     )
     set_random_seed(config.seed)
     model = REQA(config)
@@ -311,6 +312,7 @@ def run_concat_fewrl(args):
         checkpoint=args.checkpoint,
         answer_training_steps=args.answer_training_steps,
         seed=args.seed,
+        num_unseen_relations=args.num_unseen_relations,
     )
 
     set_random_seed(config.seed)
@@ -417,6 +419,13 @@ def argument_parser():
     parser.add_argument("--learning_rate", type=float, default=0.0005)
 
     parser.add_argument("--batch_size", type=int, default=8, help="static batch size")
+
+    parser.add_argument(
+        "--num_unseen_relations",
+        type=int,
+        default=5,
+        help="number of the unseen relations on the test or dev sets.",
+    )
 
     parser.add_argument(
         "--max_epochs", type=int, default=25, help="max number of training iterations"

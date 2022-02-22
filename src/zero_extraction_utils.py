@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pandas as pd
 import torch
-#from datasets import load_dataset
+# from datasets import load_dataset
 from torch.utils.data import DataLoader
 
 from src.re_qa_model import set_random_seed
@@ -783,15 +783,6 @@ def read_wikizsl_dataset(zsl_path, seed=10, m=5):
 
 
 def read_fewrl_dataset(fewrel_path, seed=10, m=5):
-    # rel_dict = {}
-    # rel_names = read_fewrl_names("train_wiki")
-    # for row in rel_names:
-    #    rel_dict[row["r_id"]] = row["r_name"]
-
-    # rel_names = read_fewrl_names("val_wiki")
-    # for row in rel_names:
-    #    rel_dict[row["r_id"]] = row["r_name"]
-
     sentence_delimiters = [". ", ".\n", "? ", "?\n", "! ", "!\n"]
 
     set_random_seed(seed)
@@ -809,6 +800,7 @@ def read_fewrl_dataset(fewrel_path, seed=10, m=5):
     val_passages = []
     val_entities = []
     val_entity_relations = []
+    val_actual_ids = []
 
     test_contexts = []
     test_posterier_contexts = []
@@ -816,6 +808,7 @@ def read_fewrl_dataset(fewrel_path, seed=10, m=5):
     test_passages = []
     test_entities = []
     test_entity_relations = []
+    test_actual_ids = []
 
     with open(fewrel_path, "r") as json_file:
         data = json.load(json_file)
@@ -849,40 +842,53 @@ def read_fewrl_dataset(fewrel_path, seed=10, m=5):
             re_desc = desc[:pos]
 
             for sent in data[r_id]:
-                sentence = " ".join(sent["tokens"])
-                head_entity = sent["h"][0]
-                tail_entity = sent["t"][0]
-                gold_answers = [tail_entity]
-                val_passages.append(sentence)
-                val_entity_relations.append(white_space_fix(head_entity + " " + r_name))
-                val_entities.append(white_space_fix(head_entity))
-                val_contexts.append(
-                    "answer: "
-                    + white_space_fix(head_entity)
-                    + " <SEP> "
-                    + white_space_fix(r_name)
-                    + " ; "
-                    + white_space_fix(re_desc)
-                    + " context: "
-                    + white_space_fix(sentence)
-                    + " </s>"
-                )
-                val_posterier_contexts.append(
-                    "answer: "
-                    + white_space_fix(head_entity)
-                    + " <SEP> "
-                    + white_space_fix(r_name)
-                    + " ; "
-                    + white_space_fix(re_desc)
-                    + " "
-                    + white_space_fix(" and ".join(gold_answers))
-                    + " context: "
-                    + white_space_fix(sentence)
-                    + " </s>"
-                )
-                val_answers.append(
-                    white_space_fix(" and ".join(gold_answers)) + " </s>"
-                )
+                for second_r_id in val_r_ids:
+                    second_r_name = rel_dict[second_r_id]
+                    second_r_desc = rel_desc[second_r_id]
+                    second_desc = second_r_desc.strip(".") + ". "
+                    second_pos = [
+                        second_desc.find(delimiter) for delimiter in sentence_delimiters
+                    ]
+                    second_pos = min([p for p in second_pos if p >= 0])
+                    second_re_desc = second_desc[:second_pos]
+
+                    val_actual_ids.append(r_id)
+                    sentence = " ".join(sent["tokens"])
+                    head_entity = sent["h"][0]
+                    tail_entity = sent["t"][0]
+                    gold_answers = [tail_entity]
+                    val_passages.append(sentence)
+                    val_entity_relations.append(
+                        white_space_fix(head_entity + " " + second_r_name)
+                    )
+                    val_entities.append(white_space_fix(head_entity))
+                    val_contexts.append(
+                        "answer: "
+                        + white_space_fix(head_entity)
+                        + " <SEP> "
+                        + white_space_fix(second_r_name)
+                        + " ; "
+                        + white_space_fix(second_re_desc)
+                        + " context: "
+                        + white_space_fix(sentence)
+                        + " </s>"
+                    )
+                    val_posterier_contexts.append(
+                        "answer: "
+                        + white_space_fix(head_entity)
+                        + " <SEP> "
+                        + white_space_fix(second_r_name)
+                        + " ; "
+                        + white_space_fix(second_re_desc)
+                        + " "
+                        + white_space_fix(" and ".join(gold_answers))
+                        + " context: "
+                        + white_space_fix(sentence)
+                        + " </s>"
+                    )
+                    val_answers.append(
+                        white_space_fix(" and ".join(gold_answers)) + " </s>"
+                    )
 
         for r_id in test_r_ids:
             r_name = rel_dict[r_id]
@@ -893,42 +899,53 @@ def read_fewrl_dataset(fewrel_path, seed=10, m=5):
             re_desc = desc[:pos]
 
             for sent in data[r_id]:
-                sentence = " ".join(sent["tokens"])
-                head_entity = sent["h"][0]
-                tail_entity = sent["t"][0]
-                gold_answers = [tail_entity]
-                test_passages.append(sentence)
-                test_entity_relations.append(
-                    white_space_fix(head_entity + " " + r_name)
-                )
-                test_entities.append(white_space_fix(head_entity))
-                test_contexts.append(
-                    "answer: "
-                    + white_space_fix(head_entity)
-                    + " <SEP> "
-                    + white_space_fix(r_name)
-                    + " ; "
-                    + white_space_fix(re_desc)
-                    + " context: "
-                    + white_space_fix(sentence)
-                    + " </s>"
-                )
-                test_posterier_contexts.append(
-                    "answer: "
-                    + white_space_fix(head_entity)
-                    + " <SEP> "
-                    + white_space_fix(r_name)
-                    + " ; "
-                    + white_space_fix(re_desc)
-                    + " "
-                    + white_space_fix(" and ".join(gold_answers))
-                    + " context: "
-                    + white_space_fix(sentence)
-                    + " </s>"
-                )
-                test_answers.append(
-                    white_space_fix(" and ".join(gold_answers)) + " </s>"
-                )
+                for second_r_id in test_r_ids:
+                    second_r_name = rel_dict[second_r_id]
+                    second_r_desc = rel_desc[second_r_id]
+                    second_desc = second_r_desc.strip(".") + ". "
+                    second_pos = [
+                        second_desc.find(delimiter) for delimiter in sentence_delimiters
+                    ]
+                    second_pos = min([p for p in second_pos if p >= 0])
+                    second_re_desc = second_desc[:second_pos]
+
+                    test_actual_ids.append(r_id)
+                    sentence = " ".join(sent["tokens"])
+                    head_entity = sent["h"][0]
+                    tail_entity = sent["t"][0]
+                    gold_answers = [tail_entity]
+                    test_passages.append(sentence)
+                    test_entity_relations.append(
+                        white_space_fix(head_entity + " " + second_r_name)
+                    )
+                    test_entities.append(white_space_fix(head_entity))
+                    test_contexts.append(
+                        "answer: "
+                        + white_space_fix(head_entity)
+                        + " <SEP> "
+                        + white_space_fix(second_r_name)
+                        + " ; "
+                        + white_space_fix(second_re_desc)
+                        + " context: "
+                        + white_space_fix(sentence)
+                        + " </s>"
+                    )
+                    test_posterier_contexts.append(
+                        "answer: "
+                        + white_space_fix(head_entity)
+                        + " <SEP> "
+                        + white_space_fix(second_r_name)
+                        + " ; "
+                        + white_space_fix(second_re_desc)
+                        + " "
+                        + white_space_fix(" and ".join(gold_answers))
+                        + " context: "
+                        + white_space_fix(sentence)
+                        + " </s>"
+                    )
+                    test_answers.append(
+                        white_space_fix(" and ".join(gold_answers)) + " </s>"
+                    )
 
         for r_id in train_r_ids:
             r_name = rel_dict[r_id]
@@ -995,6 +1012,7 @@ def read_fewrl_dataset(fewrel_path, seed=10, m=5):
             "entity_relations": val_entity_relations,
             "entities": val_entities,
             "posterier_contexts": val_posterier_contexts,
+            "actual_ids": val_actual_ids,
         }
     )
 
@@ -1006,6 +1024,7 @@ def read_fewrl_dataset(fewrel_path, seed=10, m=5):
             "entity_relations": test_entity_relations,
             "entities": test_entities,
             "posterier_contexts": test_posterier_contexts,
+            "actual_ids": test_actual_ids,
         }
     )
 

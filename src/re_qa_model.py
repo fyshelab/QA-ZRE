@@ -39,6 +39,7 @@ class HyperParameters:
     question_checkpoint: Optional[str] = "_3_model"
     checkpoint: Optional[str] = "_3_model"
     training_steps: Optional[int] = 1
+    num_unseen_relations: Optional[int] = 5
 
     # Related to decoding.
     no_repeat_ngram_size: Optional[int] = 2
