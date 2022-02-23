@@ -1,12 +1,12 @@
 #!/bin/bash
 
-#SBATCH --job-name=test_concat_fewrl_run_5
+#SBATCH --job-name=dev_concat_fewrl_run_5
 #SBATCH --account=def-afyshe-ab
 #SBATCH --nodes=1
 #SBATCH --tasks-per-node=1
 #SBATCH --gres=gpu:a100:1
 #SBATCH --mem=24000M
-#SBATCH --time=00-01:00
+#SBATCH --time=00-08:00
 #SBATCH --cpus-per-task=3
 #SBATCH --output=%N-%j.out
 
@@ -46,14 +46,14 @@ srun python src/re_gold_qa_train.py \
     --seed 1300 \
 '''
 
-for (( e=3; e<=3; e++ ))
+for (( i=1; i<=26; i++ ))
 do
-	for (( i=17; i<=17; i++ ))
+	for (( e=0; e<=3; e++ ))
 	do
 		step=$((i * 100))
 		printf "step ${step} on epoch ${i}\r\n"
 		python src/re_gold_qa_train.py \
-			--mode concat_fewrl_test \
+			--mode concat_fewrl_dev \
 			--model_path $SCRATCH/fewrl/concat_run_5/ \
 			--checkpoint _${e}_step_${step}_model \
 			--training_steps 2600 \
@@ -62,14 +62,16 @@ do
 			--num_search_samples 8 \
 			--batch_size 64 --gpu True \
 			--ignore_unknowns True \
-			--train ./fewrl_data/train_data_1300.csv \
-			--dev ./fewrl_data/val_data_1300.csv \
-			--test ./fewrl_data/test_data_1300.csv \
+			--train ./rel_fewrl_data/train_data_1300.csv \
+			--dev ./rel_fewrl_data/val_data_1300.csv \
+			--test ./rel_fewrl_data/test_data_1300.csv \
 			--gpu_device 0 \
 			--seed 1300 \
-			--prediction_file $SCRATCH/fewrl/concat_run_5/concat.run.${e}.test.predictions.step.${step}.csv
+			--prediction_file $SCRATCH/fewrl/concat_run_5/relation.concat.run.${e}.dev.predictions.step.${step}.csv &
 	done
+	wait
 done
+
 '''
 
 for (( i=26; i<=26; i++ ))

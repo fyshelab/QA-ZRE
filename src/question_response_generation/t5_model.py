@@ -113,18 +113,12 @@ class T5QA(object):
         b, sz, v = output.logits.size()
         log_p = log_p.view(b, sz)
         good_log_p = log_p.masked_fill_(labels == -100, 0.0)
-        answer_log_p = torch.sum(good_log_p, dim=1).squeeze()
+        answer_log_p = torch.sum(good_log_p, dim=1).squeeze().cpu().detach().numpy()
 
-        dynamic_batch_size = b // self.config.num_unseen_relations
-        relation_log_p = answer_log_p.view(
-            dynamic_batch_size, self.config.num_unseen_relations
-        )
-        predicted_relation_indices = torch.argmax(relation_log_p, dim=1)
-
-        for index in range(dynamic_batch_size):
-            relation_id = predicted_relation_indices[index]
+        for index in range(b):
+            relation_log_p = answer_log_p[index]
             output_batch = {
-                "predicted_relation_offsets": relation_id,
+                "relation_log_p": relation_log_p,
             }
             yield output_batch
 
