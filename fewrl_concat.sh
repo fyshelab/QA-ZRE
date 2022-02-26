@@ -1,12 +1,15 @@
 #!/bin/bash
 
-#SBATCH --job-name=dev_concat_fewrl_run_5
+source env/bin/activate
+
+'''
+#SBATCH --job-name=test_concat_fewrl_run_1
 #SBATCH --account=def-afyshe-ab
 #SBATCH --nodes=1
 #SBATCH --tasks-per-node=1
 #SBATCH --gres=gpu:a100:1
 #SBATCH --mem=24000M
-#SBATCH --time=00-08:00
+#SBATCH --time=00-01:00
 #SBATCH --cpus-per-task=3
 #SBATCH --output=%N-%j.out
 
@@ -24,7 +27,6 @@ echo "r$SLURM_NODEID Launching python script"
 
 echo "All the allocated nodes: $SLURM_JOB_NODELIST"
 
-'''
 # The SLURM_NTASKS variable tells the script how many processes are available for this execution. “srun” executes the script <tasks-per-node * nodes> times
 srun python src/re_gold_qa_train.py \
     --init_method tcp://$MASTER_ADDR:3456 \
@@ -46,15 +48,15 @@ srun python src/re_gold_qa_train.py \
     --seed 1300 \
 '''
 
-for (( i=1; i<=26; i++ ))
+for (( i=9; i<=9; i++ ))
 do
-	for (( e=0; e<=3; e++ ))
+	for (( e=1; e<=1; e++ ))
 	do
 		step=$((i * 100))
 		printf "step ${step} on epoch ${i}\r\n"
 		python src/re_gold_qa_train.py \
 			--mode concat_fewrl_dev \
-			--model_path $SCRATCH/fewrl/concat_run_5/ \
+			--model_path ~/fewrl/concat_run_1/ \
 			--checkpoint _${e}_step_${step}_model \
 			--training_steps 2600 \
 			--learning_rate 0.0005 \
@@ -62,12 +64,12 @@ do
 			--num_search_samples 8 \
 			--batch_size 64 --gpu True \
 			--ignore_unknowns True \
-			--train ./rel_fewrl_data/train_data_1300.csv \
-			--dev ./rel_fewrl_data/val_data_1300.csv \
-			--test ./rel_fewrl_data/test_data_1300.csv \
+			--train ./rel_fewrl_data/train_data_12321.csv \
+			--dev ./rel_fewrl_data/val_data_12321.csv \
+			--test ./rel_fewrl_data/test_data_12321.csv \
 			--gpu_device 0 \
-			--seed 1300 \
-			--prediction_file $SCRATCH/fewrl/concat_run_5/relation.concat.run.${e}.dev.predictions.step.${step}.csv &
+			--seed 12321 \
+			--prediction_file ~/fewrl/concat_run_1/entity.concat.run.${e}.dev.predictions.step.${step}.csv &
 	done
 	wait
 done

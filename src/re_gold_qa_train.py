@@ -314,7 +314,7 @@ def run_concat_fewrl(args):
         training_steps=args.training_steps,
         seed=args.seed,
         num_unseen_relations=args.num_unseen_relations,
-        prediction_type="relation",
+        #prediction_type="relation",
     )
 
     set_random_seed(config.seed)
