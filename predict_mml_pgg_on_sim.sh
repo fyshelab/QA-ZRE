@@ -41,8 +41,6 @@ srun python src/re_gold_qa_train.py \
     --seed 12321 \
     --train_method MML-PGG-On-Sim
 
-'''
-
 for ((j=17; j<=24; j++))
 do
 	k=$((j * 4))
@@ -71,58 +69,130 @@ do
 	wait
 done
 
+
+python src/re_gold_qa_train.py \
+	--mode re_qa_test \
+	--model_path ~/fold_8/mml-pgg-off-sim/ \
+	--answer_checkpoint _0_answer_step_8600 \
+	--question_checkpoint _0_question_step_8600 \
+	--training_steps 10000 \
+	--learning_rate 0.0005 \
+	--max_epochs 1 \
+	--num_search_samples 8 \
+	--batch_size 32 \
+	--gpu True \
+	--dev ./zero-shot-extraction/relation_splits/dev.7 \
+	--train ./zero-shot-extraction/relation_splits/train.7 \
+	--gpu_device 0 \
+	--seed 12321 \
+	--prediction_file ~/fold_8/mml-pgg-off-sim/mml-pgg-off-sim.dev.predictions.fold.8.step.8600.csv
+
 '''
 
 python src/re_gold_qa_train.py \
 	--mode re_qa_test \
-	--model_path ~/fold_10/mml-pgg-on-sim/ \
-	--answer_checkpoint _0_answer_step_4300 \
-	--question_checkpoint _0_question_step_4300 \
+	--model_path ~/fold_3/mml-pgg-on-sim/ \
+	--answer_checkpoint _0_answer_step_300 \
+	--question_checkpoint _0_question_step_300 \
 	--training_steps 10000 \
 	--learning_rate 0.0005 \
 	--max_epochs 1 \
 	--num_search_samples 8 \
 	--batch_size 32 \
 	--gpu True \
-	--dev ./zero-shot-extraction/relation_splits/test.9 \
-	--train ./zero-shot-extraction/relation_splits/train.2 \
+	--dev ./zero-shot-extraction/relation_splits/test.2 \
+	--train ./zero-shot-extraction/relation_splits/train.1 \
 	--gpu_device 0 \
 	--seed 12321 \
-	--prediction_file ~/fold_10/mml-pgg-on-sim/mml-pgg-on-sim.test.predictions.fold.10.step.4300.csv & 
+	--prediction_file ~/fold_3/mml-pgg-on-sim/mml-pgg-on-sim.test.predictions.fold.3.step.300.csv &
 
 python src/re_gold_qa_train.py \
 	--mode re_qa_test \
-	--model_path ~/fold_10/mml-mml-on-sim/ \
-	--answer_checkpoint _0_answer_step_5800 \
-	--question_checkpoint _0_question_step_5800 \
+	--model_path ~/fold_3/mml-mml-on-sim/ \
+	--answer_checkpoint _0_answer_step_2000 \
+	--question_checkpoint _0_question_step_2000 \
 	--training_steps 10000 \
 	--learning_rate 0.0005 \
 	--max_epochs 1 \
 	--num_search_samples 8 \
 	--batch_size 32 \
 	--gpu True \
-	--dev ./zero-shot-extraction/relation_splits/test.9 \
-	--train ./zero-shot-extraction/relation_splits/train.2 \
+	--dev ./zero-shot-extraction/relation_splits/test.2 \
+	--train ./zero-shot-extraction/relation_splits/train.1 \
 	--gpu_device 0 \
 	--seed 12321 \
-	--prediction_file ~/fold_10/mml-mml-on-sim/mml-mml-on-sim.test.predictions.fold.10.step.5800.csv &
+	--prediction_file ~/fold_3/mml-mml-on-sim/mml-mml-on-sim.test.predictions.fold.3.step.2000.csv &
 
 python src/re_gold_qa_train.py \
 	--mode re_qa_test \
-	--model_path ~/fold_10/mml-mml-off-sim/ \
-	--answer_checkpoint _0_answer_step_1500 \
-	--question_checkpoint _0_question_step_1500 \
+	--model_path ~/fold_3/mml-mml-off-sim/ \
+	--answer_checkpoint _0_answer_step_3800 \
+	--question_checkpoint _0_question_step_3800 \
 	--training_steps 10000 \
 	--learning_rate 0.0005 \
 	--max_epochs 1 \
 	--num_search_samples 8 \
 	--batch_size 32 \
 	--gpu True \
-	--dev ./zero-shot-extraction/relation_splits/test.9 \
+	--dev ./zero-shot-extraction/relation_splits/test.2 \
 	--train ./zero-shot-extraction/relation_splits/train.2 \
 	--gpu_device 0 \
 	--seed 12321 \
-	--prediction_file ~/fold_10/mml-mml-off-sim/mml-mml-off-sim.test.predictions.fold.10.step.1500.csv & 
+	--prediction_file ~/fold_3/mml-mml-off-sim/mml-mml-off-sim.test.predictions.fold.3.step.3800.csv & 
+
+wait
+
+'''
+python src/re_gold_qa_train.py \
+	--mode re_qa_test \
+	--model_path ~/fold_2/mml-pgg-on-sim/ \
+	--answer_checkpoint _0_answer_step_9200 \
+	--question_checkpoint _0_question_step_9200 \
+	--training_steps 10000 \
+	--learning_rate 0.0005 \
+	--max_epochs 1 \
+	--num_search_samples 8 \
+	--batch_size 32 \
+	--gpu True \
+	--dev ./zero-shot-extraction/relation_splits/test.1 \
+	--train ./zero-shot-extraction/relation_splits/train.1 \
+	--gpu_device 0 \
+	--seed 12321 \
+	--prediction_file ~/fold_2/mml-pgg-on-sim/mml-pgg-on-sim.test.predictions.fold.2.step.9200.csv &
+
+python src/re_gold_qa_train.py \
+	--mode re_qa_test \
+	--model_path ~/fold_2/mml-mml-on-sim/ \
+	--answer_checkpoint _0_answer_step_9400 \
+	--question_checkpoint _0_question_step_9400 \
+	--training_steps 10000 \
+	--learning_rate 0.0005 \
+	--max_epochs 1 \
+	--num_search_samples 8 \
+	--batch_size 32 \
+	--gpu True \
+	--dev ./zero-shot-extraction/relation_splits/test.1 \
+	--train ./zero-shot-extraction/relation_splits/train.1 \
+	--gpu_device 0 \
+	--seed 12321 \
+	--prediction_file ~/fold_2/mml-mml-on-sim/mml-mml-on-sim.test.predictions.fold.2.step.9400.csv &
+
+python src/re_gold_qa_train.py \
+	--mode re_qa_test \
+	--model_path ~/fold_2/mml-mml-off-sim/ \
+	--answer_checkpoint _0_answer_step_9300 \
+	--question_checkpoint _0_question_step_9300 \
+	--training_steps 10000 \
+	--learning_rate 0.0005 \
+	--max_epochs 1 \
+	--num_search_samples 8 \
+	--batch_size 32 \
+	--gpu True \
+	--dev ./zero-shot-extraction/relation_splits/test.1 \
+	--train ./zero-shot-extraction/relation_splits/train.2 \
+	--gpu_device 0 \
+	--seed 12321 \
+	--prediction_file ~/fold_2/mml-mml-off-sim/mml-mml-off-sim.test.predictions.fold.2.step.9300.csv & 
 
 wait
 
@@ -441,7 +511,5 @@ python src/re_gold_qa_train.py \
 	--gpu_device 0 \
 	--seed 12321 \
 	--prediction_file ~/fold_5/mml-mml-off-sim/mml-mml-off-sim.test.predictions.fold.5.step.3000.csv &
-
-wait
 
 '''
