@@ -5,6 +5,7 @@ from src.question_response_generation.train import run_model
 from src.re_qa_model import REQA, HyperParameters, load_module, set_random_seed
 from src.re_qa_train import iterative_run_model
 from src.zero_extraction_utils import (create_fewrl_dataset,
+                                       create_relation_fewrl_dataset,
                                        create_zero_re_qa_dataset)
 
 
@@ -314,7 +315,7 @@ def run_concat_fewrl(args):
         training_steps=args.training_steps,
         seed=args.seed,
         num_unseen_relations=args.num_unseen_relations,
-        #prediction_type="relation",
+        # prediction_type="relation",
     )
 
     set_random_seed(config.seed)
@@ -369,6 +370,51 @@ def run_concat_fewrl(args):
         )
 
 
+def run_nce_fewrl(args):
+    """Run nce objective for relation classification on the fewrl dataset."""
+    config = HyperParameters(
+        model_path=args.model_path,
+        batch_size=args.batch_size,
+        source_max_length=256,
+        decoder_max_length=32,
+        gpu=args.gpu,
+        learning_rate=args.learning_rate,
+        max_epochs=args.max_epochs,
+        mode="train",
+        prediction_file=args.prediction_file,
+        training_steps=int(args.training_steps),
+        answer_checkpoint=args.answer_checkpoint,
+        question_checkpoint=args.question_checkpoint,
+        num_search_samples=int(args.num_search_samples),
+        seed=args.seed,
+        num_neg_samples=args.num_neg_samples,
+        predict_type=args.predict_type,
+    )
+    set_random_seed(config.seed)
+    model = REQA(config)
+    model = model.to("cuda:0")
+
+    (train_loader, train_dataset,) = create_relation_fewrl_dataset(
+        question_tokenizer=model.question_tokenizer,
+        answer_tokenizer=model.answer_tokenizer,
+        batch_size=config.batch_size,
+        source_max_length=config.source_max_length,
+        decoder_max_length=config.decoder_max_length,
+        train_fewrel_path=args.train,
+    )
+
+    if args.mode == "nce_fewrl_train":
+        iterative_run_model(
+            model,
+            config=config,
+            train_dataloader=train_loader,
+            test_dataloader=None,
+            save_always=True,
+            current_device=0,
+            train_method=args.train_method,
+        )
+
+
 def run_main(args):
     """Decides what to do in the code."""
     if args.mode in ["re_gold_qa_train", "re_gold_qa_test"]:
@@ -381,6 +427,10 @@ def run_main(args):
         run_fewrl(args)
     if args.mode in ["concat_fewrl_train", "concat_fewrl_test", "concat_fewrl_dev"]:
         run_concat_fewrl(args)
+    if args.mode in ["nce_fewrl_train"]:
+        run_nce_fewrl(args)
+    if args.mode in ["concat_nce_fewrl_train"]:
+        run_concat_nce_fewrl(args)
 
 
 def argument_parser():
@@ -449,6 +499,12 @@ def argument_parser():
     )
     parser.add_argument(
         "--num_search_samples", type=int, default=8, help="Number of search samples"
+    )
+    parser.add_argument(
+        "--num_neg_samples",
+        type=int,
+        default=8,
+        help="Number of the negative samples for nce loss.",
     )
     parser.add_argument(
         "--answer_checkpoint", type=str, help="checkpoint of the trained answer model."

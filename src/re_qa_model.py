@@ -40,11 +40,12 @@ class HyperParameters:
     checkpoint: Optional[str] = "_3_model"
     training_steps: Optional[int] = 1
     num_unseen_relations: Optional[int] = 5
-    prediction_type: Optional[str] = "entity"
+    predict_type: Optional[str] = "entity"
 
     # Related to decoding.
     no_repeat_ngram_size: Optional[int] = 2
     num_search_samples: Optional[int] = 8
+    num_neg_samples: Optional[int] = 3
 
 
 def tuple_of_tensors_to_tensor(tuple_of_tensors):
@@ -241,7 +242,7 @@ class REQA(torch.nn.Module):
         self.question_model = question_model
         self.question_tokenizer = question_tokenizer
 
-    def question_beam_predict(self, batch, current_device):
+    def question_beam_predict(self, batch, current_device, with_tail_entity=False):
         """Use beam search to generate the questions and prepare inputs for the
         answer module."""
         question_input_ids = batch["entity_relation_passage_input_ids"]
@@ -250,17 +251,41 @@ class REQA(torch.nn.Module):
             question_input_ids = question_input_ids.to(current_device)
             question_input_mask = question_input_mask.to(current_device)
 
+        if with_tail_entity:
+            # the posterior inputs also have the tail entity.
+            posterier_question_input_ids = batch["posterier_input_ids"]
+            posterier_question_input_mask = batch["posterier_attention_mask"]
+            if self.config.gpu:
+                posterier_question_input_ids = posterier_question_input_ids.to(
+                    current_device
+                )
+                posterier_question_input_mask = posterier_question_input_mask.to(
+                    current_device
+                )
+
         with torch.no_grad():
-            question_predictions = self.question_model.generate(
-                input_ids=question_input_ids,
-                attention_mask=question_input_mask,
-                no_repeat_ngram_size=self.config.no_repeat_ngram_size,
-                early_stopping=True,
-                max_length=self.config.decoder_max_length,
-                num_return_sequences=1,
-                num_beams=self.config.num_search_samples,
-                length_penalty=1.0,  # no penalty
-            )
+            if with_tail_entity:
+                question_predictions = self.question_model.generate(
+                    input_ids=posterier_question_input_ids,
+                    attention_mask=posterier_question_input_mask,
+                    no_repeat_ngram_size=self.config.no_repeat_ngram_size,
+                    early_stopping=True,
+                    max_length=self.config.decoder_max_length,
+                    num_return_sequences=1,
+                    num_beams=self.config.num_search_samples,
+                    length_penalty=1.0,  # no penalty
+                )
+            else:
+                question_predictions = self.question_model.generate(
+                    input_ids=question_input_ids,
+                    attention_mask=question_input_mask,
+                    no_repeat_ngram_size=self.config.no_repeat_ngram_size,
+                    early_stopping=True,
+                    max_length=self.config.decoder_max_length,
+                    num_return_sequences=1,
+                    num_beams=self.config.num_search_samples,
+                    length_penalty=1.0,  # no penalty
+                )
 
         question_predictions_str = self.question_tokenizer.batch_decode(
             question_predictions, skip_special_tokens=True
@@ -338,6 +363,102 @@ class REQA(torch.nn.Module):
                 "question_predictions": question_predictions_str[index],
             }
             yield output_batch
+
+    def relation_classifier(self, batch, current_device):
+        """Relation classifier using tail entity generation."""
+        self.question_model.eval()
+        loss_fct = torch.nn.CrossEntropyLoss(ignore_index=-100, reduction="none")
+        if self.config.gpu:
+            loss_fct = loss_fct.to(current_device)
+        (
+            answer_input_ids,
+            answer_input_mask,
+            question_input_ids,
+            question_input_mask,
+            question_predictions_str,
+        ) = self.question_beam_predict(batch, current_device, with_tail_entity=True)
+        target_mask = batch["second_entity_attention_mask"]
+        labels = batch["second_entity_labels"]
+        if self.config.gpu:
+            target_mask = target_mask.to(current_device)
+            labels = labels.to(current_device)
+
+        # Answer Computation
+        self.answer_model.eval()
+        output = self.answer_model(
+            input_ids=answer_input_ids,
+            attention_mask=answer_input_mask,
+            decoder_attention_mask=target_mask,
+            decoder_input_ids=self.answer_model._shift_right(labels),
+            labels=None,
+        )
+
+        log_p = -loss_fct(
+            output.logits.view(-1, output.logits.size(-1)),
+            labels.view(-1),
+        )
+
+        # b: batch size
+        # sz: sequence size
+        # v: vocab size
+        b, sz, v = output.logits.size()
+        log_p = log_p.view(b, sz)
+        good_log_p = log_p.masked_fill_(labels == -100, 0.0)
+        answer_log_p = torch.sum(good_log_p, dim=1).squeeze()
+        for index in range(b):
+            relation_log_p = answer_log_p[index]
+            output_batch = {
+                "relation_log_p": relation_log_p,
+            }
+            yield output_batch
+
+    def infonce_answer_training(self, batch, current_device):
+        """Compute infoNCE loss only for the answer module."""
+        loss_fct = torch.nn.CrossEntropyLoss(ignore_index=-100, reduction="none")
+        if self.config.gpu:
+            loss_fct = loss_fct.to(current_device)
+        (
+            answer_input_ids,
+            answer_input_mask,
+            question_input_ids,
+            question_input_mask,
+            question_predictions_str,
+        ) = self.question_beam_predict(batch, current_device, with_tail_entity=True)
+        target_mask = batch["second_entity_attention_mask"]
+        labels = batch["second_entity_labels"]
+        if self.config.gpu:
+            target_mask = target_mask.to(current_device)
+            labels = labels.to(current_device)
+
+        # Answer Computation
+        self.answer_model.train()
+        output = self.answer_model(
+            input_ids=answer_input_ids,
+            attention_mask=answer_input_mask,
+            decoder_attention_mask=target_mask,
+            decoder_input_ids=self.answer_model._shift_right(labels),
+            labels=None,
+        )
+
+        log_p = -loss_fct(
+            output.logits.view(-1, output.logits.size(-1)),
+            labels.view(-1),
+        )
+
+        # b: batch size
+        # sz: sequence size
+        # v: vocab size
+        b, sz, v = output.logits.size()
+        log_p = log_p.view(b, sz)
+        good_log_p = log_p.masked_fill_(labels == -100, 0.0)
+        answer_log_p = torch.sum(good_log_p, dim=1).squeeze()
+        num_examples = b // self.config.num_neg_samples
+        answer_log_p = answer_log_p.view(num_examples, self.config.num_neg_samples)
+        positive_log_p = answer_log_p[:, 0].squeeze()
+        neg_pos_log_p = torch.logsumexp(answer_log_p, dim=1)
+        loss = -torch.mean(positive_log_p - neg_pos_log_p, dim=0)
+        loss_value = loss.item()
+        return loss, loss_value
 
     def pgg_answer_training(self, batch, current_device):
         """Compute PGG loss only for the answer module."""
@@ -842,3 +963,18 @@ class REQA(torch.nn.Module):
             self.answer_optimizer.step()
             self.question_optimizer.step()
             return (loss_value, pgg_loss_value)
+
+        if objective_type == "InfoNCE":
+            self.answer_optimizer.zero_grad()
+
+            self.question_model.eval()
+            nce_loss, nce_loss_value = self.infonce_answer_training(
+                batch, current_device
+            )
+            if not math.isnan(nce_loss_value):
+                # BackProp
+                nce_loss.backward()
+                # Optimize
+
+            self.answer_optimizer.step()
+            return nce_loss_value

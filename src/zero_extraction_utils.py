@@ -1300,3 +1300,264 @@ def create_fewrl_dataset(
         val_dataset,
         test_loader,
     )
+
+
+def create_relation_train_dataset_fewrl(fewrel_path, seed=10, m=5, neg_samples=3):
+    sentence_delimiters = [". ", ".\n", "? ", "?\n", "! ", "!\n"]
+
+    set_random_seed(seed)
+
+    train_contexts = []
+    train_posterier_contexts = []
+    train_answers = []
+    train_passages = []
+    train_entities = []
+    train_entity_relations = []
+
+    with open(fewrel_path, "r") as json_file:
+        data = json.load(json_file)
+        r_ids = list(data.keys())
+        random.shuffle(r_ids)
+        train_r_ids = r_ids[4 * m :]
+
+        train_id_df = pd.DataFrame(train_r_ids, columns=["relation_ids"])
+        train_id_df.to_csv(
+            "./train_ids_" + str(seed) + ".csv", sep=",", header=True, index=False
+        )
+
+        for r_id in train_r_ids:
+            r_name = rel_dict[r_id]
+            r_desc = rel_desc[r_id]
+            desc = r_desc.strip(".") + ". "
+            pos = [desc.find(delimiter) for delimiter in sentence_delimiters]
+            pos = min([p for p in pos if p >= 0])
+            re_desc = desc[:pos]
+
+            # Create a randomly shuffled dataset.
+            sentences = data[r_id]
+            random.shuffle(sentences)
+            for sent in sentences:
+                # positive sample
+                sentence = " ".join(sent["tokens"])
+                head_entity = sent["h"][0]
+                tail_entity = sent["t"][0]
+                gold_answers = [tail_entity]
+                train_passages.append(sentence)
+                train_entity_relations.append(
+                    white_space_fix(head_entity + " " + r_name)
+                )
+                train_entities.append(white_space_fix(head_entity))
+                train_contexts.append(
+                    "answer: "
+                    + white_space_fix(head_entity)
+                    + " <SEP> "
+                    + white_space_fix(r_name)
+                    + " ; "
+                    + white_space_fix(re_desc)
+                    + " context: "
+                    + white_space_fix(sentence)
+                    + " </s>"
+                )
+                train_posterier_contexts.append(
+                    "answer: "
+                    + white_space_fix(head_entity)
+                    + " <SEP> "
+                    + white_space_fix(r_name)
+                    + " ; "
+                    + white_space_fix(re_desc)
+                    + " "
+                    + white_space_fix(" and ".join(gold_answers))
+                    + " context: "
+                    + white_space_fix(sentence)
+                    + " </s>"
+                )
+                train_answers.append(
+                    white_space_fix(" and ".join(gold_answers)) + " </s>"
+                )
+
+                # add the rest with neg_samples
+                for i in range(neg_samples):
+                    random_r_id = random.choice(list(set(train_r_ids) - {r_id}))
+                    r_r_name = rel_dict[random_r_id]
+                    r_r_desc = rel_desc[random_r_id]
+                    r_desc = r_r_desc.strip(".") + ". "
+                    r_pos = [
+                        r_desc.find(delimiter) for delimiter in sentence_delimiters
+                    ]
+                    r_pos = min([p for p in r_pos if p >= 0])
+                    r_re_desc = r_desc[:r_pos]
+
+                    train_passages.append(sentence)
+                    train_entity_relations.append(
+                        white_space_fix(head_entity + " " + r_r_name)
+                    )
+                    train_entities.append(white_space_fix(head_entity))
+                    train_contexts.append(
+                        "answer: "
+                        + white_space_fix(head_entity)
+                        + " <SEP> "
+                        + white_space_fix(r_r_name)
+                        + " ; "
+                        + white_space_fix(r_re_desc)
+                        + " context: "
+                        + white_space_fix(sentence)
+                        + " </s>"
+                    )
+                    train_posterier_contexts.append(
+                        "answer: "
+                        + white_space_fix(head_entity)
+                        + " <SEP> "
+                        + white_space_fix(r_r_name)
+                        + " ; "
+                        + white_space_fix(r_re_desc)
+                        + " "
+                        + white_space_fix(" and ".join(gold_answers))
+                        + " context: "
+                        + white_space_fix(sentence)
+                        + " </s>"
+                    )
+                    train_answers.append(
+                        white_space_fix(" and ".join(gold_answers)) + " </s>"
+                    )
+
+    train_df = pd.DataFrame(
+        {
+            "passages": train_passages,
+            "contexts": train_contexts,
+            "answers": train_answers,
+            "entity_relations": train_entity_relations,
+            "entities": train_entities,
+            "posterier_contexts": train_posterier_contexts,
+        }
+    )
+
+    train_df.to_csv(
+        "./relation_train_data_" + str(seed) + ".csv", sep=",", header=True, index=False
+    )
+
+    return (
+        train_passages,
+        train_contexts,
+        train_answers,
+        train_entity_relations,
+        train_entities,
+        train_posterier_contexts,
+    )
+
+
+def create_relation_fewrl_dataset(
+    question_tokenizer,
+    answer_tokenizer,
+    batch_size,
+    source_max_length,
+    decoder_max_length,
+    train_fewrel_path=None,
+    concat=False,
+):
+    """Function to create the fewrl dataset for training with negative
+    samples."""
+    train_df = pd.read_csv(train_fewrel_path, sep=",")
+
+    train_passages = train_df["passages"].tolist()
+    train_contexts = train_df["contexts"].tolist()
+    train_answers = train_df["answers"].tolist()
+    train_entity_relations = train_df["entity_relations"].tolist()
+    train_entities = [str(row) for row in train_df["entities"].tolist()]
+    train_posterier_contexts = train_df["posterier_contexts"].tolist()
+
+    if concat:
+        for i in range(len(train_contexts)):
+            ctx = train_contexts[i]
+            ctx_str = ctx.split("context: ")[1]
+            ent_rel_str = train_entity_relations[i]
+            new_train_context = white_space_fix(
+                "answer: " + ent_rel_str + " context: " + ctx_str
+            )
+            train_contexts[i] = new_train_context
+
+    train_encodings = question_tokenizer(
+        train_contexts,
+        truncation=True,
+        padding="max_length",
+        max_length=source_max_length,
+        add_special_tokens=False,
+    )
+    train_answer_encodings = answer_tokenizer(
+        train_answers,
+        truncation=True,
+        padding="max_length",
+        max_length=decoder_max_length,
+        add_special_tokens=False,
+    )
+    train_entity_encodings = question_tokenizer(
+        train_entities,
+        truncation=True,
+        padding="max_length",
+        max_length=decoder_max_length,
+        add_special_tokens=False,
+    )
+
+    train_posterier_encodings = question_tokenizer(
+        train_posterier_contexts,
+        truncation=True,
+        padding="max_length",
+        max_length=source_max_length,
+        add_special_tokens=False,
+    )
+    train_encodings["passages"] = train_passages
+    train_encodings["entity_relations"] = train_entity_relations
+    train_encodings["posterier_input_ids"] = train_posterier_encodings.pop("input_ids")
+    train_encodings["posterier_attention_mask"] = train_posterier_encodings.pop(
+        "attention_mask"
+    )
+    train_encodings["entity_input_ids"] = train_entity_encodings.pop("input_ids")
+    train_encodings["entity_attention_mask"] = train_entity_encodings.pop(
+        "attention_mask"
+    )
+
+    train_encodings["entity_relation_passage_input_ids"] = train_encodings["input_ids"]
+    train_encodings["entity_relation_passage_attention_mask"] = train_encodings[
+        "attention_mask"
+    ]
+
+    train_encodings["target_attention_mask"] = train_answer_encodings["attention_mask"]
+    train_encodings["second_entity_labels"] = train_answer_encodings["input_ids"]
+    train_encodings["second_entity_attention_mask"] = train_answer_encodings[
+        "attention_mask"
+    ]
+
+    # because HuggingFace automatically shifts the labels, the labels correspond exactly to `target_ids`.
+    # We have to make sure that the PAD token is ignored
+
+    train_labels = [
+        [-100 if token == answer_tokenizer.pad_token_id else token for token in labels]
+        for labels in train_encodings["second_entity_labels"]
+    ]
+    train_encodings["second_entity_labels"] = train_labels
+    train_encodings["labels"] = train_labels
+
+    class HelperDataset(torch.utils.data.Dataset):
+        def __init__(self, encodings):
+            self.encodings = encodings
+
+        def __getitem__(self, idx):
+            row = {}
+            for key, val in self.encodings.items():
+                if key in ["passages", "entity_relations"]:
+                    row[key] = val[idx]
+                else:
+                    row[key] = torch.tensor(val[idx])
+            return row
+
+        def __len__(self):
+            if "entity_relation_passage_input_ids" in self.encodings:
+                return len(self.encodings.entity_relation_passage_input_ids)
+            if "input_ids" in self.encodings:
+                return len(self.encodings.input_ids)
+
+    train_dataset = HelperDataset(train_encodings)
+    train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=False)
+    return (
+        train_loader,
+        train_dataset,
+    )
