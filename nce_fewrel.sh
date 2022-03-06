@@ -28,12 +28,14 @@ echo "r$SLURM_NODEID Launching python script"
 echo "All the allocated nodes: $SLURM_JOB_NODELIST"
 '''
 
+'''
+
 # The SLURM_NTASKS variable tells the script how many processes are available for this execution. “srun” executes the script <tasks-per-node * nodes> times
 python src/re_gold_qa_train.py \
     --mode nce_fewrl_train \
-    --model_path ~/fewrel/run_1/ \
-    --answer_checkpoint _answer_pretrained \
-    --question_checkpoint _question_pretrained \
+    --model_path ~/fewrl/run_1/ \
+    --answer_checkpoint _3_answer_step_2600 \
+    --question_checkpoint _3_question_step_2600 \
     --training_steps 2600 \
     --learning_rate 0.0005 \
     --max_epochs 4 \
@@ -44,9 +46,33 @@ python src/re_gold_qa_train.py \
     --train ./nce_fewrel_data/nce_train_data_12321.csv \
     --gpu_device 0 \
     --seed 12321 \
-    --train_method InfoNCE
+    --train_method InfoNCE \
+    --num_neg_samples 3 \
+    --predict_type relation
+
 '''
 
+python src/re_gold_qa_train.py \
+    --mode nce_fewrl_dev \
+    --model_path ~/fewrl/run_1/ \
+    --answer_checkpoint _3_answer_step_2600 \
+    --question_checkpoint _3_question_step_2600 \
+    --training_steps 2600 \
+    --learning_rate 0.0005 \
+    --max_epochs 4 \
+    --num_search_samples 8 \
+    --batch_size 64 \
+    --gpu True \
+    --num_workers 3 \
+    --train ./nce_fewrel_data/nce_train_data_12321.csv \
+    --dev ./nce_fewrel_data/val_data_12321.csv \
+    --gpu_device 0 \
+    --seed 12321 \
+    --train_method InfoNCE \
+    --num_neg_samples 3 \
+    --predict_type relation \
+    --prediction_file ~/fewrl/run_1/infonce.mml-pgg-off.run.3.dev.predictions.step.2600.csv
+'''
 for (( e=0; e<=3; e++ ))
 do
 	for (( i=1; i<=46; i++ ))

@@ -372,6 +372,15 @@ def run_concat_fewrl(args):
 
 def run_nce_fewrl(args):
     """Run nce objective for relation classification on the fewrl dataset."""
+    if args.mode == "nce_fewrl_train":
+        mode = "train"
+        file_path = args.train
+    elif args.mode == "nce_fewrl_dev":
+        mode = "test"
+        file_path = args.dev
+    elif args.mode == "nce_fewrl_test":
+        mode = "test"
+        file_path = args.test
     config = HyperParameters(
         model_path=args.model_path,
         batch_size=args.batch_size,
@@ -380,7 +389,7 @@ def run_nce_fewrl(args):
         gpu=args.gpu,
         learning_rate=args.learning_rate,
         max_epochs=args.max_epochs,
-        mode="train",
+        mode=mode,
         prediction_file=args.prediction_file,
         training_steps=int(args.training_steps),
         answer_checkpoint=args.answer_checkpoint,
@@ -388,31 +397,41 @@ def run_nce_fewrl(args):
         num_search_samples=int(args.num_search_samples),
         seed=args.seed,
         num_neg_samples=args.num_neg_samples,
-        predict_type=args.predict_type,
+        predict_type=args.predict_type
     )
     set_random_seed(config.seed)
     model = REQA(config)
     model = model.to("cuda:0")
 
-    (train_loader, train_dataset,) = create_relation_fewrl_dataset(
+    (loader, dataset) = create_relation_fewrl_dataset(
         question_tokenizer=model.question_tokenizer,
         answer_tokenizer=model.answer_tokenizer,
         batch_size=config.batch_size,
         source_max_length=config.source_max_length,
         decoder_max_length=config.decoder_max_length,
-        train_fewrel_path=args.train,
+        train_fewrel_path=file_path,
     )
 
     if args.mode == "nce_fewrl_train":
         iterative_run_model(
             model,
             config=config,
-            train_dataloader=train_loader,
+            train_dataloader=loader,
             test_dataloader=None,
             save_always=True,
             current_device=0,
             train_method=args.train_method,
         )
+    elif args.mode in ["nce_fewrl_dev", "nce_fewrl_test"]:
+        iterative_run_model(
+            model,
+            config=config,
+            train_dataloader=None,
+            test_dataloader=loader,
+            save_always=True,
+            current_device=0,
+        )
+
 
 
 def run_main(args):
@@ -427,7 +446,7 @@ def run_main(args):
         run_fewrl(args)
     if args.mode in ["concat_fewrl_train", "concat_fewrl_test", "concat_fewrl_dev"]:
         run_concat_fewrl(args)
-    if args.mode in ["nce_fewrl_train"]:
+    if args.mode in ["nce_fewrl_train", "nce_fewrl_dev", "nce_fewrl_test"]:
         run_nce_fewrl(args)
     if args.mode in ["concat_nce_fewrl_train"]:
         run_concat_nce_fewrl(args)
@@ -518,6 +537,11 @@ def argument_parser():
         "--training_steps",
         type=int,
         help="number of training steps over the train data.",
+    )
+    parser.add_argument(
+        "--predict_type",
+        type=str,
+        help="What is the prediction type for the fewrel run.",
     )
     args, _ = parser.parse_known_args()
     return args

@@ -384,33 +384,34 @@ class REQA(torch.nn.Module):
             labels = labels.to(current_device)
 
         # Answer Computation
-        self.answer_model.eval()
-        output = self.answer_model(
-            input_ids=answer_input_ids,
-            attention_mask=answer_input_mask,
-            decoder_attention_mask=target_mask,
-            decoder_input_ids=self.answer_model._shift_right(labels),
-            labels=None,
-        )
+        with torch.no_grad():
+            self.answer_model.eval()
+            output = self.answer_model(
+                input_ids=answer_input_ids,
+                attention_mask=answer_input_mask,
+                decoder_attention_mask=target_mask,
+                decoder_input_ids=self.answer_model._shift_right(labels),
+                labels=None,
+            )
 
-        log_p = -loss_fct(
-            output.logits.view(-1, output.logits.size(-1)),
-            labels.view(-1),
-        )
+            log_p = -loss_fct(
+                output.logits.view(-1, output.logits.size(-1)),
+                labels.view(-1),
+            )
 
-        # b: batch size
-        # sz: sequence size
-        # v: vocab size
-        b, sz, v = output.logits.size()
-        log_p = log_p.view(b, sz)
-        good_log_p = log_p.masked_fill_(labels == -100, 0.0)
-        answer_log_p = torch.sum(good_log_p, dim=1).squeeze()
-        for index in range(b):
-            relation_log_p = answer_log_p[index]
-            output_batch = {
-                "relation_log_p": relation_log_p,
-            }
-            yield output_batch
+            # b: batch size
+            # sz: sequence size
+            # v: vocab size
+            b, sz, v = output.logits.size()
+            log_p = log_p.view(b, sz)
+            good_log_p = log_p.masked_fill_(labels == -100, 0.0)
+            answer_log_p = torch.sum(good_log_p, dim=1).squeeze().cpu().numpy()
+            for index in range(b):
+                relation_log_p = answer_log_p[index]
+                output_batch = {
+                    "relation_log_p": relation_log_p,
+                }
+                yield output_batch
 
     def infonce_answer_training(self, batch, current_device):
         """Compute infoNCE loss only for the answer module."""
@@ -452,8 +453,8 @@ class REQA(torch.nn.Module):
         log_p = log_p.view(b, sz)
         good_log_p = log_p.masked_fill_(labels == -100, 0.0)
         answer_log_p = torch.sum(good_log_p, dim=1).squeeze()
-        num_examples = b // self.config.num_neg_samples
-        answer_log_p = answer_log_p.view(num_examples, self.config.num_neg_samples)
+        num_examples = b // (self.config.num_neg_samples + 1)
+        answer_log_p = answer_log_p.view(num_examples, (self.config.num_neg_samples+1))
         positive_log_p = answer_log_p[:, 0].squeeze()
         neg_pos_log_p = torch.logsumexp(answer_log_p, dim=1)
         loss = -torch.mean(positive_log_p - neg_pos_log_p, dim=0)
