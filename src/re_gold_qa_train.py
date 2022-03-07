@@ -243,12 +243,13 @@ def run_fewrl(args):
         num_search_samples=int(args.num_search_samples),
         seed=args.seed,
         num_unseen_relations=args.num_unseen_relations,
-        prediction_type="relation",
+        predict_type=args.predict_type,
     )
     set_random_seed(config.seed)
     model = REQA(config)
     model = model.to("cuda:0")
 
+    """
     (
         train_loader,
         val_loader,
@@ -266,13 +267,23 @@ def run_fewrl(args):
         dev_fewrel_path=args.dev,
         test_fewrel_path=args.test,
     )
+    """
 
     if args.mode == "fewrl_train":
+        (loader, dataset) = create_relation_fewrl_dataset(
+            question_tokenizer=model.question_tokenizer,
+            answer_tokenizer=model.answer_tokenizer,
+            batch_size=config.batch_size,
+            source_max_length=config.source_max_length,
+            decoder_max_length=config.decoder_max_length,
+            train_fewrel_path=args.train,
+        )
+
         iterative_run_model(
             model,
             config=config,
-            train_dataloader=train_loader,
-            test_dataloader=test_loader,
+            train_dataloader=loader,
+            test_dataloader=None,
             save_always=True,
             current_device=0,
             train_method=args.train_method,
@@ -397,11 +408,20 @@ def run_nce_fewrl(args):
         num_search_samples=int(args.num_search_samples),
         seed=args.seed,
         num_neg_samples=args.num_neg_samples,
-        predict_type=args.predict_type
+        predict_type=args.predict_type,
     )
     set_random_seed(config.seed)
     model = REQA(config)
-    #model = model.to("cuda:0")
+    model = model.to("cuda:0")
+
+    """(loader, dataset) = create_relation_fewrl_dataset(
+        question_tokenizer=model.question_tokenizer,
+        answer_tokenizer=model.answer_tokenizer,
+        batch_size=config.batch_size,
+        source_max_length=config.source_max_length,
+        decoder_max_length=config.decoder_max_length,
+        train_fewrel_path=file_path,
+    )"""
 
     (loader, dataset) = create_relation_fewrl_dataset(
         question_tokenizer=model.question_tokenizer,
@@ -411,7 +431,7 @@ def run_nce_fewrl(args):
         decoder_max_length=config.decoder_max_length,
         train_fewrel_path=file_path,
     )
-    config.gpu = False
+
     if args.mode == "nce_fewrl_train":
         iterative_run_model(
             model,
@@ -431,7 +451,6 @@ def run_nce_fewrl(args):
             save_always=True,
             current_device=0,
         )
-
 
 
 def run_main(args):

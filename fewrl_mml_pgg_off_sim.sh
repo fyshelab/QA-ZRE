@@ -28,28 +28,25 @@ echo "r$SLURM_NODEID Launching python script"
 echo "All the allocated nodes: $SLURM_JOB_NODELIST"
 '''
 
-'''
 # The SLURM_NTASKS variable tells the script how many processes are available for this execution. “srun” executes the script <tasks-per-node * nodes> times
 python src/re_gold_qa_train.py \
     --mode fewrl_train \
-    --model_path ~/wikizsl/run_3/ \
+    --model_path ~/fewrl/run_1/ \
     --answer_checkpoint _response_pretrained \
     --question_checkpoint _fold_1_question_pretrained \
-    --training_steps 4682 \
+    --training_steps 5200 \
     --learning_rate 0.0005 \
     --max_epochs 4 \
     --num_search_samples 8 \
     --batch_size 16 \
     --gpu True \
     --num_workers 3 \
-    --train ./wikizsl_data/train_data_2022.csv \
-    --dev ./wikizsl_data/val_data_2022.csv \
-    --test ./wikizsl_data/test_data_2022.csv \
+    --train ./fewrl_data/train_data_12321.csv \
     --gpu_device 0 \
-    --seed 2022 \
+    --seed 12321 \
     --train_method MML-PGG-Off-Sim
-'''
 
+'''
 for (( e=0; e<=3; e++ ))
 do
 	for (( i=1; i<=46; i++ ))
@@ -73,7 +70,6 @@ do
 	done
 done
 
-'''
 python src/re_gold_qa_train.py \
 	--mode re_qa_test \
 	--model_path $SCRATCH/fold_1/mml-pgg-off-sim/ \

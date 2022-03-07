@@ -1302,7 +1302,7 @@ def create_fewrl_dataset(
     )
 
 
-def create_relation_train_dataset_fewrl(fewrel_path, seed=10, m=5, neg_samples=3):
+def create_relation_train_dataset_fewrl(fewrel_path, seed=10, m=5, neg_samples=1):
     sentence_delimiters = [". ", ".\n", "? ", "?\n", "! ", "!\n"]
 
     set_random_seed(seed)
@@ -1391,6 +1391,7 @@ def create_relation_train_dataset_fewrl(fewrel_path, seed=10, m=5, neg_samples=3
                     train_entity_relations.append(
                         white_space_fix(head_entity + " " + r_r_name)
                     )
+
                     train_entities.append(white_space_fix(head_entity))
                     train_contexts.append(
                         "answer: "
@@ -1416,9 +1417,7 @@ def create_relation_train_dataset_fewrl(fewrel_path, seed=10, m=5, neg_samples=3
                         + white_space_fix(sentence)
                         + " </s>"
                     )
-                    train_answers.append(
-                        white_space_fix(" and ".join(gold_answers)) + " </s>"
-                    )
+                    train_answers.append(white_space_fix("no_answer") + " </s>")
 
     train_df = pd.DataFrame(
         {

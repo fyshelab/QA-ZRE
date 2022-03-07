@@ -334,7 +334,7 @@ class REQA(torch.nn.Module):
             question_input_ids,
             question_input_mask,
             question_predictions_str,
-            question_log_ps
+            question_log_ps,
         )
 
     def predict_step(self, batch, current_device):
@@ -353,7 +353,7 @@ class REQA(torch.nn.Module):
             _,
             _,
             question_predictions_str,
-            question_log_ps
+            question_log_ps,
         ) = self.question_beam_predict(batch, current_device)
 
         second_entity_predictions = self.answer_model.generate(
@@ -384,7 +384,7 @@ class REQA(torch.nn.Module):
             question_input_ids,
             question_input_mask,
             question_predictions_str,
-            question_log_ps
+            question_log_ps,
         ) = self.question_beam_predict(batch, current_device, with_tail_entity=True)
         target_mask = batch["second_entity_attention_mask"]
         labels = batch["second_entity_labels"]
@@ -464,7 +464,9 @@ class REQA(torch.nn.Module):
         good_log_p = log_p.masked_fill_(labels == -100, 0.0)
         answer_log_p = torch.sum(good_log_p, dim=1).squeeze()
         num_examples = b // (self.config.num_neg_samples + 1)
-        answer_log_p = answer_log_p.view(num_examples, (self.config.num_neg_samples+1))
+        answer_log_p = answer_log_p.view(
+            num_examples, (self.config.num_neg_samples + 1)
+        )
         positive_log_p = answer_log_p[:, 0].squeeze()
         neg_pos_log_p = torch.logsumexp(answer_log_p, dim=1)
         loss = -torch.mean(positive_log_p - neg_pos_log_p, dim=0)
