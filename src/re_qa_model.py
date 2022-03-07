@@ -265,7 +265,7 @@ class REQA(torch.nn.Module):
 
         with torch.no_grad():
             if with_tail_entity:
-                question_predictions = self.question_model.generate(
+                question_output = self.question_model.generate(
                     input_ids=posterier_question_input_ids,
                     attention_mask=posterier_question_input_mask,
                     no_repeat_ngram_size=self.config.no_repeat_ngram_size,
@@ -274,9 +274,11 @@ class REQA(torch.nn.Module):
                     num_return_sequences=1,
                     num_beams=self.config.num_search_samples,
                     length_penalty=1.0,  # no penalty
+                    output_scores=True,
+                    return_dict_in_generate=True,
                 )
             else:
-                question_predictions = self.question_model.generate(
+                question_output = self.question_model.generate(
                     input_ids=question_input_ids,
                     attention_mask=question_input_mask,
                     no_repeat_ngram_size=self.config.no_repeat_ngram_size,
@@ -285,7 +287,11 @@ class REQA(torch.nn.Module):
                     num_return_sequences=1,
                     num_beams=self.config.num_search_samples,
                     length_penalty=1.0,  # no penalty
+                    output_scores=True,
+                    return_dict_in_generate=True,
                 )
+            question_predictions = question_output.sequences
+            question_log_ps = question_output.sequences_scores
 
         question_predictions_str = self.question_tokenizer.batch_decode(
             question_predictions, skip_special_tokens=True
@@ -328,6 +334,7 @@ class REQA(torch.nn.Module):
             question_input_ids,
             question_input_mask,
             question_predictions_str,
+            question_log_ps
         )
 
     def predict_step(self, batch, current_device):
@@ -346,6 +353,7 @@ class REQA(torch.nn.Module):
             _,
             _,
             question_predictions_str,
+            question_log_ps
         ) = self.question_beam_predict(batch, current_device)
 
         second_entity_predictions = self.answer_model.generate(
@@ -376,6 +384,7 @@ class REQA(torch.nn.Module):
             question_input_ids,
             question_input_mask,
             question_predictions_str,
+            question_log_ps
         ) = self.question_beam_predict(batch, current_device, with_tail_entity=True)
         target_mask = batch["second_entity_attention_mask"]
         labels = batch["second_entity_labels"]
@@ -406,8 +415,9 @@ class REQA(torch.nn.Module):
             log_p = log_p.view(b, sz)
             good_log_p = log_p.masked_fill_(labels == -100, 0.0)
             answer_log_p = torch.sum(good_log_p, dim=1).squeeze().cpu().numpy()
+            question_log_ps = question_log_ps.cpu().numpy()
             for index in range(b):
-                relation_log_p = answer_log_p[index]
+                relation_log_p = answer_log_p[index] + question_log_ps[index]
                 output_batch = {
                     "relation_log_p": relation_log_p,
                 }

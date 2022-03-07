@@ -54,15 +54,15 @@ python src/re_gold_qa_train.py \
 
 python src/re_gold_qa_train.py \
     --mode nce_fewrl_dev \
-    --model_path ~/fewrl/run_1/ \
+    --model_path /Users/saeed/Desktop/codes/repos/fewrl/run_1/ \
     --answer_checkpoint _3_answer_step_2600 \
     --question_checkpoint _3_question_step_2600 \
     --training_steps 2600 \
     --learning_rate 0.0005 \
     --max_epochs 4 \
     --num_search_samples 8 \
-    --batch_size 64 \
-    --gpu True \
+    --batch_size 4 \
+    --gpu False \
     --num_workers 3 \
     --train ./nce_fewrel_data/nce_train_data_12321.csv \
     --dev ./nce_fewrel_data/val_data_12321.csv \
@@ -71,7 +71,8 @@ python src/re_gold_qa_train.py \
     --train_method InfoNCE \
     --num_neg_samples 3 \
     --predict_type relation \
-    --prediction_file ~/fewrl/run_1/infonce.mml-pgg-off.run.3.dev.predictions.step.2600.csv
+    --prediction_file /Users/saeed/Desktop/codes/repos/fewrl/run_1/relation.infonce.mml-pgg-off.run.3.dev.predictions.step.2600.csv
+
 '''
 for (( e=0; e<=3; e++ ))
 do

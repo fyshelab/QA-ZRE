@@ -401,7 +401,7 @@ def run_nce_fewrl(args):
     )
     set_random_seed(config.seed)
     model = REQA(config)
-    model = model.to("cuda:0")
+    #model = model.to("cuda:0")
 
     (loader, dataset) = create_relation_fewrl_dataset(
         question_tokenizer=model.question_tokenizer,
@@ -411,7 +411,7 @@ def run_nce_fewrl(args):
         decoder_max_length=config.decoder_max_length,
         train_fewrel_path=file_path,
     )
-
+    config.gpu = False
     if args.mode == "nce_fewrl_train":
         iterative_run_model(
             model,
