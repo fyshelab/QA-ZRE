@@ -1452,6 +1452,7 @@ def create_relation_fewrl_dataset(
     decoder_max_length,
     train_fewrel_path=None,
     concat=False,
+    shuffle=False
 ):
     """Function to create the fewrl dataset for training with negative
     samples."""
@@ -1555,7 +1556,7 @@ def create_relation_fewrl_dataset(
                 return len(self.encodings.input_ids)
 
     train_dataset = HelperDataset(train_encodings)
-    train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=False)
+    train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=shuffle)
     return (
         train_loader,
         train_dataset,

@@ -287,13 +287,23 @@ def run_fewrl(args):
             save_always=True,
             current_device=0,
             train_method=args.train_method,
+            shuffle=True,
         )
 
     if args.mode == "fewrl_dev":
+        (loader, dataset) = create_relation_fewrl_dataset(
+            question_tokenizer=model.question_tokenizer,
+            answer_tokenizer=model.answer_tokenizer,
+            batch_size=config.batch_size,
+            source_max_length=config.source_max_length,
+            decoder_max_length=config.decoder_max_length,
+            train_fewrel_path=args.dev,
+            shuffle=False,
+        )
         iterative_run_model(
             model,
             config=config,
-            test_dataloader=val_loader,
+            test_dataloader=loader,
             current_device=0,
         )
 

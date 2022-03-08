@@ -484,6 +484,7 @@ class REQA(torch.nn.Module):
             question_input_ids,
             question_input_mask,
             question_predictions_str,
+            question_log_ps,
         ) = self.question_beam_predict(batch, current_device)
         target_mask = batch["second_entity_attention_mask"]
         labels = batch["second_entity_labels"]

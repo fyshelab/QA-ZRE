@@ -26,7 +26,7 @@ echo "r$SLURM_NODEID master: $MASTER_ADDR"
 echo "r$SLURM_NODEID Launching python script"
 
 echo "All the allocated nodes: $SLURM_JOB_NODELIST"
-'''
+
 
 # The SLURM_NTASKS variable tells the script how many processes are available for this execution. “srun” executes the script <tasks-per-node * nodes> times
 python src/re_gold_qa_train.py \
@@ -41,35 +41,38 @@ python src/re_gold_qa_train.py \
     --batch_size 16 \
     --gpu True \
     --num_workers 3 \
-    --train ./fewrl_data/train_data_12321.csv \
+    --train ./unk_fewrl_data/unk_train_data_12321.csv \
     --gpu_device 0 \
     --seed 12321 \
     --train_method MML-PGG-Off-Sim
 
 '''
-for (( e=0; e<=3; e++ ))
+
+for (( e=0; e<=0; e++ ))
 do
-	for (( i=1; i<=46; i++ ))
+	for (( i=52; i<=52; i++ ))
 	do
 		step=$((i * 100))
 		printf "step ${step} on epoch ${i}\r\n"
 		python src/re_gold_qa_train.py \
 			--mode fewrl_dev \
-			--model_path $HOME/wikizsl/run_5/ \
+			--model_path ~/fewrl/run_1/ \
 			--answer_checkpoint _${e}_answer_step_${step} \
 			--question_checkpoint _${e}_question_step_${step} \
 			--num_search_samples 8 \
 			--training_steps 4682 \
 			--batch_size 64 --gpu True \
-			--train ./wikizsl_data/train_data_1.csv \
-			--dev ./wikizsl_data/val_data_1.csv \
-			--test ./wikizsl_data/test_data_1.csv \
+			--train ./unk_fewrl_data/unk_train_data_12321.csv \
+			--dev ./unk_fewrl_data/val_data_12321.csv \
+			--test ./unk_fewrl_data/val_data_12321.csv \
 			--gpu_device 0 \
-			--seed 1 \
-			--prediction_file $HOME/wikizsl/run_5/mml-pgg-off-sim.run.${e}.dev.predictions.step.${step}.csv
+			--seed 12321 \
+			--prediction_file ~/fewrl/run_1/relation.unk.mml-pgg-off-sim.run.${e}.dev.predictions.step.${step}.csv \
+			--predict_type relation 
 	done
 done
 
+'''
 python src/re_gold_qa_train.py \
 	--mode re_qa_test \
 	--model_path $SCRATCH/fold_1/mml-pgg-off-sim/ \
@@ -86,6 +89,7 @@ python src/re_gold_qa_train.py \
 
 python src/re_gold_qa_train.py \
 	--mode re_qa_test \
+
 	--model_path $SCRATCH/fold_1/mml-pgg-off-sim/ \
 	--answer_checkpoint _0_answer_step_500 \
 	--question_checkpoint _0_question_step_500 \
