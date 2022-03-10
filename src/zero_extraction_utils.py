@@ -1377,6 +1377,10 @@ def create_relation_train_dataset_fewrl(fewrel_path, seed=10, m=5, neg_samples=1
 
                 # add the rest with neg_samples
                 for i in range(neg_samples):
+                    neg_sent = random.choice(sentences)
+                    neg_sentence = " ".join(neg_sent["tokens"])
+                    neg_head_entity = neg_sent["h"][0]
+                    neg_tail_entity = neg_sent["t"][0]
                     random_r_id = random.choice(list(set(train_r_ids) - {r_id}))
                     r_r_name = rel_dict[random_r_id]
                     r_r_desc = rel_desc[random_r_id]
@@ -1387,34 +1391,34 @@ def create_relation_train_dataset_fewrl(fewrel_path, seed=10, m=5, neg_samples=1
                     r_pos = min([p for p in r_pos if p >= 0])
                     r_re_desc = r_desc[:r_pos]
 
-                    train_passages.append(sentence)
+                    train_passages.append(neg_sentence)
                     train_entity_relations.append(
-                        white_space_fix(head_entity + " " + r_r_name)
+                        white_space_fix(neg_head_entity + " " + r_r_name)
                     )
 
-                    train_entities.append(white_space_fix(head_entity))
+                    train_entities.append(white_space_fix(neg_head_entity))
                     train_contexts.append(
                         "answer: "
-                        + white_space_fix(head_entity)
+                        + white_space_fix(neg_head_entity)
                         + " <SEP> "
                         + white_space_fix(r_r_name)
                         + " ; "
                         + white_space_fix(r_re_desc)
                         + " context: "
-                        + white_space_fix(sentence)
+                        + white_space_fix(neg_sentence)
                         + " </s>"
                     )
                     train_posterier_contexts.append(
                         "answer: "
-                        + white_space_fix(head_entity)
+                        + white_space_fix(neg_head_entity)
                         + " <SEP> "
                         + white_space_fix(r_r_name)
                         + " ; "
                         + white_space_fix(r_re_desc)
                         + " "
-                        + white_space_fix(" and ".join(gold_answers))
+                        + white_space_fix(neg_tail_entity)
                         + " context: "
-                        + white_space_fix(sentence)
+                        + white_space_fix(neg_sentence)
                         + " </s>"
                     )
                     train_answers.append(white_space_fix("no_answer") + " </s>")
@@ -1431,7 +1435,7 @@ def create_relation_train_dataset_fewrl(fewrel_path, seed=10, m=5, neg_samples=1
     )
 
     train_df.to_csv(
-        "./relation_train_data_" + str(seed) + ".csv", sep=",", header=True, index=False
+        "./unk_train_data_" + str(seed) + ".csv", sep=",", header=True, index=False
     )
 
     return (
@@ -1452,7 +1456,7 @@ def create_relation_fewrl_dataset(
     decoder_max_length,
     train_fewrel_path=None,
     concat=False,
-    shuffle=False
+    shuffle=False,
 ):
     """Function to create the fewrl dataset for training with negative
     samples."""
