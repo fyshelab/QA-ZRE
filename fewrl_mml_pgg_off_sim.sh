@@ -28,7 +28,7 @@ echo "r$SLURM_NODEID Launching python script"
 echo "All the allocated nodes: $SLURM_JOB_NODELIST"
 
 '''
-
+'''
 # The SLURM_NTASKS variable tells the script how many processes are available for this execution. “srun” executes the script <tasks-per-node * nodes> times
 python src/re_gold_qa_train.py \
     --mode fewrl_train \
@@ -37,15 +37,14 @@ python src/re_gold_qa_train.py \
     --question_checkpoint _fold_1_question_pretrained \
     --training_steps 5200 \
     --learning_rate 0.0005 \
-    --max_epochs 4 \
+    --max_epochs 1 \
     --num_search_samples 8 \
     --batch_size 16 \
     --gpu True \
-    --num_workers 3 \
     --train ./unk_fewrl_data/unk_train_data_12321.csv \
     --gpu_device 0 \
     --seed 12321 \
-    --train_method MML-PGG-Off-Sim
+    --train_method MML-MML-Off-Sim
 
 '''
 for (( e=0; e<=0; e++ ))
@@ -60,17 +59,19 @@ do
 			--answer_checkpoint _${e}_answer_step_${step} \
 			--question_checkpoint _${e}_question_step_${step} \
 			--num_search_samples 8 \
-			--training_steps 4682 \
-			--batch_size 64 --gpu True \
+			--training_steps 5200 \
+			--batch_size 128 --gpu True \
 			--train ./unk_fewrl_data/unk_train_data_12321.csv \
 			--dev ./unk_fewrl_data/val_data_12321.csv \
 			--test ./unk_fewrl_data/val_data_12321.csv \
 			--gpu_device 0 \
 			--seed 12321 \
-			--prediction_file ~/fewrl/run_1/relation.unk.mml-pgg-off-sim.run.${e}.dev.predictions.step.${step}.csv \
-			--predict_type relation 
+			--prediction_file ~/fewrl/run_1/relation.unk.mml-mml-off-sim.run.${e}.dev.predictions.step.${step}.csv \
+			--predict_type relation
 	done
 done
+
+'''
 
 python src/re_gold_qa_train.py \
 	--mode re_qa_test \
