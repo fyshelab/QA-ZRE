@@ -14,6 +14,150 @@ def white_space_fix(text):
     return " ".join(text.split())
 
 
+def read_gold_re_qa_relation_data(path):
+    """Create val data for relation classification considering all the data and
+    gold_templates."""
+    path = Path(path)
+
+    rel_dict = {}
+    with open("./props.json", "r") as fd:
+        re_desc_data = json.load(fd)
+        sentence_delimiters = [". ", ".\n", "? ", "?\n", "! ", "!\n"]
+        for row in re_desc_data:
+            desc = row["description"]
+            if desc == {}:
+                continue
+            desc = desc.strip(".") + ". "
+            pos = [desc.find(delimiter) for delimiter in sentence_delimiters]
+            pos = min([p for p in pos if p >= 0])
+            re_desc = desc[:pos]
+            re_id = row["label"]
+            rel_dict[white_space_fix(re_id).lower()] = white_space_fix(re_desc)
+
+    all_relations = {}
+    with open(path, "r") as fd:
+        for line in fd:
+            line = line.strip()
+            line_arr = line.split("\t")
+            if line_arr[0] not in all_relations:
+                all_relations[line_arr[0]] = {line_arr[1]}
+            else:
+                all_relations[line_arr[0]].add(line_arr[1])
+
+    with open(path, "r") as fd:
+        contexts = []
+        answers = []
+        passages = []
+        entities = []
+        entity_relations = []
+        for line in fd:
+            line = line.strip()
+            line_arr = line.split("\t")
+            passage = line_arr[3]
+            for rel_type in all_relations.keys():
+                gold_template = next(iter(all_relations[rel_type]))
+                gold_question = gold_template.replace("XXX", " " + line_arr[2] + " ")
+                if len(line_arr) > 4:
+                    if rel_type == line_arr[0]:
+                        gold_answers = line_arr[4:]
+                    else:
+                        gold_answers = ["no_answer"]
+                else:
+                    continue
+                passages.append(passage)
+                entity_relations.append(white_space_fix(line_arr[2] + " " + rel_type))
+                entities.append(white_space_fix(line_arr[2]))
+                contexts.append(
+                    "question: "
+                    + white_space_fix(gold_question)
+                    + " context: "
+                    + white_space_fix(passage)
+                    + " </s>"
+                )
+                answers.append(white_space_fix(" and ".join(gold_answers)) + " </s>")
+
+    data_df = pd.DataFrame(
+        {
+            "passages": passages,
+            "contexts": contexts,
+            "answers": answers,
+            "entity_relations": entity_relations,
+            "entities": entities,
+        }
+    )
+    data_df.to_csv("./data.csv", sep=",", header=True, index=False)
+    return passages, contexts, answers, entity_relations, entities
+
+
+def create_zero_re_qa_gold_dataset(
+    question_tokenizer,
+    answer_tokenizer,
+    batch_size,
+    source_max_length,
+    decoder_max_length,
+    file=None,
+):
+    """Function to create the zero re qa dataset."""
+    (
+        val_passages,
+        val_contexts,
+        val_answers,
+        val_entity_relations,
+        _,
+    ) = read_gold_re_qa_relation_data(file)
+
+    val_encodings = question_tokenizer(
+        val_contexts,
+        truncation=True,
+        padding="max_length",
+        max_length=source_max_length,
+        add_special_tokens=False,
+    )
+    val_answer_encodings = answer_tokenizer(
+        val_answers,
+        truncation=True,
+        padding="max_length",
+        max_length=decoder_max_length,
+        add_special_tokens=False,
+    )
+
+    val_encodings["target_attention_mask"] = val_answer_encodings.attention_mask
+
+    val_encodings["labels"] = val_answer_encodings.input_ids
+
+    # because HuggingFace automatically shifts the labels, the labels correspond exactly to `target_ids`.
+    # We have to make sure that the PAD token is ignored.
+
+    val_labels = [
+        [-100 if token == answer_tokenizer.pad_token_id else token for token in labels]
+        for labels in val_encodings["labels"]
+    ]
+    val_encodings["labels"] = val_labels
+
+    class HelperDataset(torch.utils.data.Dataset):
+        def __init__(self, encodings):
+            self.encodings = encodings
+
+        def __getitem__(self, idx):
+            row = {}
+            for key, val in self.encodings.items():
+                if key in ["passages", "entity_relations"]:
+                    row[key] = val[idx]
+                else:
+                    row[key] = torch.tensor(val[idx])
+            return row
+
+        def __len__(self):
+            if "entity_relation_passage_input_ids" in self.encodings:
+                return len(self.encodings.entity_relation_passage_input_ids)
+            if "input_ids" in self.encodings:
+                return len(self.encodings.input_ids)
+
+    val_dataset = HelperDataset(val_encodings)
+    val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False)
+    return val_loader, val_dataset
+
+
 def read_zero_re_qa(path, ignore_unknowns=True, gold_question=False, concat=False):
     """Main function to read the zero re qa dataset."""
     path = Path(path)

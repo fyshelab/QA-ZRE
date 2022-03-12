@@ -6,7 +6,47 @@ from src.re_qa_model import REQA, HyperParameters, load_module, set_random_seed
 from src.re_qa_train import iterative_run_model
 from src.zero_extraction_utils import (create_fewrl_dataset,
                                        create_relation_fewrl_dataset,
-                                       create_zero_re_qa_dataset)
+                                       create_zero_re_qa_dataset,
+                                       create_zero_re_qa_gold_dataset)
+
+
+def run_relation_classification_gold_qa(args):
+    """Run the relation-extraction qa models using the given gold questions for
+    the head entity and the relation."""
+    config = HyperParameters(
+        model_path=args.model_path,
+        batch_size=args.batch_size,
+        source_max_length=256,
+        decoder_max_length=32,
+        gpu=args.gpu,
+        learning_rate=args.learning_rate,
+        max_epochs=args.max_epochs,
+        mode="test",
+        prediction_file=args.prediction_file,
+        checkpoint=args.checkpoint,
+        training_steps=args.training_steps,
+        seed=args.seed,
+    )
+
+    set_random_seed(config.seed)
+
+    model = T5QA(config)
+    (val_loaders, val_dataset,) = create_zero_re_qa_gold_dataset(
+        question_tokenizer=model.tokenizer,
+        answer_tokenizer=model.tokenizer,
+        batch_size=config.batch_size,
+        source_max_length=config.source_max_length,
+        decoder_max_length=config.decoder_max_length,
+        file=args.dev,
+    )
+
+    run_model(
+        model,
+        config=config,
+        train_dataloader=None,
+        test_dataloader=val_loaders,
+        save_always=True,
+    )
 
 
 def run_re_gold_qa(args):
@@ -479,6 +519,8 @@ def run_main(args):
     """Decides what to do in the code."""
     if args.mode in ["re_gold_qa_train", "re_gold_qa_test"]:
         run_re_gold_qa(args)
+    if args.mode in ["re_classification_gold_qa_train"]:
+        run_relation_classification_gold_qa(args)
     if args.mode in ["re_concat_qa_train", "re_concat_qa_test"]:
         run_re_concat_qa(args)
     if args.mode in ["re_qa_train", "re_qa_test"]:
