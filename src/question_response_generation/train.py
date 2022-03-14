@@ -153,7 +153,7 @@ def run_model(
             model,
             test_dataloader,
             config.prediction_file,
-            prediction_type=config.prediction_type,
+            prediction_type=config.predict_type,
         )
         msg = "\nTotal prediction time:{} seconds\n".format(time.time() - start)
         print(msg)

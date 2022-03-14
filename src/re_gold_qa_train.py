@@ -26,6 +26,7 @@ def run_relation_classification_gold_qa(args):
         checkpoint=args.checkpoint,
         training_steps=args.training_steps,
         seed=args.seed,
+        predict_type=args.predict_type,
     )
 
     set_random_seed(config.seed)

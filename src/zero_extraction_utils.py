@@ -50,6 +50,8 @@ def read_gold_re_qa_relation_data(path):
         passages = []
         entities = []
         entity_relations = []
+        correct_indices = []
+        rel_types = []
         for line in fd:
             line = line.strip()
             line_arr = line.split("\t")
@@ -58,12 +60,14 @@ def read_gold_re_qa_relation_data(path):
                 gold_template = next(iter(all_relations[rel_type]))
                 gold_question = gold_template.replace("XXX", " " + line_arr[2] + " ")
                 if len(line_arr) > 4:
+                    gold_answers = line_arr[4:]
                     if rel_type == line_arr[0]:
-                        gold_answers = line_arr[4:]
+                        correct_indices.append(True)
                     else:
-                        gold_answers = ["no_answer"]
+                        correct_indices.append(False)
                 else:
                     continue
+                rel_types.append(rel_type)
                 passages.append(passage)
                 entity_relations.append(white_space_fix(line_arr[2] + " " + rel_type))
                 entities.append(white_space_fix(line_arr[2]))
@@ -83,9 +87,11 @@ def read_gold_re_qa_relation_data(path):
             "answers": answers,
             "entity_relations": entity_relations,
             "entities": entities,
+            "correct_indices": correct_indices,
+            "rel_types": rel_types,
         }
     )
-    data_df.to_csv("./data.csv", sep=",", header=True, index=False)
+    data_df.to_csv(path + ".relation_data.csv", sep=",", header=True, index=False)
     return passages, contexts, answers, entity_relations, entities
 
 
