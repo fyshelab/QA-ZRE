@@ -91,7 +91,7 @@ def read_gold_re_qa_relation_data(path):
             "rel_types": rel_types,
         }
     )
-    data_df.to_csv(path + ".relation_data.csv", sep=",", header=True, index=False)
+    data_df.to_csv(str(path) + ".relation_data.csv", sep=",", header=True, index=False)
     return passages, contexts, answers, entity_relations, entities
 
 

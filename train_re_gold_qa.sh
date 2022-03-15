@@ -42,7 +42,7 @@ do
 		printf "step ${step}\r\n"
 		python src/re_gold_qa_train.py \
 			--mode re_classification_gold_qa_train \
-		    	--model_path $SCRATCH/feb-15-2022-arr/${fold}/gold/ \
+		    	--model_path ~/fold_${fold_num}/gold/ \
                         --checkpoint _0_step_${step}_model \
 		        --num_search_samples 8 \
 		    	--batch_size 64 \
@@ -50,7 +50,7 @@ do
 		    	--dev ./zero-shot-extraction/relation_splits/dev.${fold_data_id} \
 		    	--gpu_device 0 \
 		    	--seed 12321 \
-			--prediction_file $SCRATCH/feb-15-2022-arr/${fold}/gold/relation.gold.dev.predictions.fold.${fold_num}.step.${step}.csv \
+			--prediction_file ~/fold_${fold_num}/gold/relation.gold.dev.predictions.fold.${fold_num}.step.${step}.csv \
                         --predict_type relation &
 	done
 	wait
