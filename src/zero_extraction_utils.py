@@ -14,7 +14,7 @@ def white_space_fix(text):
     return " ".join(text.split())
 
 
-def read_gold_re_qa_relation_data(path):
+def read_gold_re_qa_relation_data(path, concat=False):
     """Create val data for relation classification considering all the data and
     gold_templates."""
     path = Path(path)
@@ -57,8 +57,11 @@ def read_gold_re_qa_relation_data(path):
             line_arr = line.split("\t")
             passage = line_arr[3]
             for rel_type in all_relations.keys():
-                gold_template = next(iter(all_relations[rel_type]))
-                gold_question = gold_template.replace("XXX", " " + line_arr[2] + " ")
+                if concat:
+                    gold_question = line_arr[2] + " <SEP> " + rel_type
+                else:    
+                    gold_template = next(iter(all_relations[rel_type]))
+                    gold_question = gold_template.replace("XXX", " " + line_arr[2] + " ")
                 if len(line_arr) > 4:
                     gold_answers = line_arr[4:]
                     if rel_type == line_arr[0]:
@@ -91,7 +94,10 @@ def read_gold_re_qa_relation_data(path):
             "rel_types": rel_types,
         }
     )
-    data_df.to_csv(str(path) + ".relation_data.csv", sep=",", header=True, index=False)
+    if concat:
+        data_df.to_csv(str(path) + ".concat.relation_data.csv", sep=",", header=True, index=False)
+    else:
+        data_df.to_csv(str(path) + ".relation_data.csv", sep=",", header=True, index=False)
     return passages, contexts, answers, entity_relations, entities
 
 
@@ -102,6 +108,7 @@ def create_zero_re_qa_gold_dataset(
     source_max_length,
     decoder_max_length,
     file=None,
+    concat=False
 ):
     """Function to create the zero re qa dataset."""
     (
@@ -110,7 +117,7 @@ def create_zero_re_qa_gold_dataset(
         val_answers,
         val_entity_relations,
         _,
-    ) = read_gold_re_qa_relation_data(file)
+    ) = read_gold_re_qa_relation_data(file, concat=concat)
 
     val_encodings = question_tokenizer(
         val_contexts,

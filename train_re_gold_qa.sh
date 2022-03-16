@@ -3,6 +3,8 @@
 echo -n "Enter Fold Number: " 
 read fold_num
 
+source env/bin/activate
+
 '''
 #SBATCH --job-name=dev_concat_fold_1
 #SBATCH --account=def-afyshe-ab
@@ -28,8 +30,8 @@ echo "r$SLURM_NODEID Launching python script"
 
 echo "All the allocated nodes: $SLURM_JOB_NODELIST"
 
-'''
 source env/bin/activate
+
 
 for ((j=0; j<=130; j++))
 do
@@ -41,8 +43,8 @@ do
 		step=$(((i+1) * 100))
 		printf "step ${step}\r\n"
 		python src/re_gold_qa_train.py \
-			--mode re_classification_gold_qa_train \
-		    	--model_path ~/fold_${fold_num}/gold/ \
+			--mode re_classification_qa_train \
+		    	--model_path ~/fold_${fold_num}/concat/ \
                         --checkpoint _0_step_${step}_model \
 		        --num_search_samples 8 \
 		    	--batch_size 64 \
@@ -50,12 +52,30 @@ do
 		    	--dev ./zero-shot-extraction/relation_splits/dev.${fold_data_id} \
 		    	--gpu_device 0 \
 		    	--seed 12321 \
-			--prediction_file ~/fold_${fold_num}/gold/relation.gold.dev.predictions.fold.${fold_num}.step.${step}.csv \
+			--concat True \
+			--prediction_file ~/fold_${fold_num}/concat/relation.concat.dev.predictions.fold.${fold_num}.step.${step}.csv \
                         --predict_type relation &
 	done
 	wait
 done
 
+'''
+
+step=3600
+fold_data_id=$((fold_num-1))
+python src/re_gold_qa_train.py \
+	--mode re_classification_qa_train \
+	--model_path ~/fold_${fold_num}/concat/ \
+	--checkpoint _0_step_${step}_model \
+	--num_search_samples 8 \
+	--batch_size 256 \
+	--gpu True \
+	--dev ./zero-shot-extraction/relation_splits/test.${fold_data_id} \
+	--gpu_device 0 \
+	--seed 12321 \
+	--concat True \
+	--prediction_file ~/fold_${fold_num}/concat/relation.concat.test.predictions.fold.${fold_num}.step.${step}.csv \
+	--predict_type relation 
 '''
 for (( i=1; i<=525; i++ ))
 do

@@ -10,7 +10,7 @@ from src.zero_extraction_utils import (create_fewrl_dataset,
                                        create_zero_re_qa_gold_dataset)
 
 
-def run_relation_classification_gold_qa(args):
+def run_relation_classification_qa(args):
     """Run the relation-extraction qa models using the given gold questions for
     the head entity and the relation."""
     config = HyperParameters(
@@ -31,6 +31,10 @@ def run_relation_classification_gold_qa(args):
 
     set_random_seed(config.seed)
 
+    if args.concat == 'True':
+        concat_bool = True
+    else:
+        concat_bool = False
     model = T5QA(config)
     (val_loaders, val_dataset,) = create_zero_re_qa_gold_dataset(
         question_tokenizer=model.tokenizer,
@@ -39,6 +43,7 @@ def run_relation_classification_gold_qa(args):
         source_max_length=config.source_max_length,
         decoder_max_length=config.decoder_max_length,
         file=args.dev,
+        concat=concat_bool
     )
 
     run_model(
@@ -520,8 +525,8 @@ def run_main(args):
     """Decides what to do in the code."""
     if args.mode in ["re_gold_qa_train", "re_gold_qa_test"]:
         run_re_gold_qa(args)
-    if args.mode in ["re_classification_gold_qa_train"]:
-        run_relation_classification_gold_qa(args)
+    if args.mode in ["re_classification_qa_train"]:
+        run_relation_classification_qa(args)
     if args.mode in ["re_concat_qa_train", "re_concat_qa_test"]:
         run_re_concat_qa(args)
     if args.mode in ["re_qa_train", "re_qa_test"]:
@@ -544,6 +549,10 @@ def argument_parser():
         type=str,
         required=True,
         help="re_gold_qa_train | re_gold_qa_test | re_concat_qa_train | re_concat_qa_test | re_qa_train | re_qa_test",
+    )
+    parser.add_argument(
+        "--concat",
+        type=str,
     )
     parser.add_argument(
         "--train_method",
