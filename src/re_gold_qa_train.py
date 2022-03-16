@@ -4,10 +4,9 @@ from src.question_response_generation.t5_model import T5QA
 from src.question_response_generation.train import run_model
 from src.re_qa_model import REQA, HyperParameters, load_module, set_random_seed
 from src.re_qa_train import iterative_run_model
-from src.zero_extraction_utils import (create_fewrl_dataset,
-                                       create_relation_fewrl_dataset,
-                                       create_zero_re_qa_dataset,
-                                       create_zero_re_qa_gold_dataset)
+from src.zero_extraction_utils import (  # create_relation_fewrl_dataset,
+    create_fewrl_dataset, create_relation_qq_dataset,
+    create_zero_re_qa_dataset, create_zero_re_qa_gold_dataset)
 
 
 def run_relation_classification_qa(args):
@@ -31,7 +30,7 @@ def run_relation_classification_qa(args):
 
     set_random_seed(config.seed)
 
-    if args.concat == 'True':
+    if args.concat == "True":
         concat_bool = True
     else:
         concat_bool = False
@@ -43,7 +42,7 @@ def run_relation_classification_qa(args):
         source_max_length=config.source_max_length,
         decoder_max_length=config.decoder_max_length,
         file=args.dev,
-        concat=concat_bool
+        concat=concat_bool,
     )
 
     run_model(
@@ -316,7 +315,7 @@ def run_fewrl(args):
     """
 
     if args.mode == "fewrl_train":
-        (loader, dataset) = create_relation_fewrl_dataset(
+        (loader, dataset) = create_relation_qq_dataset(
             question_tokenizer=model.question_tokenizer,
             answer_tokenizer=model.answer_tokenizer,
             batch_size=config.batch_size,
@@ -337,7 +336,7 @@ def run_fewrl(args):
         )
 
     if args.mode == "fewrl_dev":
-        (loader, dataset) = create_relation_fewrl_dataset(
+        (loader, dataset) = create_relation_qq_dataset(
             question_tokenizer=model.question_tokenizer,
             answer_tokenizer=model.answer_tokenizer,
             batch_size=config.batch_size,
@@ -354,7 +353,7 @@ def run_fewrl(args):
         )
 
     if args.mode == "fewrl_test":
-        (loader, dataset) = create_relation_fewrl_dataset(
+        (loader, dataset) = create_relation_qq_dataset(
             question_tokenizer=model.question_tokenizer,
             answer_tokenizer=model.answer_tokenizer,
             batch_size=config.batch_size,

@@ -14,7 +14,7 @@ def white_space_fix(text):
     return " ".join(text.split())
 
 
-def read_gold_re_qa_relation_data(path, concat=False):
+def read_gold_re_qa_relation_data(path, concat=False, for_question_generation=False):
     """Create val data for relation classification considering all the data and
     gold_templates."""
     path = Path(path)
@@ -46,6 +46,7 @@ def read_gold_re_qa_relation_data(path, concat=False):
 
     with open(path, "r") as fd:
         contexts = []
+        posterier_contexts = []
         answers = []
         passages = []
         entities = []
@@ -59,9 +60,11 @@ def read_gold_re_qa_relation_data(path, concat=False):
             for rel_type in all_relations.keys():
                 if concat:
                     gold_question = line_arr[2] + " <SEP> " + rel_type
-                else:    
+                else:
                     gold_template = next(iter(all_relations[rel_type]))
-                    gold_question = gold_template.replace("XXX", " " + line_arr[2] + " ")
+                    gold_question = gold_template.replace(
+                        "XXX", " " + line_arr[2] + " "
+                    )
                 if len(line_arr) > 4:
                     gold_answers = line_arr[4:]
                     if rel_type == line_arr[0]:
@@ -74,31 +77,101 @@ def read_gold_re_qa_relation_data(path, concat=False):
                 passages.append(passage)
                 entity_relations.append(white_space_fix(line_arr[2] + " " + rel_type))
                 entities.append(white_space_fix(line_arr[2]))
-                contexts.append(
-                    "question: "
-                    + white_space_fix(gold_question)
-                    + " context: "
-                    + white_space_fix(passage)
-                    + " </s>"
-                )
+                if for_question_generation:
+                    if white_space_fix(rel_type).lower() in rel_dict:
+                        contexts.append(
+                            "answer: "
+                            + white_space_fix(line_arr[2])
+                            + " <SEP> "
+                            + white_space_fix(rel_type)
+                            + " ; "
+                            + rel_dict[white_space_fix(rel_type).lower()]
+                            + " context: "
+                            + white_space_fix(passage)
+                            + " </s>"
+                        )
+                        posterier_contexts.append(
+                            "answer: "
+                            + white_space_fix(line_arr[2])
+                            + " <SEP> "
+                            + white_space_fix(rel_type)
+                            + " ; "
+                            + rel_dict[white_space_fix(rel_type).lower()]
+                            + " "
+                            + white_space_fix(" and ".join(gold_answers))
+                            + " context: "
+                            + white_space_fix(passage)
+                            + " </s>"
+                        )
+                    else:
+                        contexts.append(
+                            "answer: "
+                            + white_space_fix(line_arr[2])
+                            + " <SEP> "
+                            + white_space_fix(rel_type)
+                            + " context: "
+                            + white_space_fix(passage)
+                            + " </s>"
+                        )
+                        posterier_contexts.append(
+                            "answer: "
+                            + white_space_fix(line_arr[2])
+                            + " <SEP> "
+                            + white_space_fix(rel_type)
+                            + " "
+                            + white_space_fix(" and ".join(gold_answers))
+                            + " context: "
+                            + white_space_fix(passage)
+                            + " </s>"
+                        )
+                else:
+                    contexts.append(
+                        "question: "
+                        + white_space_fix(gold_question)
+                        + " context: "
+                        + white_space_fix(passage)
+                        + " </s>"
+                    )
                 answers.append(white_space_fix(" and ".join(gold_answers)) + " </s>")
 
-    data_df = pd.DataFrame(
-        {
-            "passages": passages,
-            "contexts": contexts,
-            "answers": answers,
-            "entity_relations": entity_relations,
-            "entities": entities,
-            "correct_indices": correct_indices,
-            "rel_types": rel_types,
-        }
-    )
-    if concat:
-        data_df.to_csv(str(path) + ".concat.relation_data.csv", sep=",", header=True, index=False)
+    if for_question_generation:
+        data_df = pd.DataFrame(
+            {
+                "passages": passages,
+                "contexts": contexts,
+                "posterier_contexts": posterier_contexts,
+                "answers": answers,
+                "entity_relations": entity_relations,
+                "entities": entities,
+                "correct_indices": correct_indices,
+                "rel_types": rel_types,
+            }
+        )
     else:
-        data_df.to_csv(str(path) + ".relation_data.csv", sep=",", header=True, index=False)
-    return passages, contexts, answers, entity_relations, entities
+        data_df = pd.DataFrame(
+            {
+                "passages": passages,
+                "contexts": contexts,
+                "answers": answers,
+                "entity_relations": entity_relations,
+                "entities": entities,
+                "correct_indices": correct_indices,
+                "rel_types": rel_types,
+            }
+        )
+    if concat:
+        data_df.to_csv(
+            str(path) + ".concat.relation_data.csv", sep=",", header=True, index=False
+        )
+    elif for_question_generation:
+        data_df.to_csv(
+            str(path) + ".qq.relation_data.csv", sep=",", header=True, index=False
+        )
+    else:
+        data_df.to_csv(
+            str(path) + ".relation_data.csv", sep=",", header=True, index=False
+        )
+    return passages, contexts, posterier_contexts, answers, entity_relations, entities
 
 
 def create_zero_re_qa_gold_dataset(
@@ -108,7 +181,7 @@ def create_zero_re_qa_gold_dataset(
     source_max_length,
     decoder_max_length,
     file=None,
-    concat=False
+    concat=False,
 ):
     """Function to create the zero re qa dataset."""
     (
@@ -1605,7 +1678,7 @@ def create_relation_train_dataset_fewrl(fewrel_path, seed=10, m=5, neg_samples=1
     )
 
 
-def create_relation_fewrl_dataset(
+def create_relation_qq_dataset(
     question_tokenizer,
     answer_tokenizer,
     batch_size,
@@ -1617,6 +1690,19 @@ def create_relation_fewrl_dataset(
 ):
     """Function to create the fewrl dataset for training with negative
     samples."""
+
+    (
+        train_passages,
+        train_contexts,
+        train_posterier_contexts,
+        train_answers,
+        train_entity_relations,
+        train_entities,
+    ) = read_gold_re_qa_relation_data(
+        train_fewrel_path, concat=False, for_question_generation=True
+    )
+
+    """
     train_df = pd.read_csv(train_fewrel_path, sep=",")
 
     train_passages = train_df["passages"].tolist()
@@ -1635,7 +1721,7 @@ def create_relation_fewrl_dataset(
                 "answer: " + ent_rel_str + " context: " + ctx_str
             )
             train_contexts[i] = new_train_context
-
+    """
     train_encodings = question_tokenizer(
         train_contexts,
         truncation=True,
