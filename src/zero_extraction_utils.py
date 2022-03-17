@@ -14,6 +14,61 @@ def white_space_fix(text):
     return " ".join(text.split())
 
 
+def find_sub_list(sl, l):
+    i = 0
+    while i <= len(l) - len(sl):
+        sub_arr = l[i : i + len(sl)]
+        check = True
+        for j in range(len(sub_arr)):
+            if sl[j] not in sub_arr[j]:
+                check = False
+        if check:
+            return list(range(i, i + len(sl), 1))
+        i += 1
+    return []
+
+
+def convert_reqa_to_fewrel_format(path, output_path):
+    path = Path(path)
+
+    label_to_id = {}
+    with open("./props.json", "r") as fd:
+        re_desc_data = json.load(fd)
+        for row in re_desc_data:
+            re_label = row["label"]
+            re_id = row["id"]
+            label_to_id[re_label] = re_id
+
+    output_json = {}
+    with open(output_path, "w") as out_fd:
+        with open(path, "r") as fd:
+            for line in fd:
+                line = line.strip()
+                line_arr = line.split("\t")
+                passage = line_arr[3].rstrip(".") + " ."
+                h = line_arr[2]
+                if line_arr[4:]:
+                    t = line_arr[4:][0]
+                else:
+                    continue
+                rel_desc = line_arr[0]
+                rel_id = label_to_id.get(rel_desc.lower(), rel_desc.lower())
+                list_update = output_json.get(rel_id, [])
+                tokens = white_space_fix(passage).split(" ")
+                h_tokens = white_space_fix(h).split(" ")
+                t_tokens = white_space_fix(t).split(" ")
+                h_indices = find_sub_list(h_tokens, tokens)
+                t_indices = find_sub_list(t_tokens, tokens)
+                ret_row = {
+                    "tokens": tokens,
+                    "h": [h, "dummy_id", [h_indices]],
+                    "t": [t, "dummy_id", [t_indices]],
+                }
+                list_update.append(ret_row)
+                output_json[rel_id] = list_update
+        json.dump(output_json, out_fd)
+
+
 def read_gold_re_qa_relation_data(path, concat=False, for_question_generation=False):
     """Create val data for relation classification considering all the data and
     gold_templates."""
