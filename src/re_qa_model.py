@@ -417,7 +417,7 @@ class REQA(torch.nn.Module):
             answer_log_p = torch.sum(good_log_p, dim=1).squeeze().cpu().numpy()
             question_log_ps = question_log_ps.cpu().numpy()
             for index in range(b):
-                relation_log_p = answer_log_p[index] + question_log_ps[index]
+                relation_log_p = answer_log_p[index] #+ question_log_ps[index]
                 output_batch = {
                     "relation_log_p": relation_log_p,
                 }

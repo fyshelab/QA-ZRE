@@ -28,7 +28,7 @@ def find_sub_list(sl, l):
     return []
 
 
-def convert_reqa_to_fewrel_format(path, output_path):
+def convert_reqa_to_fewrel_format(path, output_path, train=False):
     path = Path(path)
 
     label_to_id = {}
@@ -45,7 +45,7 @@ def convert_reqa_to_fewrel_format(path, output_path):
             for line in fd:
                 line = line.strip()
                 line_arr = line.split("\t")
-                passage = line_arr[3].rstrip(".") + " ."
+                passage = line_arr[3]
                 h = line_arr[2]
                 if line_arr[4:]:
                     t = line_arr[4:][0]
@@ -59,6 +59,9 @@ def convert_reqa_to_fewrel_format(path, output_path):
                 t_tokens = white_space_fix(t).split(" ")
                 h_indices = find_sub_list(h_tokens, tokens)
                 t_indices = find_sub_list(t_tokens, tokens)
+                if train and len(tokens) > 160:
+                    print("skipped an example in train")
+                    continue
                 ret_row = {
                     "tokens": tokens,
                     "h": [h, "dummy_id", [h_indices]],

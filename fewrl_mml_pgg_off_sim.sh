@@ -46,33 +46,55 @@ python src/re_gold_qa_train.py \
     --seed 12321 \
     --train_method MML-MML-Off-Sim
 
+for ((j=9; j<=50; j++))
+do
+	k=$((j * 4))
+	end_k=$((k+3))
+        fold_data_id=$((fold_num-1))
+	for (( i=${k}; i<=${end_k}; i++ ))
+	do
+		step=$(((i+1) * 100))
+		printf "step ${step}\r\n"
+		python src/re_gold_qa_train.py \
+			--mode fewrl_dev \
+			--model_path ~/fold_1/mml-pgg-off-sim/ \
+			--answer_checkpoint _0_answer_step_${step} \
+			--question_checkpoint _0_question_step_${step} \
+			--num_search_samples 8 \
+			--batch_size 32 --gpu True \
+			--dev ~/QA-ZRE/zero-shot-extraction/relation_splits/dev.0 \
+			--gpu_device 0 \
+			--seed 12321 \
+			--prediction_file ~/fold_1/mml-pgg-off-sim/relation.mml-pgg-off-sim.run.0.dev.predictions.step.${step}.csv \
+                        --predict_type relation &
+	done
+	wait
+done
+
 '''
+
 for (( e=0; e<=0; e++ ))
 do
-	for (( i=52; i<=52; i++ ))
+	for (( i=93; i<=93; i++ ))
 	do
 		step=$((i * 100))
 		printf "step ${step} on epoch ${i}\r\n"
 		python src/re_gold_qa_train.py \
 			--mode fewrl_dev \
-			--model_path ~/fewrl/run_1/ \
+			--model_path ~/fold_1/mml-pgg-off-sim/ \
 			--answer_checkpoint _${e}_answer_step_${step} \
 			--question_checkpoint _${e}_question_step_${step} \
 			--num_search_samples 8 \
-			--training_steps 5200 \
-			--batch_size 128 --gpu True \
-			--train ./unk_fewrl_data/unk_train_data_12321.csv \
-			--dev ./unk_fewrl_data/val_data_12321.csv \
-			--test ./unk_fewrl_data/val_data_12321.csv \
+			--batch_size 160 --gpu True \
+			--dev ~/QA-ZRE/zero-shot-extraction/relation_splits/dev.0 \
 			--gpu_device 0 \
 			--seed 12321 \
-			--prediction_file ~/fewrl/run_1/relation.unk.mml-mml-off-sim.run.${e}.dev.predictions.step.${step}.csv \
-			--predict_type relation
+			--prediction_file ~/fold_1/mml-pgg-off-sim/entity.relation.mml-pgg-off-sim.run.${e}.dev.predictions.step.${step}.csv \
+			--predict_type entity
 	done
 done
 
 '''
-
 python src/re_gold_qa_train.py \
 	--mode re_qa_test \
 	--model_path $SCRATCH/fold_1/mml-pgg-off-sim/ \

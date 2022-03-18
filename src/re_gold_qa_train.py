@@ -628,6 +628,7 @@ def argument_parser():
     parser.add_argument(
         "--training_steps",
         type=int,
+        default=0,
         help="number of training steps over the train data.",
     )
     parser.add_argument(
