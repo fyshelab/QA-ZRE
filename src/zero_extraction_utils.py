@@ -59,9 +59,12 @@ def convert_reqa_to_fewrel_format(path, output_path, train=False):
                 t_tokens = white_space_fix(t).split(" ")
                 h_indices = find_sub_list(h_tokens, tokens)
                 t_indices = find_sub_list(t_tokens, tokens)
-                if train and len(tokens) > 160:
-                    print("skipped an example in train")
+                #if train and len(tokens) > 160:
+                #    print("skipped an example in train")
+                #    continue
+                if len(tokens) > 160:
                     continue
+                    print("skipped an example in test")
                 ret_row = {
                     "tokens": tokens,
                     "h": [h, "dummy_id", [h_indices]],
