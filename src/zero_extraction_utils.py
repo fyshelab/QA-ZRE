@@ -248,6 +248,7 @@ def create_zero_re_qa_gold_dataset(
     (
         val_passages,
         val_contexts,
+        val_posterier_contexts,
         val_answers,
         val_entity_relations,
         _,

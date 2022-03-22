@@ -1,12 +1,6 @@
 #!/bin/bash
 
-echo -n "Enter Fold Number: " 
-read fold_num
-
-source env/bin/activate
-
-'''
-#SBATCH --job-name=dev_concat_fold_1
+#SBATCH --job-name=test_concats
 #SBATCH --account=def-afyshe-ab
 #SBATCH --nodes=1
 #SBATCH --tasks-per-node=1
@@ -18,7 +12,7 @@ source env/bin/activate
 
 module load StdEnv/2020 gcc/9.3.0 cuda/11.4 arrow/5.0.0
 
-source env/bin/activate
+source ../dreamscape-qa/env/bin/activate
 
 export NCCL_BLOCKING_WAIT=1  #Set this environment variable if you wish to use the NCCL backend for inter-GPU communication.
 
@@ -30,9 +24,8 @@ echo "r$SLURM_NODEID Launching python script"
 
 echo "All the allocated nodes: $SLURM_JOB_NODELIST"
 
-source env/bin/activate
 
-
+'''
 for ((j=0; j<=130; j++))
 do
 	k=$((j * 4))
@@ -61,22 +54,29 @@ done
 
 '''
 
-step=3600
-fold_data_id=$((fold_num-1))
-python src/re_gold_qa_train.py \
-	--mode re_classification_qa_train \
-	--model_path ~/fold_${fold_num}/concat/ \
-	--checkpoint _0_step_${step}_model \
-	--num_search_samples 8 \
-	--batch_size 256 \
-	--gpu True \
-	--dev ./zero-shot-extraction/relation_splits/test.${fold_data_id} \
-	--gpu_device 0 \
-	--seed 12321 \
-	--concat True \
-	--prediction_file ~/fold_${fold_num}/concat/relation.concat.test.predictions.fold.${fold_num}.step.${step}.csv \
-	--predict_type relation 
+steps=(3600 4300 5200 1600 2900 1400 2500 21700 2600 800)
+for i in ${!steps[@]};
+do
+	fold_num=$((i+1))
+        fold_data_id=$((fold_num-1))
+	step=${steps[$i]}
+	python src/re_gold_qa_train.py \
+		--mode re_classification_qa_train \
+		--model_path $SCRATCH/feb-15-2022-arr/fold_${fold_num}/concat/ \
+		--checkpoint _0_step_${step}_model \
+		--num_search_samples 8 \
+		--batch_size 256 \
+		--gpu True \
+		--dev ./zero-shot-extraction/relation_splits/test.${fold_data_id} \
+		--gpu_device 0 \
+		--seed 12321 \
+		--concat True \
+		--prediction_file $SCRATCH/feb-15-2022-arr/fold_${fold_num}/concat/relation.concat.test.predictions.fold.${fold_num}.step.${step}.csv \
+		--predict_type relation 
+done
+
 '''
+
 for (( i=1; i<=525; i++ ))
 do
         step=$((i * 100))

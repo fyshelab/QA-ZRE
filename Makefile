@@ -1,8 +1,7 @@
 .PHONY: install_narval
-install:
+install_narval:
 
-	python3 -m venv env; \
-	. env/bin/activate; \
+	. ../dreamscape-qa/env/bin/activate; \
 	pip3 install -e .; \
 	pip3 install torch==1.8.1+cu111 torchvision==0.9.1+cu111 torchaudio==0.8.1 -U -f https://download.pytorch.org/whl/torch_stable.html --no-cache-dir; \
 	pip3 install nltk rouge-score sentencepiece absl-py; \
