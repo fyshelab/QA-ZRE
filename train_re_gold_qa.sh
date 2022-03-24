@@ -1,6 +1,6 @@
 #!/bin/bash
 
-#SBATCH --job-name=test_concats
+#SBATCH --job-name=test_golds
 #SBATCH --account=def-afyshe-ab
 #SBATCH --nodes=1
 #SBATCH --tasks-per-node=1
@@ -54,7 +54,7 @@ done
 
 '''
 
-steps=(3600 4300 5200 1600 2900 1400 2500 21700 2600 800)
+steps=(2500 6600 200 9500 15300 1100 43100 1000 1900 4000)
 for i in ${!steps[@]};
 do
 	fold_num=$((i+1))
@@ -62,7 +62,7 @@ do
 	step=${steps[$i]}
 	python src/re_gold_qa_train.py \
 		--mode re_classification_qa_train \
-		--model_path $SCRATCH/feb-15-2022-arr/fold_${fold_num}/concat/ \
+		--model_path $SCRATCH/feb-15-2022-arr/fold_${fold_num}/gold/ \
 		--checkpoint _0_step_${step}_model \
 		--num_search_samples 8 \
 		--batch_size 256 \
@@ -70,8 +70,8 @@ do
 		--dev ./zero-shot-extraction/relation_splits/test.${fold_data_id} \
 		--gpu_device 0 \
 		--seed 12321 \
-		--concat True \
-		--prediction_file $SCRATCH/feb-15-2022-arr/fold_${fold_num}/concat/relation.concat.test.predictions.fold.${fold_num}.step.${step}.csv \
+		--concat False \
+		--prediction_file $SCRATCH/feb-15-2022-arr/fold_${fold_num}/gold/relation.gold.test.predictions.fold.${fold_num}.step.${step}.csv \
 		--predict_type relation 
 done
 

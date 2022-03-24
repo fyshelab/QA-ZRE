@@ -151,7 +151,7 @@ def prob_of_sampled_predictions(loss_fct, sample_outputs):
     return sampled_predictions, log_p
 
 
-MODEL_NAME = "t5-small"
+MODEL_NAME = "./t5-small"
 
 
 class REQA(torch.nn.Module):
@@ -167,32 +167,32 @@ class REQA(torch.nn.Module):
 
         # Answer Model tokenizer
         answer_tokenizer = T5Tokenizer.from_pretrained(
-            MODEL_NAME  # , local_files_only=True
+            MODEL_NAME, local_files_only=True
         )
 
         # Construct the answer model
         answer_model = T5ForConditionalGeneration.from_pretrained(
-            MODEL_NAME  # , local_files_only=True
+            MODEL_NAME, local_files_only=True
         )
 
         # Question Model tokenizer
         question_tokenizer = T5Tokenizer.from_pretrained(
-            MODEL_NAME  # , local_files_only=True
+            MODEL_NAME, local_files_only=True
         )
 
         # Construct the question model
         question_model = T5ForConditionalGeneration.from_pretrained(
-            MODEL_NAME  # , local_files_only=True
+            MODEL_NAME, local_files_only=True
         )
 
         # Pretrained question model tokenizer
         self.init_question_tokenizer = T5Tokenizer.from_pretrained(
-            MODEL_NAME  # , local_files_only=True
+            MODEL_NAME, local_files_only=True
         )
 
         # Construct the pretrained question model
         self.init_question_model = T5ForConditionalGeneration.from_pretrained(
-            MODEL_NAME  # , local_files_only=True
+            MODEL_NAME, local_files_only=True
         )
 
         if cfg.mode == "train":
@@ -417,9 +417,12 @@ class REQA(torch.nn.Module):
             answer_log_p = torch.sum(good_log_p, dim=1).squeeze().cpu().numpy()
             question_log_ps = question_log_ps.cpu().numpy()
             for index in range(b):
-                relation_log_p = answer_log_p[index] #+ question_log_ps[index]
+                relation_log_p = answer_log_p[index] + question_log_ps[index]
                 output_batch = {
                     "relation_log_p": relation_log_p,
+                    "question_log_p": question_log_ps[index],
+                    "answer_log_p": answer_log_p[index],
+                    "generated_question": question_predictions_str[index]
                 }
                 yield output_batch
 

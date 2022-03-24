@@ -1,9 +1,6 @@
 #!/bin/bash
 
-source env/bin/activate
-
-'''
-#SBATCH --job-name=test_base_fewrl_run_3
+#SBATCH --job-name=test_mml_idea
 #SBATCH --account=def-afyshe-ab
 #SBATCH --nodes=1
 #SBATCH --tasks-per-node=1
@@ -15,7 +12,7 @@ source env/bin/activate
 
 module load StdEnv/2020 gcc/9.3.0 cuda/11.4 arrow/5.0.0
 
-source env/bin/activate
+source ../dreamscape-qa/env/bin/activate
 
 export NCCL_BLOCKING_WAIT=1  #Set this environment variable if you wish to use the NCCL backend for inter-GPU communication.
 
@@ -27,7 +24,6 @@ echo "r$SLURM_NODEID Launching python script"
 
 echo "All the allocated nodes: $SLURM_JOB_NODELIST"
 
-'''
 '''
 # The SLURM_NTASKS variable tells the script how many processes are available for this execution. “srun” executes the script <tasks-per-node * nodes> times
 python src/re_gold_qa_train.py \
@@ -81,16 +77,16 @@ do
 		printf "step ${step} on epoch ${i}\r\n"
 		python src/re_gold_qa_train.py \
 			--mode fewrl_dev \
-			--model_path ~/fold_1/mml-pgg-off-sim/ \
+			--model_path $SCRATCH/feb-15-2022-arr/fold_1/mml-pgg-off-sim/ \
 			--answer_checkpoint _${e}_answer_step_${step} \
 			--question_checkpoint _${e}_question_step_${step} \
 			--num_search_samples 8 \
 			--batch_size 160 --gpu True \
-			--dev ~/QA-ZRE/zero-shot-extraction/relation_splits/dev.0 \
+			--dev ./zero-shot-extraction/relation_splits/dev.0 \
 			--gpu_device 0 \
 			--seed 12321 \
-			--prediction_file ~/fold_1/mml-pgg-off-sim/entity.relation.mml-pgg-off-sim.run.${e}.dev.predictions.step.${step}.csv \
-			--predict_type entity
+			--prediction_file $SCRATCH/feb-15-2022-arr/fold_1/mml-pgg-off-sim/relation.mml-pgg-off-sim.run.${e}.dev.predictions.step.${step}.csv \
+			--predict_type relation
 	done
 done
 
