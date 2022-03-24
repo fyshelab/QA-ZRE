@@ -1,5 +1,7 @@
 #!/bin/bash
 
+
+'''
 #SBATCH --job-name=test_mml_idea
 #SBATCH --account=def-afyshe-ab
 #SBATCH --nodes=1
@@ -24,7 +26,6 @@ echo "r$SLURM_NODEID Launching python script"
 
 echo "All the allocated nodes: $SLURM_JOB_NODELIST"
 
-'''
 # The SLURM_NTASKS variable tells the script how many processes are available for this execution. “srun” executes the script <tasks-per-node * nodes> times
 python src/re_gold_qa_train.py \
     --mode fewrl_train \
@@ -69,6 +70,8 @@ done
 
 '''
 
+source ../dreamscape-qa/env/bin/activate
+
 for (( e=0; e<=0; e++ ))
 do
 	for (( i=93; i<=93; i++ ))
@@ -77,15 +80,15 @@ do
 		printf "step ${step} on epoch ${i}\r\n"
 		python src/re_gold_qa_train.py \
 			--mode fewrl_dev \
-			--model_path $SCRATCH/feb-15-2022-arr/fold_1/mml-pgg-off-sim/ \
+			--model_path /home/snajafi/march-23-models/fold_1/mml-pgg-off-sim/ \
 			--answer_checkpoint _${e}_answer_step_${step} \
 			--question_checkpoint _${e}_question_step_${step} \
 			--num_search_samples 8 \
-			--batch_size 160 --gpu True \
+			--batch_size 2 --gpu True \
 			--dev ./zero-shot-extraction/relation_splits/dev.0 \
 			--gpu_device 0 \
 			--seed 12321 \
-			--prediction_file $SCRATCH/feb-15-2022-arr/fold_1/mml-pgg-off-sim/relation.mml-pgg-off-sim.run.${e}.dev.predictions.step.${step}.csv \
+			--prediction_file /home/snajafi/march-23-models/fold_1/mml-pgg-off-sim/relation.mml-pgg-off-sim.run.${e}.dev.predictions.step.${step}.csv \
 			--predict_type relation
 	done
 done

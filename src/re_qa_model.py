@@ -151,7 +151,7 @@ def prob_of_sampled_predictions(loss_fct, sample_outputs):
     return sampled_predictions, log_p
 
 
-MODEL_NAME = "./t5-small"
+MODEL_NAME = "t5-small"
 
 
 class REQA(torch.nn.Module):
@@ -167,32 +167,32 @@ class REQA(torch.nn.Module):
 
         # Answer Model tokenizer
         answer_tokenizer = T5Tokenizer.from_pretrained(
-            MODEL_NAME, local_files_only=True
+            MODEL_NAME#, local_files_only=True
         )
 
         # Construct the answer model
         answer_model = T5ForConditionalGeneration.from_pretrained(
-            MODEL_NAME, local_files_only=True
+            MODEL_NAME#, local_files_only=True
         )
 
         # Question Model tokenizer
         question_tokenizer = T5Tokenizer.from_pretrained(
-            MODEL_NAME, local_files_only=True
+            MODEL_NAME#, local_files_only=True
         )
 
         # Construct the question model
         question_model = T5ForConditionalGeneration.from_pretrained(
-            MODEL_NAME, local_files_only=True
+            MODEL_NAME#, local_files_only=True
         )
 
         # Pretrained question model tokenizer
         self.init_question_tokenizer = T5Tokenizer.from_pretrained(
-            MODEL_NAME, local_files_only=True
+            MODEL_NAME#, local_files_only=True
         )
 
         # Construct the pretrained question model
         self.init_question_model = T5ForConditionalGeneration.from_pretrained(
-            MODEL_NAME, local_files_only=True
+            MODEL_NAME#, local_files_only=True
         )
 
         if cfg.mode == "train":
@@ -271,7 +271,7 @@ class REQA(torch.nn.Module):
                     no_repeat_ngram_size=self.config.no_repeat_ngram_size,
                     early_stopping=True,
                     max_length=self.config.decoder_max_length,
-                    num_return_sequences=1,
+                    num_return_sequences=self.config.num_search_samples,
                     num_beams=self.config.num_search_samples,
                     length_penalty=1.0,  # no penalty
                     output_scores=True,
@@ -284,7 +284,7 @@ class REQA(torch.nn.Module):
                     no_repeat_ngram_size=self.config.no_repeat_ngram_size,
                     early_stopping=True,
                     max_length=self.config.decoder_max_length,
-                    num_return_sequences=1,
+                    num_return_sequences=self.config.num_search_samples,
                     num_beams=self.config.num_search_samples,
                     length_penalty=1.0,  # no penalty
                     output_scores=True,
@@ -302,14 +302,14 @@ class REQA(torch.nn.Module):
         ]
 
         new_articles = []
-        for i in range(len(batch["passages"])):
+        for i in range(len(question_predictions_str)):
             new_article = (
                 "relation: "
-                + batch["entity_relations"][i]
+                + batch["entity_relations"][i // self.config.num_search_samples]
                 + " question: "
                 + question_predictions_str[i]
                 + " context: "
-                + batch["passages"][i]
+                + batch["passages"][i // self.config.num_search_samples]
                 + " </s>"
             )
             new_articles.append(new_article)
@@ -391,6 +391,10 @@ class REQA(torch.nn.Module):
         if self.config.gpu:
             target_mask = target_mask.to(current_device)
             labels = labels.to(current_device)
+
+        b_sz, dec_seq_len = labels.size()
+        labels = labels.repeat(1, self.config.num_search_samples).view(-1, dec_seq_len)
+        target_mask = target_mask.repeat(1, self.config.num_search_samples).view(-1, dec_seq_len)
 
         # Answer Computation
         with torch.no_grad():
