@@ -82,13 +82,13 @@ do
 			--mode fewrl_dev \
 			--model_path /home/snajafi/march-23-models/fold_1/mml-pgg-off-sim/ \
 			--answer_checkpoint _${e}_answer_step_${step} \
-			--question_checkpoint _${e}_question_step_${step} \
+			--question_checkpoint _fold_1_question_pretrained \
 			--num_search_samples 8 \
-			--batch_size 2 --gpu True \
+			--batch_size 8 --gpu True \
 			--dev ./zero-shot-extraction/relation_splits/dev.0 \
 			--gpu_device 0 \
 			--seed 12321 \
-			--prediction_file /home/snajafi/march-23-models/fold_1/mml-pgg-off-sim/relation.mml-pgg-off-sim.run.${e}.dev.predictions.step.${step}.csv \
+			--prediction_file /home/snajafi/march-23-models/fold_1/mml-pgg-off-sim/init_q.relation.mml-pgg-off-sim.run.${e}.dev.predictions.step.${step}.csv \
 			--predict_type relation
 	done
 done
