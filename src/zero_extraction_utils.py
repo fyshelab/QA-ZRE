@@ -59,7 +59,7 @@ def convert_reqa_to_fewrel_format(path, output_path, train=False):
                 t_tokens = white_space_fix(t).split(" ")
                 h_indices = find_sub_list(h_tokens, tokens)
                 t_indices = find_sub_list(t_tokens, tokens)
-                #if train and len(tokens) > 160:
+                # if train and len(tokens) > 160:
                 #    print("skipped an example in train")
                 #    continue
                 if len(tokens) > 160:
@@ -1843,6 +1843,120 @@ def create_relation_qq_dataset(
         for labels in train_encodings["second_entity_labels"]
     ]
     train_encodings["second_entity_labels"] = train_labels
+    train_encodings["labels"] = train_labels
+
+    class HelperDataset(torch.utils.data.Dataset):
+        def __init__(self, encodings):
+            self.encodings = encodings
+
+        def __getitem__(self, idx):
+            row = {}
+            for key, val in self.encodings.items():
+                if key in ["passages", "entity_relations"]:
+                    row[key] = val[idx]
+                else:
+                    row[key] = torch.tensor(val[idx])
+            return row
+
+        def __len__(self):
+            if "entity_relation_passage_input_ids" in self.encodings:
+                return len(self.encodings.entity_relation_passage_input_ids)
+            if "input_ids" in self.encodings:
+                return len(self.encodings.input_ids)
+
+    train_dataset = HelperDataset(train_encodings)
+    train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=shuffle)
+    return (
+        train_loader,
+        train_dataset,
+    )
+
+
+def read_relation_extraction_lm_reqa_data(path):
+    """Main function to create the relation extraction LM data from the RE-QA
+    dataset."""
+    path = Path(path)
+
+    rel_dict = {}
+    with open("./props.json", "r") as fd:
+        re_desc_data = json.load(fd)
+        sentence_delimiters = [". ", ".\n", "? ", "?\n", "! ", "!\n"]
+        for row in re_desc_data:
+            desc = row["description"]
+            if desc == {}:
+                continue
+            desc = desc.strip(".") + ". "
+            pos = [desc.find(delimiter) for delimiter in sentence_delimiters]
+            pos = min([p for p in pos if p >= 0])
+            re_desc = desc[:pos]
+            re_id = row["label"]
+            rel_dict[white_space_fix(re_id).lower()] = white_space_fix(re_desc)
+
+    with open(path, "r") as fd:
+        contexts = []
+        answers = []
+        for line in fd:
+            line = line.strip()
+            line_arr = line.split("\t")
+            passage = line_arr[3]
+            h_entity = line_arr[2]
+            output_relation_lm = line_arr[0]
+            if len(line_arr) > 4:
+                tail_entity = line_arr[4:]
+            else:
+                tail_entity = ["no_answer"]
+            contexts.append(
+                "head: "
+                + white_space_fix(h_entity)
+                + " tail: "
+                + white_space_fix(" and ".join(tail_entity))
+                + " context: "
+                + white_space_fix(passage)
+                + " </s>"
+            )
+
+            output_lm = output_relation_lm
+            if output_relation_lm.lower() in rel_dict:
+                output_lm = rel_dict[output_relation_lm.lower()]
+            answers.append(white_space_fix(output_lm) + " </s>")
+
+    return contexts, answers
+
+
+def create_relation_extraction_lm_dataset(
+    tokenizer,
+    batch_size,
+    source_max_length,
+    decoder_max_length,
+    data_file,
+    shuffle=False,
+):
+    contexts, answers = read_relation_extraction_lm_reqa_data(data_file)
+    train_encodings = tokenizer(
+        contexts,
+        truncation=True,
+        padding="max_length",
+        max_length=source_max_length,
+        add_special_tokens=False,
+    )
+    train_answer_encodings = tokenizer(
+        answers,
+        truncation=True,
+        padding="max_length",
+        max_length=decoder_max_length,
+        add_special_tokens=False,
+    )
+    train_encodings["target_attention_mask"] = train_answer_encodings.attention_mask
+
+    train_encodings["labels"] = train_answer_encodings.input_ids
+
+    # because HuggingFace automatically shifts the labels, the labels correspond exactly to `target_ids`.
+    # We have to make sure that the PAD token is ignored
+
+    train_labels = [
+        [-100 if token == tokenizer.pad_token_id else token for token in labels]
+        for labels in train_encodings["labels"]
+    ]
     train_encodings["labels"] = train_labels
 
     class HelperDataset(torch.utils.data.Dataset):

@@ -167,32 +167,32 @@ class REQA(torch.nn.Module):
 
         # Answer Model tokenizer
         answer_tokenizer = T5Tokenizer.from_pretrained(
-            MODEL_NAME#, local_files_only=True
+            MODEL_NAME  # , local_files_only=True
         )
 
         # Construct the answer model
         answer_model = T5ForConditionalGeneration.from_pretrained(
-            MODEL_NAME#, local_files_only=True
+            MODEL_NAME  # , local_files_only=True
         )
 
         # Question Model tokenizer
         question_tokenizer = T5Tokenizer.from_pretrained(
-            MODEL_NAME#, local_files_only=True
+            MODEL_NAME  # , local_files_only=True
         )
 
         # Construct the question model
         question_model = T5ForConditionalGeneration.from_pretrained(
-            MODEL_NAME#, local_files_only=True
+            MODEL_NAME  # , local_files_only=True
         )
 
         # Pretrained question model tokenizer
         self.init_question_tokenizer = T5Tokenizer.from_pretrained(
-            MODEL_NAME#, local_files_only=True
+            MODEL_NAME  # , local_files_only=True
         )
 
         # Construct the pretrained question model
         self.init_question_model = T5ForConditionalGeneration.from_pretrained(
-            MODEL_NAME#, local_files_only=True
+            MODEL_NAME  # , local_files_only=True
         )
 
         if cfg.mode == "train":
@@ -394,7 +394,9 @@ class REQA(torch.nn.Module):
 
         b_sz, dec_seq_len = labels.size()
         labels = labels.repeat(1, self.config.num_search_samples).view(-1, dec_seq_len)
-        target_mask = target_mask.repeat(1, self.config.num_search_samples).view(-1, dec_seq_len)
+        target_mask = target_mask.repeat(1, self.config.num_search_samples).view(
+            -1, dec_seq_len
+        )
 
         # Answer Computation
         with torch.no_grad():
@@ -426,7 +428,7 @@ class REQA(torch.nn.Module):
                     "relation_log_p": relation_log_p,
                     "question_log_p": question_log_ps[index],
                     "answer_log_p": answer_log_p[index],
-                    "generated_question": question_predictions_str[index]
+                    "generated_question": question_predictions_str[index],
                 }
                 yield output_batch
 

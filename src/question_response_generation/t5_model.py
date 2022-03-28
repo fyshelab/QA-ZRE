@@ -38,7 +38,9 @@ class T5QA(object):
 
             # Construct model
             model = torch.nn.DataParallel(
-                T5ForConditionalGeneration.from_pretrained(MODEL_NAME, local_files_only=True)
+                T5ForConditionalGeneration.from_pretrained(
+                    MODEL_NAME, local_files_only=True
+                )
             )
             model.to(self.device)
 
@@ -61,7 +63,9 @@ class T5QA(object):
 
         elif cfg.mode in ["test", "inference"]:
             tokenizer = T5Tokenizer.from_pretrained(MODEL_NAME, local_files_only=True)
-            model = T5ForConditionalGeneration.from_pretrained(MODEL_NAME, local_files_only=True)
+            model = T5ForConditionalGeneration.from_pretrained(
+                MODEL_NAME, local_files_only=True
+            )
             model.to(self.device)
 
             self.model_path = os.path.join(cfg.model_path, "model")
