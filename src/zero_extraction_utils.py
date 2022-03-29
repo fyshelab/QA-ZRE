@@ -1872,7 +1872,7 @@ def create_relation_qq_dataset(
     )
 
 
-def read_relation_extraction_lm_reqa_data(path):
+def read_relation_extraction_lm_reqa_data(path, re_prior=False):
     """Main function to create the relation extraction LM data from the RE-QA
     dataset."""
     path = Path(path)
@@ -1905,15 +1905,24 @@ def read_relation_extraction_lm_reqa_data(path):
                 tail_entity = line_arr[4:]
             else:
                 tail_entity = ["no_answer"]
-            contexts.append(
-                "head: "
-                + white_space_fix(h_entity)
-                + " tail: "
-                + white_space_fix(" and ".join(tail_entity))
-                + " context: "
-                + white_space_fix(passage)
-                + " </s>"
-            )
+            if re_prior:
+                contexts.append(
+                    "head: "
+                    + white_space_fix(h_entity)
+                    + " context: "
+                    + white_space_fix(passage)
+                    + " </s>"
+                )
+            else:
+                contexts.append(
+                    "head: "
+                    + white_space_fix(h_entity)
+                    + " tail: "
+                    + white_space_fix(" and ".join(tail_entity))
+                    + " context: "
+                    + white_space_fix(passage)
+                    + " </s>"
+                )
 
             output_lm = output_relation_lm
             if output_relation_lm.lower() in rel_dict:
@@ -1930,8 +1939,9 @@ def create_relation_extraction_lm_dataset(
     decoder_max_length,
     data_file,
     shuffle=False,
+    re_prior=False
 ):
-    contexts, answers = read_relation_extraction_lm_reqa_data(data_file)
+    contexts, answers = read_relation_extraction_lm_reqa_data(data_file, re_prior=re_prior)
     train_encodings = tokenizer(
         contexts,
         truncation=True,

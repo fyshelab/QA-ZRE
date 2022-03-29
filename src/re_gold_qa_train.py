@@ -61,9 +61,19 @@ def run_relation_extraction_lm(args):
     if args.mode == "relation_extraction_lm_train":
         mode = "train"
         for_evaluation = False
+        prior = False
     elif args.mode == "relation_extraction_lm_test":
         mode = "test"
         for_evaluation = True
+        prior = False
+    if args.mode == "relation_extraction_prior_lm_train":
+        mode = "train"
+        for_evaluation = False
+        prior = True
+    elif args.mode == "relation_extraction_prior_lm_test":
+        mode = "test"
+        for_evaluation = True
+        prior = True
     config = HyperParameters(
         model_path=args.model_path,
         batch_size=args.batch_size,
@@ -77,6 +87,7 @@ def run_relation_extraction_lm(args):
         checkpoint=args.checkpoint,
         training_steps=args.training_steps,
         seed=args.seed,
+        predict_type=args.predict_type
     )
 
     set_random_seed(config.seed)
@@ -91,6 +102,7 @@ def run_relation_extraction_lm(args):
             decoder_max_length=config.decoder_max_length,
             data_file=args.train,
             shuffle=True,
+            re_prior=prior
         )
 
         run_model(
@@ -109,6 +121,7 @@ def run_relation_extraction_lm(args):
             decoder_max_length=config.decoder_max_length,
             data_file=args.dev,
             shuffle=False,
+            re_prior=prior
         )
 
         run_model(
@@ -598,7 +611,7 @@ def run_main(args):
         run_re_qa(args)
     if args.mode in ["fewrl_train", "fewrl_test", "fewrl_dev"]:
         run_fewrl(args)
-    if args.mode in ["relation_extraction_lm_train", "relation_extraction_lm_test"]:
+    if args.mode in ["relation_extraction_prior_lm_train", "relation_extraction_prior_lm_test", "relation_extraction_lm_train", "relation_extraction_lm_test"]:
         run_relation_extraction_lm(args)
     if args.mode in ["concat_fewrl_train", "concat_fewrl_test", "concat_fewrl_dev"]:
         run_concat_fewrl(args)
