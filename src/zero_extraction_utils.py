@@ -1994,3 +1994,90 @@ def create_relation_extraction_lm_dataset(
         train_loader,
         train_dataset,
     )
+
+def read_relation_extraction_prediction_reqa_data(path, re_prior=False):
+    """Main function to create the relation extraction final test data from the RE-QA
+    dataset."""
+    path = Path(path)
+
+    rel_dict = {}
+    with open("./props.json", "r") as fd:
+        re_desc_data = json.load(fd)
+        sentence_delimiters = [". ", ".\n", "? ", "?\n", "! ", "!\n"]
+        for row in re_desc_data:
+            desc = row["description"]
+            if desc == {}:
+                continue
+            desc = desc.strip(".") + ". "
+            pos = [desc.find(delimiter) for delimiter in sentence_delimiters]
+            pos = min([p for p in pos if p >= 0])
+            re_desc = desc[:pos]
+            re_id = row["label"]
+            rel_dict[white_space_fix(re_id).lower()] = white_space_fix(re_desc)
+
+    all_relations = {}
+    with open(path, "r") as fd:
+        for line in fd:
+            line = line.strip()
+            line_arr = line.split("\t")
+            if line_arr[0] not in all_relations:
+                all_relations[line_arr[0]] = {line_arr[1]}
+            else:
+                all_relations[line_arr[0]].add(line_arr[1])
+
+    with open(path, "r") as fd:
+        contexts = []
+        answers = []
+        correct_indices = []
+        for line in fd:
+            line = line.strip()
+            line_arr = line.split("\t")
+            passage = line_arr[3]
+            h_entity = line_arr[2]
+            if len(line_arr) > 4:
+                tail_entity = line_arr[4:]
+            else:
+                continue
+            for rel_type in all_relations.keys():
+                output_relation_lm = rel_type
+                if rel_type == line_arr[0]:
+                    correct_indices.append(True)
+                else:
+                    correct_indices.append(False)
+                if re_prior:
+                    contexts.append(
+                        "head: "
+                        + white_space_fix(h_entity)
+                        + " context: "
+                        + white_space_fix(passage)
+                        + " </s>"
+                    )
+                else:
+                    contexts.append(
+                        "head: "
+                        + white_space_fix(h_entity)
+                        + " tail: "
+                        + white_space_fix(" and ".join(tail_entity))
+                        + " context: "
+                        + white_space_fix(passage)
+                        + " </s>"
+                    )
+
+                output_lm = output_relation_lm
+                if output_relation_lm.lower() in rel_dict:
+                    output_lm = rel_dict[output_relation_lm.lower()]
+                answers.append(white_space_fix(output_lm) + " </s>")
+
+    df = pd.DataFrame(
+        {
+            "contexts": contexts,
+            "answers": answers,
+            "correct_indices": correct_indices,
+        }
+    )
+
+    df.to_csv(
+        path + ".relation_extraction.csv", sep=",", header=True, index=False
+    )
+
+    return contexts, answers, correct_indices
