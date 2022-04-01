@@ -1904,7 +1904,7 @@ def read_relation_extraction_lm_reqa_data(path, re_prior=False):
             if len(line_arr) > 4:
                 tail_entity = line_arr[4:]
             else:
-                tail_entity = ["no_answer"]
+                continue
             if re_prior:
                 contexts.append(
                     "head: "
@@ -1925,8 +1925,8 @@ def read_relation_extraction_lm_reqa_data(path, re_prior=False):
                 )
 
             output_lm = output_relation_lm
-            if output_relation_lm.lower() in rel_dict:
-                output_lm = rel_dict[output_relation_lm.lower()]
+            #if output_relation_lm.lower() in rel_dict:
+            #    output_lm = rel_dict[output_relation_lm.lower()]
             answers.append(white_space_fix(output_lm) + " </s>")
 
     return contexts, answers
@@ -1939,9 +1939,14 @@ def create_relation_extraction_lm_dataset(
     decoder_max_length,
     data_file,
     shuffle=False,
-    re_prior=False
+    re_prior=False,
+    final_re_prediction=False
 ):
-    contexts, answers = read_relation_extraction_lm_reqa_data(data_file, re_prior=re_prior)
+    if final_re_prediction:
+        contexts, answers, _ = read_relation_extraction_prediction_reqa_data(data_file, re_prior=re_prior)
+    else:
+        contexts, answers = read_relation_extraction_lm_reqa_data(data_file, re_prior=re_prior)
+
     train_encodings = tokenizer(
         contexts,
         truncation=True,
@@ -2064,8 +2069,8 @@ def read_relation_extraction_prediction_reqa_data(path, re_prior=False):
                     )
 
                 output_lm = output_relation_lm
-                if output_relation_lm.lower() in rel_dict:
-                    output_lm = rel_dict[output_relation_lm.lower()]
+                #if output_relation_lm.lower() in rel_dict:
+                #    output_lm = rel_dict[output_relation_lm.lower()]
                 answers.append(white_space_fix(output_lm) + " </s>")
 
     df = pd.DataFrame(
@@ -2077,7 +2082,7 @@ def read_relation_extraction_prediction_reqa_data(path, re_prior=False):
     )
 
     df.to_csv(
-        path + ".relation_extraction.csv", sep=",", header=True, index=False
+        str(path) + ".relation_extraction.csv", sep=",", header=True, index=False
     )
 
     return contexts, answers, correct_indices
