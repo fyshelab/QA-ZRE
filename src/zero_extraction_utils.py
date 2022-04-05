@@ -2064,8 +2064,8 @@ def read_relation_extraction_prediction_reqa_data(path, re_prior=False):
                     )
 
                 output_lm = output_relation_lm
-                if output_relation_lm.lower() in rel_dict:
-                    output_lm = rel_dict[output_relation_lm.lower()]
+                #if output_relation_lm.lower() in rel_dict:
+                #    output_lm = rel_dict[output_relation_lm.lower()]
                 answers.append(white_space_fix(output_lm) + " </s>")
 
     df = pd.DataFrame(
@@ -2077,7 +2077,7 @@ def read_relation_extraction_prediction_reqa_data(path, re_prior=False):
     )
 
     df.to_csv(
-        path + ".relation_extraction.csv", sep=",", header=True, index=False
+        str(path) + ".relation_extraction.csv", sep=",", header=True, index=False
     )
 
     return contexts, answers, correct_indices
