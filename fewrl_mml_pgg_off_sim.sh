@@ -1,14 +1,12 @@
 #!/bin/bash
 
-
-'''
-#SBATCH --job-name=test_mml_idea
+#SBATCH --job-name=dev_mml_mml_off_re_fold_10
 #SBATCH --account=def-afyshe-ab
 #SBATCH --nodes=1
 #SBATCH --tasks-per-node=1
 #SBATCH --gres=gpu:a100:1
 #SBATCH --mem=24000M
-#SBATCH --time=0-01:00
+#SBATCH --time=0-12:00
 #SBATCH --cpus-per-task=3
 #SBATCH --output=%N-%j.out
 
@@ -26,6 +24,7 @@ echo "r$SLURM_NODEID Launching python script"
 
 echo "All the allocated nodes: $SLURM_JOB_NODELIST"
 
+'''
 # The SLURM_NTASKS variable tells the script how many processes are available for this execution. “srun” executes the script <tasks-per-node * nodes> times
 python src/re_gold_qa_train.py \
     --mode fewrl_train \
@@ -42,8 +41,10 @@ python src/re_gold_qa_train.py \
     --gpu_device 0 \
     --seed 12321 \
     --train_method MML-MML-Off-Sim
+'''
 
-for ((j=9; j<=50; j++))
+fold_num=10
+for ((j=0; j<=62; j++))
 do
 	k=$((j * 4))
 	end_k=$((k+3))
@@ -54,15 +55,15 @@ do
 		printf "step ${step}\r\n"
 		python src/re_gold_qa_train.py \
 			--mode fewrl_dev \
-			--model_path ~/fold_1/mml-pgg-off-sim/ \
+			--model_path /home/saeednjf/scratch/feb-15-2022-arr/fold_${fold_num}/mml-mml-off-sim/ \
 			--answer_checkpoint _0_answer_step_${step} \
 			--question_checkpoint _0_question_step_${step} \
 			--num_search_samples 8 \
-			--batch_size 32 --gpu True \
-			--dev ~/QA-ZRE/zero-shot-extraction/relation_splits/dev.0 \
+			--batch_size 16 --gpu True \
+			--dev $SCRATCH/QA-ZRE/zero-shot-extraction/relation_splits/dev.${fold_data_id} \
 			--gpu_device 0 \
 			--seed 12321 \
-			--prediction_file ~/fold_1/mml-pgg-off-sim/relation.mml-pgg-off-sim.run.0.dev.predictions.step.${step}.csv \
+			--prediction_file /home/saeednjf/scratch/feb-15-2022-arr/fold_${fold_num}/mml-mml-off-sim/relation.mml-mml-off-sim.run.0.dev.predictions.step.${step}.csv
                         --predict_type relation &
 	done
 	wait
@@ -93,7 +94,6 @@ do
 	done
 done
 
-'''
 python src/re_gold_qa_train.py \
 	--mode re_qa_test \
 	--model_path $SCRATCH/fold_1/mml-pgg-off-sim/ \
