@@ -334,7 +334,7 @@ def read_zero_re_qa(path, ignore_unknowns=True, gold_question=False, concat=Fals
         entities = []
         entity_relations = []
         relations = []
-        uniq_relations = {}
+        uniq_relations = set()
         for line in fd:
             line = line.strip()
             line_arr = line.split("\t")
