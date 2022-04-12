@@ -95,7 +95,7 @@ def run_relation_extraction_lm(args):
         checkpoint=args.checkpoint,
         training_steps=args.training_steps,
         seed=args.seed,
-        predict_type=args.predict_type
+        predict_type=args.predict_type,
     )
 
     set_random_seed(config.seed)
@@ -111,7 +111,7 @@ def run_relation_extraction_lm(args):
             data_file=args.train,
             shuffle=True,
             re_prior=prior,
-            final_re_prediction=for_evaluation
+            final_re_prediction=for_evaluation,
         )
 
         run_model(
@@ -131,8 +131,7 @@ def run_relation_extraction_lm(args):
             data_file=args.dev,
             shuffle=False,
             re_prior=prior,
-            final_re_prediction=for_evaluation
-
+            final_re_prediction=for_evaluation,
         )
 
         run_model(
@@ -622,7 +621,14 @@ def run_main(args):
         run_re_qa(args)
     if args.mode in ["fewrl_train", "fewrl_test", "fewrl_dev"]:
         run_fewrl(args)
-    if args.mode in ["relation_extraction_final_test", "relation_extraction_final_prior_test", "relation_extraction_prior_lm_train", "relation_extraction_prior_lm_test", "relation_extraction_lm_train", "relation_extraction_lm_test"]:
+    if args.mode in [
+        "relation_extraction_final_test",
+        "relation_extraction_final_prior_test",
+        "relation_extraction_prior_lm_train",
+        "relation_extraction_prior_lm_test",
+        "relation_extraction_lm_train",
+        "relation_extraction_lm_test",
+    ]:
         run_relation_extraction_lm(args)
     if args.mode in ["concat_fewrl_train", "concat_fewrl_test", "concat_fewrl_dev"]:
         run_concat_fewrl(args)

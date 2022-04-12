@@ -1,6 +1,7 @@
 import json
 import random
 from pathlib import Path
+from re import I
 
 import pandas as pd
 import torch
@@ -332,6 +333,20 @@ def read_zero_re_qa(path, ignore_unknowns=True, gold_question=False, concat=Fals
         passages = []
         entities = []
         entity_relations = []
+        relations = []
+        uniq_relations = {}
+        for line in fd:
+            line = line.strip()
+            line_arr = line.split("\t")
+            uniq_relations.add(white_space_fix(line_arr[0]))
+
+        relation_to_id = {}
+        i = 0
+        for rel in uniq_relations:
+            relation_to_id[rel] = i
+            i += 1
+        id_to_relation = {id: rel for rel, id in relation_to_id.items()}
+
         for line in fd:
             line = line.strip()
             line_arr = line.split("\t")
@@ -349,6 +364,7 @@ def read_zero_re_qa(path, ignore_unknowns=True, gold_question=False, concat=Fals
             passages.append(passage)
             entity_relations.append(white_space_fix(line_arr[2] + " " + line_arr[0]))
             entities.append(white_space_fix(line_arr[2]))
+            relations.append(relation_to_id[white_space_fix(line_arr[0])])
             if concat or gold_question:
                 contexts.append(
                     "question: "
@@ -406,7 +422,15 @@ def read_zero_re_qa(path, ignore_unknowns=True, gold_question=False, concat=Fals
                     )
 
             answers.append(white_space_fix(" and ".join(gold_answers)) + " </s>")
-    return passages, contexts, answers, entity_relations, entities, posterier_contexts
+    return (
+        passages,
+        contexts,
+        answers,
+        entity_relations,
+        entities,
+        posterier_contexts,
+        (relations, relation_to_id, id_to_relation),
+    )
 
 
 def create_zero_re_qa_dataset(
@@ -431,6 +455,7 @@ def create_zero_re_qa_dataset(
             train_entity_relations,
             train_entities,
             train_posterier_contexts,
+            relation_info,
         ) = read_zero_re_qa(
             train_file,
             ignore_unknowns=ignore_unknowns,
@@ -442,6 +467,7 @@ def create_zero_re_qa_dataset(
         val_contexts,
         val_answers,
         val_entity_relations,
+        _,
         _,
         _,
     ) = read_zero_re_qa(
@@ -577,6 +603,7 @@ def create_zero_re_qa_dataset(
                 for labels in train_encodings["second_entity_labels"]
             ]
             train_encodings["second_entity_labels"] = train_labels
+            train_encodings["relation_labels"] = relation_info[0]
 
         val_encodings["passages"] = val_passages
         val_encodings["entity_relations"] = val_entity_relations
@@ -1925,7 +1952,7 @@ def read_relation_extraction_lm_reqa_data(path, re_prior=False):
                 )
 
             output_lm = output_relation_lm
-            #if output_relation_lm.lower() in rel_dict:
+            # if output_relation_lm.lower() in rel_dict:
             #    output_lm = rel_dict[output_relation_lm.lower()]
             answers.append(white_space_fix(output_lm) + " </s>")
 
@@ -1940,12 +1967,16 @@ def create_relation_extraction_lm_dataset(
     data_file,
     shuffle=False,
     re_prior=False,
-    final_re_prediction=False
+    final_re_prediction=False,
 ):
     if final_re_prediction:
-        contexts, answers, _ = read_relation_extraction_prediction_reqa_data(data_file, re_prior=re_prior)
+        contexts, answers, _ = read_relation_extraction_prediction_reqa_data(
+            data_file, re_prior=re_prior
+        )
     else:
-        contexts, answers = read_relation_extraction_lm_reqa_data(data_file, re_prior=re_prior)
+        contexts, answers = read_relation_extraction_lm_reqa_data(
+            data_file, re_prior=re_prior
+        )
 
     train_encodings = tokenizer(
         contexts,
@@ -2000,9 +2031,10 @@ def create_relation_extraction_lm_dataset(
         train_dataset,
     )
 
+
 def read_relation_extraction_prediction_reqa_data(path, re_prior=False):
-    """Main function to create the relation extraction final test data from the RE-QA
-    dataset."""
+    """Main function to create the relation extraction final test data from the
+    RE-QA dataset."""
     path = Path(path)
 
     rel_dict = {}
@@ -2069,7 +2101,7 @@ def read_relation_extraction_prediction_reqa_data(path, re_prior=False):
                     )
 
                 output_lm = output_relation_lm
-                #if output_relation_lm.lower() in rel_dict:
+                # if output_relation_lm.lower() in rel_dict:
                 #    output_lm = rel_dict[output_relation_lm.lower()]
                 answers.append(white_space_fix(output_lm) + " </s>")
 
@@ -2081,8 +2113,6 @@ def read_relation_extraction_prediction_reqa_data(path, re_prior=False):
         }
     )
 
-    df.to_csv(
-        str(path) + ".relation_extraction.csv", sep=",", header=True, index=False
-    )
+    df.to_csv(str(path) + ".relation_extraction.csv", sep=",", header=True, index=False)
 
     return contexts, answers, correct_indices
