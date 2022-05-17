@@ -1,6 +1,6 @@
 #!/bin/bash
 
-#SBATCH --job-name=dev_mml_mml_off_re_fold_10
+#SBATCH --job-name=dev_mml_pgg_off_re_fold_10
 #SBATCH --account=def-afyshe-ab
 #SBATCH --nodes=1
 #SBATCH --tasks-per-node=1
@@ -44,7 +44,7 @@ python src/re_gold_qa_train.py \
 '''
 
 fold_num=10
-for ((j=0; j<=62; j++))
+for ((j=0; j<=125; j++))
 do
 	k=$((j * 4))
 	end_k=$((k+3))
@@ -55,7 +55,7 @@ do
 		printf "step ${step}\r\n"
 		python src/re_gold_qa_train.py \
 			--mode fewrl_dev \
-			--model_path /home/saeednjf/scratch/feb-15-2022-arr/fold_${fold_num}/mml-mml-off-sim/ \
+			--model_path /home/saeednjf/scratch/feb-15-2022-arr/fold_${fold_num}/mml-pgg-off-sim/ \
 			--answer_checkpoint _0_answer_step_${step} \
 			--question_checkpoint _0_question_step_${step} \
 			--num_search_samples 8 \
@@ -63,7 +63,7 @@ do
 			--dev $SCRATCH/QA-ZRE/zero-shot-extraction/relation_splits/dev.${fold_data_id} \
 			--gpu_device 0 \
 			--seed 12321 \
-			--prediction_file /home/saeednjf/scratch/feb-15-2022-arr/fold_${fold_num}/mml-mml-off-sim/relation.mml-mml-off-sim.run.0.dev.predictions.step.${step}.csv
+			--prediction_file /home/saeednjf/scratch/feb-15-2022-arr/fold_${fold_num}/mml-pgg-off-sim/relation.mml-pgg-off-sim.run.0.dev.predictions.step.${step}.csv \
                         --predict_type relation &
 	done
 	wait

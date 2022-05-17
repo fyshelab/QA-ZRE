@@ -242,7 +242,7 @@ class REQA(torch.nn.Module):
         self.question_model = question_model
         self.question_tokenizer = question_tokenizer
 
-    def question_beam_predict(self, batch, current_device, with_tail_entity=False):
+    def question_beam_predict(self, batch, current_device, with_tail_entity=False, num_ret_seqs=1):
         """Use beam search to generate the questions and prepare inputs for the
         answer module."""
         question_input_ids = batch["entity_relation_passage_input_ids"]
@@ -271,7 +271,7 @@ class REQA(torch.nn.Module):
                     no_repeat_ngram_size=self.config.no_repeat_ngram_size,
                     early_stopping=True,
                     max_length=self.config.decoder_max_length,
-                    num_return_sequences=self.config.num_search_samples,
+                    num_return_sequences=num_ret_seqs,
                     num_beams=self.config.num_search_samples,
                     length_penalty=1.0,  # no penalty
                     output_scores=True,
@@ -284,7 +284,7 @@ class REQA(torch.nn.Module):
                     no_repeat_ngram_size=self.config.no_repeat_ngram_size,
                     early_stopping=True,
                     max_length=self.config.decoder_max_length,
-                    num_return_sequences=self.config.num_search_samples,
+                    num_return_sequences=num_ret_seqs,
                     num_beams=self.config.num_search_samples,
                     length_penalty=1.0,  # no penalty
                     output_scores=True,
@@ -304,13 +304,12 @@ class REQA(torch.nn.Module):
         new_articles = []
         for i in range(len(question_predictions_str)):
             new_article = (
-                # "relation: "
-                # + batch["entity_relations"][i // self.config.num_search_samples]
-                # + " question: "
-                "question: "
+                "relation: "
+                + batch["entity_relations"][i // num_ret_seqs]
+                + " question: "
                 + question_predictions_str[i]
                 + " context: "
-                + batch["passages"][i // self.config.num_search_samples]
+                + batch["passages"][i // num_ret_seqs]
                 + " </s>"
             )
             new_articles.append(new_article)
@@ -386,7 +385,7 @@ class REQA(torch.nn.Module):
             question_input_mask,
             question_predictions_str,
             question_log_ps,
-        ) = self.question_beam_predict(batch, current_device, with_tail_entity=True)
+        ) = self.question_beam_predict(batch, current_device, with_tail_entity=False, num_ret_seqs=self.config.num_search_samples)
         target_mask = batch["second_entity_attention_mask"]
         labels = batch["second_entity_labels"]
         if self.config.gpu:
@@ -432,56 +431,6 @@ class REQA(torch.nn.Module):
                     "generated_question": question_predictions_str[index],
                 }
                 yield output_batch
-
-    def infonce_answer_training(self, batch, current_device):
-        """Compute infoNCE loss only for the answer module."""
-        loss_fct = torch.nn.CrossEntropyLoss(ignore_index=-100, reduction="none")
-        if self.config.gpu:
-            loss_fct = loss_fct.to(current_device)
-        (
-            answer_input_ids,
-            answer_input_mask,
-            question_input_ids,
-            question_input_mask,
-            question_predictions_str,
-        ) = self.question_beam_predict(batch, current_device, with_tail_entity=True)
-        target_mask = batch["second_entity_attention_mask"]
-        labels = batch["second_entity_labels"]
-        if self.config.gpu:
-            target_mask = target_mask.to(current_device)
-            labels = labels.to(current_device)
-
-        # Answer Computation
-        self.answer_model.train()
-        output = self.answer_model(
-            input_ids=answer_input_ids,
-            attention_mask=answer_input_mask,
-            decoder_attention_mask=target_mask,
-            decoder_input_ids=self.answer_model._shift_right(labels),
-            labels=None,
-        )
-
-        log_p = -loss_fct(
-            output.logits.view(-1, output.logits.size(-1)),
-            labels.view(-1),
-        )
-
-        # b: batch size
-        # sz: sequence size
-        # v: vocab size
-        b, sz, v = output.logits.size()
-        log_p = log_p.view(b, sz)
-        good_log_p = log_p.masked_fill_(labels == -100, 0.0)
-        answer_log_p = torch.sum(good_log_p, dim=1).squeeze()
-        num_examples = b // (self.config.num_neg_samples + 1)
-        answer_log_p = answer_log_p.view(
-            num_examples, (self.config.num_neg_samples + 1)
-        )
-        positive_log_p = answer_log_p[:, 0].squeeze()
-        neg_pos_log_p = torch.logsumexp(answer_log_p, dim=1)
-        loss = -torch.mean(positive_log_p - neg_pos_log_p, dim=0)
-        loss_value = loss.item()
-        return loss, loss_value
 
     def pgg_answer_training(self, batch, current_device):
         """Compute PGG loss only for the answer module."""
@@ -835,10 +784,9 @@ class REQA(torch.nn.Module):
         for i in range(b_sz):
             for j in range(self.config.num_search_samples):
                 new_article = (
-                    # "relation: "
-                    # + batch["entity_relations"][i]
-                    # + " question: "
-                    "question: "
+                    "relation: "
+                    + batch["entity_relations"][i]
+                    + " question: "
                     + sampled_question_predictions_str_reshaped[i][j]
                     + " context: "
                     + batch["passages"][i]
@@ -988,18 +936,3 @@ class REQA(torch.nn.Module):
             self.answer_optimizer.step()
             self.question_optimizer.step()
             return (loss_value, pgg_loss_value)
-
-        if objective_type == "InfoNCE":
-            self.answer_optimizer.zero_grad()
-
-            self.question_model.eval()
-            nce_loss, nce_loss_value = self.infonce_answer_training(
-                batch, current_device
-            )
-            if not math.isnan(nce_loss_value):
-                # BackProp
-                nce_loss.backward()
-                # Optimize
-
-            self.answer_optimizer.step()
-            return nce_loss_value
