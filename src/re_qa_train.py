@@ -133,13 +133,13 @@ def iterative_run_model(
                     str(epoch) + "_answer_full",
                 )
 
-            msg = "\nEpoch training time: {1} seconds\n".format(time.time() - start)
+            msg = "\nEpoch training time: {0} seconds\n".format(time.time() - start)
             print(msg)
             epoch += 1
 
         save_config(config, model_path)
 
-        msg = "\nTotal training time: {1} seconds\n".format(time.time() - first_start)
+        msg = "\nTotal training time: {0} seconds\n".format(time.time() - first_start)
         print(msg)
 
     elif mode == "test":
@@ -152,5 +152,5 @@ def iterative_run_model(
             current_device,
             config.predict_type,
         )
-        msg = "\nTotal prediction time:{} seconds\n".format(time.time() - start)
+        msg = "\nTotal prediction time:{0} seconds\n".format(time.time() - start)
         print(msg)

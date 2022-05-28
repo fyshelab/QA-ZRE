@@ -242,7 +242,9 @@ class REQA(torch.nn.Module):
         self.question_model = question_model
         self.question_tokenizer = question_tokenizer
 
-    def question_beam_predict(self, batch, current_device, with_tail_entity=False, num_ret_seqs=1):
+    def question_beam_predict(
+        self, batch, current_device, with_tail_entity=False, num_ret_seqs=1
+    ):
         """Use beam search to generate the questions and prepare inputs for the
         answer module."""
         question_input_ids = batch["entity_relation_passage_input_ids"]
@@ -385,7 +387,12 @@ class REQA(torch.nn.Module):
             question_input_mask,
             question_predictions_str,
             question_log_ps,
-        ) = self.question_beam_predict(batch, current_device, with_tail_entity=False, num_ret_seqs=self.config.num_search_samples)
+        ) = self.question_beam_predict(
+            batch,
+            current_device,
+            with_tail_entity=False,
+            num_ret_seqs=self.config.num_search_samples,
+        )
         target_mask = batch["second_entity_attention_mask"]
         labels = batch["second_entity_labels"]
         if self.config.gpu:
