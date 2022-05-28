@@ -1,15 +1,6 @@
 #!/bin/bash
 
-#SBATCH --job-name=test_golds
-#SBATCH --account=def-afyshe-ab
-#SBATCH --nodes=1
-#SBATCH --tasks-per-node=1
-#SBATCH --gres=gpu:a100:1
-#SBATCH --mem=24000M
-#SBATCH --time=0-12:00
-#SBATCH --cpus-per-task=3
-#SBATCH --output=%N-%j.out
-
+'''
 module load StdEnv/2020 gcc/9.3.0 cuda/11.4 arrow/5.0.0
 
 source ../dreamscape-qa/env/bin/activate
@@ -24,8 +15,6 @@ echo "r$SLURM_NODEID Launching python script"
 
 echo "All the allocated nodes: $SLURM_JOB_NODELIST"
 
-
-'''
 for ((j=0; j<=130; j++))
 do
 	k=$((j * 4))
@@ -54,29 +43,91 @@ done
 
 '''
 
-steps=(2500 6600 200 9500 15300 1100 43100 1000 1900 4000)
+'''
+CUDA_VISIBLE_DEVICES=3 python3.7 src/re_gold_qa_train.py \
+		--mode re_classification_qa_train \
+		--model_path ~/may-20/fold_8/concat/ \
+		--checkpoint _0_step_400_model \
+		--num_search_samples 8 \
+		--batch_size 128 \
+		--gpu True \
+		--dev ./zero-shot-extraction/relation_splits/test.7 \
+		--gpu_device 0 \
+		--seed 12321 \
+		--concat True \
+		--prediction_file ~/may-20/fold_8/concat/relation.concat.test.predictions.fold.8.step.400.csv \
+		--predict_type relation
+CUDA_VISIBLE_DEVICES=3 python3.7 src/re_gold_qa_train.py \
+		--mode re_classification_qa_train \
+		--model_path ~/may-20/fold_2/gold/ \
+		--checkpoint _0_step_1900_model \
+		--num_search_samples 8 \
+		--batch_size 128 \
+		--gpu True \
+		--dev ./zero-shot-extraction/relation_splits/test.1 \
+		--gpu_device 0 \
+		--seed 12321 \
+		--concat False \
+		--prediction_file ~/may-20/fold_2/gold/relation.gold.test.predictions.fold.2.step.1900.csv \
+		--predict_type relation
+
+CUDA_VISIBLE_DEVICES=3 python3.7 src/re_gold_qa_train.py \
+		--mode re_classification_qa_train \
+		--model_path ~/may-20/fold_7/gold/ \
+		--checkpoint _0_step_2600_model \
+		--num_search_samples 8 \
+		--batch_size 128 \
+		--gpu True \
+		--dev ./zero-shot-extraction/relation_splits/test.6 \
+		--gpu_device 0 \
+		--seed 12321 \
+		--concat False \
+		--prediction_file ~/may-20/fold_7/gold/relation.gold.test.predictions.fold.7.step.2600.csv \
+		--predict_type relation
+
+'''
+'''
+#steps=(4700 10300 1400 800 14700 1100 2100 800 1300 1600)
+steps=(4700)
 for i in ${!steps[@]};
 do
 	fold_num=$((i+1))
-        fold_data_id=$((fold_num-1))
+    fold_data_id=$((fold_num-1))
 	step=${steps[$i]}
-	python src/re_gold_qa_train.py \
-		--mode re_classification_qa_train \
-		--model_path $SCRATCH/feb-15-2022-arr/fold_${fold_num}/gold/ \
-		--checkpoint _0_step_${step}_model \
+	CUDA_VISIBLE_DEVICES=3 python3.7 src/re_gold_qa_train.py \
+		--mode fewrl_dev \
+		--model_path ~/may-20/fold_${fold_num}/ \
+		--answer_checkpoint _0_answer_step_${step} \
+		--question_checkpoint _0_question_step_${step} \
 		--num_search_samples 8 \
-		--batch_size 256 \
+		--batch_size 64 \
 		--gpu True \
 		--dev ./zero-shot-extraction/relation_splits/test.${fold_data_id} \
 		--gpu_device 0 \
 		--seed 12321 \
-		--concat False \
-		--prediction_file $SCRATCH/feb-15-2022-arr/fold_${fold_num}/gold/relation.gold.test.predictions.fold.${fold_num}.step.${step}.csv \
-		--predict_type relation 
+		--prediction_file ~/may-20/fold_${fold_num}/relation.mml-pgg-off-sim.run.fold_${fold_num}.test.predictions.step.${step}.csv \
+		--predict_type relation
 done
-
 '''
 
+fold_num=5
+fold_data_id=4
+step=14700
+CUDA_VISIBLE_DEVICES=0 python3.7 src/re_gold_qa_train.py \
+	--mode fewrl_dev \
+	--model_path ~/may-20/fold_${fold_num}/ \
+	--answer_checkpoint _0_answer_step_${step} \
+	--question_checkpoint _0_question_step_${step} \
+	--num_search_samples 8 \
+	--batch_size 64 \
+	--gpu True \
+	--dev ./zero-shot-extraction/relation_splits/test.${fold_data_id} \
+	--gpu_device 0 \
+	--seed 12321 \
+	--prediction_file ~/may-20/fold_${fold_num}/relation.mml-pgg-off-sim.run.fold_${fold_num}.test.predictions.step.${step}.csv \
+	--predict_type relation
+
+'''
 for (( i=1; i<=525; i++ ))
 do
         step=$((i * 100))
