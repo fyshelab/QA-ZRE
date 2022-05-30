@@ -1,6 +1,6 @@
 #!/bin/bash
 
-#source env/bin/activate
+source env/bin/activate
 
 '''
 #SBATCH --job-name=test_concat_fewrl_run_1
@@ -29,12 +29,10 @@ echo "All the allocated nodes: $SLURM_JOB_NODELIST"
 
 # The SLURM_NTASKS variable tells the script how many processes are available for this execution. “srun” executes the script <tasks-per-node * nodes> times
 srun python src/re_gold_qa_train.py \
-'''
-
-'''
-CUDA_VISIBLE_DEVICES=3 python3.7 src/re_gold_qa_train.py \
+    --init_method tcp://$MASTER_ADDR:3456 \
+    --world_size $SLURM_NTASKS \
     --mode concat_fewrl_train \
-    --model_path ~/may-29/fewrl/concat_run_1/ \
+    --model_path $SCRATCH/fewrl/concat_run_5/ \
     --checkpoint _response_pretrained \
     --training_steps 2600 \
     --learning_rate 0.0005 \
@@ -43,11 +41,11 @@ CUDA_VISIBLE_DEVICES=3 python3.7 src/re_gold_qa_train.py \
     --batch_size 16 \
     --gpu True \
     --num_workers 3 \
-    --train ./fewrl_data/train_data_12321.csv \
-    --dev ./fewrl_data/val_data_12321.csv \
-    --test ./fewrl_data/test_data_12321.csv \
+    --train ./fewrl_data/train_data_1300.csv \
+    --dev ./fewrl_data/val_data_1300.csv \
+    --test ./fewrl_data/test_data_1300.csv \
     --gpu_device 0 \
-    --seed 12321 \
+    --seed 1300 \
 '''
 
 for (( i=9; i<=9; i++ ))
@@ -56,27 +54,28 @@ do
 	do
 		step=$((i * 100))
 		printf "step ${step} on epoch ${i}\r\n"
-		CUDA_VISIBLE_DEVICES=0 python3.7 src/re_gold_qa_train.py \
+		python src/re_gold_qa_train.py \
 			--mode concat_fewrl_dev \
-			--model_path ~/may-29/fewrl/concat_run_1/ \
-			--checkpoint _0_step_1000_model \
+			--model_path ~/fewrl/concat_run_1/ \
+			--checkpoint _${e}_step_${step}_model \
 			--training_steps 2600 \
 			--learning_rate 0.0005 \
 			--max_epochs 1 \
 			--num_search_samples 8 \
 			--batch_size 64 --gpu True \
 			--ignore_unknowns True \
-			--train ./fewrl_data/train_data_12321.csv \
-			--dev ./fewrl_data/val_data_12321.csv \
-			--test ./fewrl_data/test_data_12321.csv \
+			--train ./rel_fewrl_data/train_data_12321.csv \
+			--dev ./rel_fewrl_data/val_data_12321.csv \
+			--test ./rel_fewrl_data/test_data_12321.csv \
 			--gpu_device 0 \
 			--seed 12321 \
-			--prediction_file ~/may-29/fewrl/concat_run_1/relation.concat.run.0.dev.predictions.step.1000.csv \
-			--predict_type relation
+			--prediction_file ~/fewrl/concat_run_1/entity.concat.run.${e}.dev.predictions.step.${step}.csv &
 	done
+	wait
 done
 
 '''
+
 for (( i=26; i<=26; i++ ))
 do
         step=$((i * 100))

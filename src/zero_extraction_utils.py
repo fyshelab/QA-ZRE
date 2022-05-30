@@ -307,7 +307,7 @@ def create_zero_re_qa_gold_dataset(
     return val_loader, val_dataset
 
 
-def read_zero_re_qa(path, ignore_unknowns=True, gold_question=False, concat=False, only_unknowns=True):
+def read_zero_re_qa(path, ignore_unknowns=True, gold_question=False, concat=False):
     """Main function to read the zero re qa dataset."""
     path = Path(path)
 
@@ -327,6 +327,13 @@ def read_zero_re_qa(path, ignore_unknowns=True, gold_question=False, concat=Fals
             rel_dict[white_space_fix(re_id).lower()] = white_space_fix(re_desc)
 
     with open(path, "r") as fd:
+        contexts = []
+        posterier_contexts = []
+        answers = []
+        passages = []
+        entities = []
+        entity_relations = []
+        relations = []
         uniq_relations = set()
         for line in fd:
             line = line.strip()
@@ -340,14 +347,6 @@ def read_zero_re_qa(path, ignore_unknowns=True, gold_question=False, concat=Fals
             i += 1
         id_to_relation = {id: rel for rel, id in relation_to_id.items()}
 
-    contexts = []
-    posterier_contexts = []
-    answers = []
-    passages = []
-    entities = []
-    entity_relations = []
-    relations = []
-    with open(path, "r") as fd:
         for line in fd:
             line = line.strip()
             line_arr = line.split("\t")
@@ -358,8 +357,6 @@ def read_zero_re_qa(path, ignore_unknowns=True, gold_question=False, concat=Fals
                 gold_question = line_arr[1].replace("XXX", " " + line_arr[2] + " ")
             if len(line_arr) > 4:
                 gold_answers = line_arr[4:]
-                if only_unknowns:
-                    continue
             elif ignore_unknowns:
                 continue
             else:
@@ -425,19 +422,6 @@ def read_zero_re_qa(path, ignore_unknowns=True, gold_question=False, concat=Fals
                     )
 
             answers.append(white_space_fix(" and ".join(gold_answers)) + " </s>")
-    
-    data_df = pd.DataFrame(
-            {
-                "passages": passages,
-                "contexts": contexts,
-                "answers": answers,
-                "entity_relations": entity_relations,
-                "entities": entities,
-            }
-    )
-    data_df.to_csv(
-            str(path) + ".unknowns.csv", sep=",", header=True, index=False
-    )
     return (
         passages,
         contexts,
@@ -1194,7 +1178,7 @@ def read_fewrl_dataset(fewrel_path, seed=10, m=5):
                     gold_answers = [tail_entity]
                     val_passages.append(sentence)
                     val_entity_relations.append(
-                        white_space_fix(head_entity + " <SEP> " + second_r_name)
+                        white_space_fix(head_entity + " " + second_r_name)
                     )
                     val_entities.append(white_space_fix(head_entity))
                     val_contexts.append(
@@ -1251,7 +1235,7 @@ def read_fewrl_dataset(fewrel_path, seed=10, m=5):
                     gold_answers = [tail_entity]
                     test_passages.append(sentence)
                     test_entity_relations.append(
-                        white_space_fix(head_entity + " <SEP> " + second_r_name)
+                        white_space_fix(head_entity + " " + second_r_name)
                     )
                     test_entities.append(white_space_fix(head_entity))
                     test_contexts.append(
@@ -1297,7 +1281,7 @@ def read_fewrl_dataset(fewrel_path, seed=10, m=5):
                 gold_answers = [tail_entity]
                 train_passages.append(sentence)
                 train_entity_relations.append(
-                    white_space_fix(head_entity + " <SEP> " + r_name)
+                    white_space_fix(head_entity + " " + r_name)
                 )
                 train_entities.append(white_space_fix(head_entity))
                 train_contexts.append(
@@ -1409,47 +1393,32 @@ def create_fewrl_dataset(
     dev_fewrel_path=None,
     test_fewrel_path=None,
     concat=False,
-    unk_file_path=None,
 ):
     """Function to create the fewrl dataset."""
     train_df = pd.read_csv(train_fewrel_path, sep=",")
     dev_df = pd.read_csv(dev_fewrel_path, sep=",")
     test_df = pd.read_csv(test_fewrel_path, sep=",")
-    #unk_df = pd.read_csv(unk_file_path, sep=",")
 
-    train_passages = [row.lower() for row in train_df["passages"].tolist()]
-    train_contexts = [row.lower() for row in train_df["contexts"].tolist()]
-    train_answers = [row.lower() for row in train_df["answers"].tolist()]
-    train_entity_relations = [row.lower() for row in train_df["entity_relations"].tolist()]
-    train_entities = [str(row).lower() for row in train_df["entities"].tolist()]
-    train_posterier_contexts = [row.lower() for row in train_df["posterier_contexts"].tolist()]
+    train_passages = train_df["passages"].tolist()
+    train_contexts = train_df["contexts"].tolist()
+    train_answers = train_df["answers"].tolist()
+    train_entity_relations = train_df["entity_relations"].tolist()
+    train_entities = [str(row) for row in train_df["entities"].tolist()]
+    train_posterier_contexts = train_df["posterier_contexts"].tolist()
 
-    #unk_passages = unk_df["passages"].tolist()
-    #unk_contexts = unk_df["contexts"].tolist()
-    #unk_answers = unk_df["answers"].tolist()
-    #unk_entity_relations = unk_df["entity_relations"].tolist()
-    #unk_entities = [str(row) for row in unk_df["entities"].tolist()]
- 
-    #train_passages += unk_passages
-    #train_contexts += unk_contexts
-    #train_answers += unk_answers
-    #train_entity_relations += unk_entity_relations
-    #train_entities += unk_entities
-    #train_posterier_contexts += unk_passages
+    val_passages = dev_df["passages"].tolist()
+    val_contexts = dev_df["contexts"].tolist()
+    val_answers = dev_df["answers"].tolist()
+    val_entity_relations = dev_df["entity_relations"].tolist()
+    val_entities = dev_df["entities"].tolist()
+    val_posterier_contexts = dev_df["posterier_contexts"].tolist()
 
-    val_passages = [row.lower() for row in dev_df["passages"].tolist()]
-    val_contexts = [row.lower() for row in dev_df["contexts"].tolist()]
-    val_answers = [row.lower() for row in dev_df["answers"].tolist()]
-    val_entity_relations = [row.lower() for row in dev_df["entity_relations"].tolist()]
-    val_entities = [row.lower() for row in dev_df["entities"].tolist()]
-    val_posterier_contexts = [row.lower() for row in dev_df["posterier_contexts"].tolist()]
-
-    test_passages = [row.lower() for row in test_df["passages"].tolist()]
-    test_contexts = [row.lower() for row in test_df["contexts"].tolist()]
-    test_answers = [row.lower() for row in test_df["answers"].tolist()]
-    test_entity_relations = [row.lower() for row in test_df["entity_relations"].tolist()]
-    test_entities = [row.lower() for row in test_df["entities"].tolist()]
-    test_posterier_contexts = [row.lower() for row in test_df["posterier_contexts"].tolist()]
+    test_passages = test_df["passages"].tolist()
+    test_contexts = test_df["contexts"].tolist()
+    test_answers = test_df["answers"].tolist()
+    test_entity_relations = test_df["entity_relations"].tolist()
+    test_entities = test_df["entities"].tolist()
+    test_posterier_contexts = test_df["posterier_contexts"].tolist()
 
     if concat:
         for i in range(len(train_contexts)):
@@ -1457,7 +1426,7 @@ def create_fewrl_dataset(
             ctx_str = ctx.split("context: ")[1]
             ent_rel_str = train_entity_relations[i]
             new_train_context = white_space_fix(
-                "question: " + ent_rel_str + " context: " + ctx_str
+                "answer: " + ent_rel_str + " context: " + ctx_str
             )
             train_contexts[i] = new_train_context
 
@@ -1466,17 +1435,16 @@ def create_fewrl_dataset(
             ctx_str = ctx.split("context: ")[1]
             ent_rel_str = val_entity_relations[i]
             new_val_context = white_space_fix(
-                "question: " + ent_rel_str + " context: " + ctx_str
+                "answer: " + ent_rel_str + " context: " + ctx_str
             )
             val_contexts[i] = new_val_context
-
 
         for i in range(len(test_contexts)):
             ctx = test_contexts[i]
             ctx_str = ctx.split("context: ")[1]
             ent_rel_str = test_entity_relations[i]
             new_test_context = white_space_fix(
-                "question: " + ent_rel_str + " context: " + ctx_str
+                "answer: " + ent_rel_str + " context: " + ctx_str
             )
             test_contexts[i] = new_test_context
 

@@ -482,7 +482,7 @@ def run_concat_fewrl(args):
         training_steps=args.training_steps,
         seed=args.seed,
         num_unseen_relations=args.num_unseen_relations,
-        predict_type=args.predict_type,
+        # prediction_type="relation",
     )
 
     set_random_seed(config.seed)
@@ -506,7 +506,7 @@ def run_concat_fewrl(args):
         train_fewrel_path=args.train,
         dev_fewrel_path=args.dev,
         test_fewrel_path=args.test,
-        concat=True
+        concat=True,
     )
 
     if args.mode == "concat_fewrl_train":
