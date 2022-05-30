@@ -34,12 +34,12 @@ class T5QA(object):
         self.device = torch.device("cuda" if cfg.gpu else "cpu")
 
         if cfg.mode == "train":
-            tokenizer = T5Tokenizer.from_pretrained(MODEL_NAME, local_files_only=True)
+            tokenizer = T5Tokenizer.from_pretrained(MODEL_NAME)#, local_files_only=True)
 
             # Construct model
             model = torch.nn.DataParallel(
                 T5ForConditionalGeneration.from_pretrained(
-                    MODEL_NAME, local_files_only=True
+                    MODEL_NAME#, local_files_only=True
                 )
             )
             model.to(self.device)
@@ -62,9 +62,9 @@ class T5QA(object):
             self.model_path = os.path.join(cfg.model_path, "model")
 
         elif cfg.mode in ["test", "inference"]:
-            tokenizer = T5Tokenizer.from_pretrained(MODEL_NAME, local_files_only=True)
+            tokenizer = T5Tokenizer.from_pretrained(MODEL_NAME)#, local_files_only=True)
             model = T5ForConditionalGeneration.from_pretrained(
-                MODEL_NAME, local_files_only=True
+                MODEL_NAME#, local_files_only=True
             )
             model.to(self.device)
 
