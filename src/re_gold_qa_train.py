@@ -4,8 +4,7 @@ from src.question_response_generation.t5_model import T5QA
 from src.question_response_generation.train import run_model
 from src.re_qa_model import REQA, HyperParameters, load_module, set_random_seed
 from src.re_qa_train import iterative_run_model
-from src.zero_extraction_utils import (  # create_relation_fewrl_dataset,
-    create_fewrl_dataset, create_relation_extraction_lm_dataset,
+from src.zero_extraction_utils import (create_fewrl_dataset,
     create_relation_qq_dataset, create_zero_re_qa_dataset,
     create_zero_re_qa_gold_dataset)
 
@@ -53,94 +52,6 @@ def run_relation_classification_qa(args):
         test_dataloader=val_loaders,
         save_always=True,
     )
-
-
-def run_relation_extraction_lm(args):
-    """Train a pre-trained T5 model on the RE-QA dataset generating the text of
-    the relation in the output."""
-    if args.mode == "relation_extraction_lm_train":
-        mode = "train"
-        for_evaluation = False
-        prior = False
-    elif args.mode == "relation_extraction_lm_test":
-        mode = "test"
-        for_evaluation = False
-        prior = False
-    if args.mode == "relation_extraction_prior_lm_train":
-        mode = "train"
-        for_evaluation = False
-        prior = True
-    elif args.mode == "relation_extraction_prior_lm_test":
-        mode = "test"
-        for_evaluation = False
-        prior = True
-    elif args.mode == "relation_extraction_final_test":
-        mode = "test"
-        for_evaluation = True
-        prior = False
-    elif args.mode == "relation_extraction_final_prior_test":
-        mode = "test"
-        for_evaluation = True
-        prior = True
-    config = HyperParameters(
-        model_path=args.model_path,
-        batch_size=args.batch_size,
-        source_max_length=256,
-        decoder_max_length=32,
-        gpu=args.gpu,
-        learning_rate=args.learning_rate,
-        max_epochs=args.max_epochs,
-        mode=mode,
-        prediction_file=args.prediction_file,
-        checkpoint=args.checkpoint,
-        training_steps=args.training_steps,
-        seed=args.seed,
-        predict_type=args.predict_type,
-    )
-
-    set_random_seed(config.seed)
-
-    model = T5QA(config)
-
-    if mode == "train":
-        (data_loaders, data_dataset) = create_relation_extraction_lm_dataset(
-            tokenizer=model.tokenizer,
-            batch_size=config.batch_size,
-            source_max_length=config.source_max_length,
-            decoder_max_length=config.decoder_max_length,
-            data_file=args.train,
-            shuffle=True,
-            re_prior=prior,
-            final_re_prediction=for_evaluation,
-        )
-
-        run_model(
-            model,
-            config=config,
-            train_dataloader=data_loaders,
-            test_dataloader=None,
-            save_always=True,
-        )
-
-    elif mode == "test":
-        (data_loaders, data_dataset) = create_relation_extraction_lm_dataset(
-            tokenizer=model.tokenizer,
-            batch_size=config.batch_size,
-            source_max_length=config.source_max_length,
-            decoder_max_length=config.decoder_max_length,
-            data_file=args.dev,
-            shuffle=False,
-            re_prior=prior,
-            final_re_prediction=for_evaluation,
-        )
-
-        run_model(
-            model,
-            config=config,
-            train_dataloader=None,
-            test_dataloader=data_loaders,
-            save_always=True,
-        )
 
 
 def run_re_gold_qa(args):
@@ -383,26 +294,6 @@ def run_fewrl(args):
     model = REQA(config)
     model = model.to("cuda:0")
 
-    """
-    (
-        train_loader,
-        val_loader,
-        test_loader,
-        train_dataset,
-        val_dataset,
-        test_loader,
-    ) = create_fewrl_dataset(
-        question_tokenizer=model.question_tokenizer,
-        answer_tokenizer=model.answer_tokenizer,
-        batch_size=config.batch_size,
-        source_max_length=config.source_max_length,
-        decoder_max_length=config.decoder_max_length,
-        train_fewrel_path=args.train,
-        dev_fewrel_path=args.dev,
-        test_fewrel_path=args.test,
-    )
-    """
-
     if args.mode == "fewrl_train":
         (loader, dataset) = create_relation_qq_dataset(
             question_tokenizer=model.question_tokenizer,
@@ -549,15 +440,6 @@ def run_main(args):
         run_re_qa(args)
     if args.mode in ["fewrl_train", "fewrl_test", "fewrl_dev"]:
         run_fewrl(args)
-    if args.mode in [
-        "relation_extraction_final_test",
-        "relation_extraction_final_prior_test",
-        "relation_extraction_prior_lm_train",
-        "relation_extraction_prior_lm_test",
-        "relation_extraction_lm_train",
-        "relation_extraction_lm_test",
-    ]:
-        run_relation_extraction_lm(args)
     if args.mode in ["concat_fewrl_train", "concat_fewrl_test", "concat_fewrl_dev"]:
         run_concat_fewrl(args)
 

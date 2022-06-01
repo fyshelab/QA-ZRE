@@ -1,5 +1,6 @@
 #!/bin/bash
 
+'''
 #SBATCH --job-name=dev_mml_pgg_off_re_fold_10
 #SBATCH --account=def-afyshe-ab
 #SBATCH --nodes=1
@@ -23,54 +24,50 @@ echo "r$SLURM_NODEID master: $MASTER_ADDR"
 echo "r$SLURM_NODEID Launching python script"
 
 echo "All the allocated nodes: $SLURM_JOB_NODELIST"
+'''
 
 '''
 # The SLURM_NTASKS variable tells the script how many processes are available for this execution. “srun” executes the script <tasks-per-node * nodes> times
-python src/re_gold_qa_train.py \
+CUDA_VISIBLE_DEVICES=3 python3.7 src/re_gold_qa_train.py \
     --mode fewrl_train \
-    --model_path ~/fewrl/run_1/ \
+    --model_path ~/may-29/fewrl/run_1/ \
     --answer_checkpoint _response_pretrained \
     --question_checkpoint _fold_1_question_pretrained \
-    --training_steps 5200 \
+    --training_steps 2600 \
     --learning_rate 0.0005 \
     --max_epochs 1 \
     --num_search_samples 8 \
-    --batch_size 16 \
+    --batch_size 8 \
     --gpu True \
-    --train ./unk_fewrl_data/unk_train_data_12321.csv \
+    --train ./fewrl_data/train_data_12321.csv \
     --gpu_device 0 \
     --seed 12321 \
     --train_method MML-MML-Off-Sim
 '''
 
-fold_num=10
-for ((j=0; j<=125; j++))
+for (( i=11; i<=11; i++ ))
 do
-	k=$((j * 4))
-	end_k=$((k+3))
-        fold_data_id=$((fold_num-1))
-	for (( i=${k}; i<=${end_k}; i++ ))
+	for (( e=0; e<=0; e++ ))
 	do
-		step=$(((i+1) * 100))
-		printf "step ${step}\r\n"
-		python src/re_gold_qa_train.py \
-			--mode fewrl_dev \
-			--model_path /home/saeednjf/scratch/feb-15-2022-arr/fold_${fold_num}/mml-pgg-off-sim/ \
-			--answer_checkpoint _0_answer_step_${step} \
-			--question_checkpoint _0_question_step_${step} \
+		step=$(((i) * 200))
+		printf "epoch ${e} & step ${step}\r\n"
+		CUDA_VISIBLE_DEVICES=3 python3.7 src/re_gold_qa_train.py \
+			--mode fewrl_test \
+			--model_path ~/may-29/fewrl/run_1/ \
+			--answer_checkpoint _${e}_answer_step_${step} \
+			--question_checkpoint _${e}_question_step_${step} \
 			--num_search_samples 8 \
-			--batch_size 16 --gpu True \
-			--dev $SCRATCH/QA-ZRE/zero-shot-extraction/relation_splits/dev.${fold_data_id} \
+			--batch_size 32 --gpu True \
+			--test ./fewrl_data/test_data_12321.csv \
 			--gpu_device 0 \
 			--seed 12321 \
-			--prediction_file /home/saeednjf/scratch/feb-15-2022-arr/fold_${fold_num}/mml-pgg-off-sim/relation.mml-pgg-off-sim.run.0.dev.predictions.step.${step}.csv \
-                        --predict_type relation &
+			--prediction_file ~/may-29/fewrl/run_1/relation.mml-pgg-off-sim.${e}.test.predictions.step.${step}.csv \
+            --predict_type relation &
 	done
 	wait
 done
 
 '''
-
 source ../dreamscape-qa/env/bin/activate
 
 for (( e=0; e<=0; e++ ))
