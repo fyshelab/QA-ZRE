@@ -1,6 +1,16 @@
 #!/bin/bash
 
-'''
+
+#SBATCH --job-name=dev_concat_fold_10
+#SBATCH --account=def-afyshe-ab
+#SBATCH --nodes=1
+#SBATCH --tasks-per-node=1
+#SBATCH --gres=gpu:a100:1
+#SBATCH --mem=24000M
+#SBATCH --time=4-00:00
+#SBATCH --cpus-per-task=3
+#SBATCH --output=%N-%j.out
+
 module load StdEnv/2020 gcc/9.3.0 cuda/11.4 arrow/5.0.0
 
 source ../dreamscape-qa/env/bin/activate

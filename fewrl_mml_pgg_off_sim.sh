@@ -1,44 +1,46 @@
 #!/bin/bash
 
-source env/bin/activate
+#SBATCH --job-name=mml-pgg-off-sim
+#SBATCH --account=def-afyshe-ab
+#SBATCH --nodes=1
+#SBATCH --tasks-per-node=1
+#SBATCH --gres=gpu:a100:1
+#SBATCH --mem=24000M
+#SBATCH --time=0-04:00
+#SBATCH --cpus-per-task=3
+#SBATCH --output=%N-%j.out
 
-'''
-CUDA_VISIBLE_DEVICES=1 python src/re_gold_qa_train.py \
-    --mode fewrl_train \
-    --model_path ~/fewrl/run_1/ \
-    --answer_checkpoint _response_pretrained \
-    --question_checkpoint _fold_1_question_pretrained \
-    --training_steps 2600 \
-    --learning_rate 0.0005 \
-    --max_epochs 4 \
-    --num_search_samples 8 \
-    --batch_size 16 \
-    --gpu True \
-    --train ./fewrl_data/train_data_12321.csv \
-    --gpu_device 0 \
-    --seed 12321 \
-    --train_method MML-MML-Off-Sim 
-'''
+module load StdEnv/2020 gcc/9.3.0 cuda/11.4 arrow/5.0.0
 
-#run 4 test
-for (( i=3; i<=3; i++ ))
+source ../dreamscape-qa/env/bin/activate
+
+export NCCL_BLOCKING_WAIT=1  #Set this environment variable if you wish to use the NCCL backend for inter-GPU communication.
+
+export MASTER_ADDR=$(hostname) #Store the master node’s IP address in the MASTER_ADDR environment variable.
+
+echo "r$SLURM_NODEID master: $MASTER_ADDR"
+
+echo "r$SLURM_NODEID Launching python script"
+
+echo "All the allocated nodes: $SLURM_JOB_NODELIST"
+
+steps=(4700 400 3600 800 7900 700 2100 6800 4300 1600)
+for i in ${!steps[@]};
 do
-	for (( e=0; e<=0; e++ ))
-	do
-		step=$(((i) * 200))
-		printf "epoch ${e} & step ${step}\r\n"
-		CUDA_VISIBLE_DEVICES=3 python src/re_gold_qa_train.py \
-			--mode fewrl_test \
-			--model_path ~/fewrl/run_4/ \
-			--answer_checkpoint _${e}_answer_step_${step} \
-			--question_checkpoint _${e}_question_step_${step} \
-			--num_search_samples 8 \
-			--batch_size 128 --gpu True \
-			--test ./fewrl_data/test_data_300.csv \
-			--gpu_device 0 \
-			--seed 300 \
-			--prediction_file ~/fewrl/run_4/relation.mml-pgg-off-sim.${e}.test.predictions.step.${step}.csv \
-			--predict_type relation &
-	done
-	wait
+	fold_num=$((i+1))
+	fold_data_id=$((fold_num-1))
+	step=${steps[$i]}
+	srun python src/re_gold_qa_train.py \
+		--mode reqa_mml_eval \
+		--model_path ~/scratch/feb-15-2022-arr/fold_${fold_num}/mml-pgg-off-sim/ \
+		--answer_checkpoint _0_answer_step_${step} \
+		--question_checkpoint _0_question_step_${step} \
+		--num_search_samples 8 \
+		--batch_size 64 \
+		--gpu True \
+		--test ./zero-shot-extraction/relation_splits/test.${fold_data_id} \
+		--gpu_device 0 \
+		--seed 12321 \
+		--prediction_file ~/scratch/feb-15-2022-arr/fold_${fold_num}/relation.mml-pgg-off-sim.run.fold_${fold_num}.test.predictions.step.${step}.csv \
+		--predict_type relation
 done

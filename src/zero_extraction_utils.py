@@ -1628,31 +1628,31 @@ def create_relation_qq_dataset(
     train_fewrel_path=None,
     concat=False,
     shuffle=False,
+    for_fewrel_dataset=False,
 ):
     """Function to create the fewrl dataset for training with negative
     samples."""
 
-    '''
-    (
+    if for_fewrel_dataset:
+        train_df = pd.read_csv(train_fewrel_path, sep=",")
+
+        train_passages = train_df["passages"].tolist()
+        train_contexts = train_df["contexts"].tolist()
+        train_answers = train_df["answers"].tolist()
+        train_entity_relations = train_df["entity_relations"].tolist()
+        train_entities = [str(row) for row in train_df["entities"].tolist()]
+        train_posterier_contexts = train_df["posterier_contexts"].tolist()
+    else:
+        (
         train_passages,
         train_contexts,
         train_posterier_contexts,
         train_answers,
         train_entity_relations,
         train_entities,
-    ) = read_gold_re_qa_relation_data(
-        train_fewrel_path, concat=False, for_question_generation=True
-    )
-    '''
-
-    train_df = pd.read_csv(train_fewrel_path, sep=",")
-
-    train_passages = train_df["passages"].tolist()
-    train_contexts = train_df["contexts"].tolist()
-    train_answers = train_df["answers"].tolist()
-    train_entity_relations = train_df["entity_relations"].tolist()
-    train_entities = [str(row) for row in train_df["entities"].tolist()]
-    train_posterier_contexts = train_df["posterier_contexts"].tolist()
+        ) = read_gold_re_qa_relation_data(
+            train_fewrel_path, concat=False, for_question_generation=True
+        )
 
     train_encodings = question_tokenizer(
         train_contexts,

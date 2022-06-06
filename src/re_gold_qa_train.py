@@ -267,10 +267,16 @@ def run_fewrl(args):
     the response generator explored with some search algorithm."""
     if args.mode == "fewrl_train":
         mode = "train"
+        for_fewrl = True
     elif args.mode == "fewrl_dev":
         mode = "test"
+        for_fewrl = True
     elif args.mode == "fewrl_test":
         mode = "test"
+        for_fewrl = True
+    elif args.mode == 'reqa_mml_eval':
+        mode = "test"
+        for_fewrl = False
 
     config = HyperParameters(
         model_path=args.model_path,
@@ -303,6 +309,7 @@ def run_fewrl(args):
             decoder_max_length=config.decoder_max_length,
             train_fewrel_path=args.train,
             shuffle=True,
+            for_fewrel_dataset=for_fewrl
         )
 
         iterative_run_model(
@@ -324,6 +331,7 @@ def run_fewrl(args):
             decoder_max_length=config.decoder_max_length,
             train_fewrel_path=args.dev,
             shuffle=False,
+            for_fewrel_dataset=for_fewrl
         )
         iterative_run_model(
             model,
@@ -332,7 +340,7 @@ def run_fewrl(args):
             current_device=0,
         )
 
-    if args.mode == "fewrl_test":
+    if args.mode == ["fewrl_test", "reqa_mml_eval"]:
         (loader, dataset) = create_relation_qq_dataset(
             question_tokenizer=model.question_tokenizer,
             answer_tokenizer=model.answer_tokenizer,
@@ -341,6 +349,7 @@ def run_fewrl(args):
             decoder_max_length=config.decoder_max_length,
             train_fewrel_path=args.test,
             shuffle=False,
+            for_fewrel_dataset=for_fewrl
         )
         iterative_run_model(
             model,
@@ -438,7 +447,7 @@ def run_main(args):
         run_re_concat_qa(args)
     if args.mode in ["re_qa_train", "re_qa_test"]:
         run_re_qa(args)
-    if args.mode in ["fewrl_train", "fewrl_test", "fewrl_dev"]:
+    if args.mode in ["reqa_mml_eval", "fewrl_train", "fewrl_test", "fewrl_dev"]:
         run_fewrl(args)
     if args.mode in ["concat_fewrl_train", "concat_fewrl_test", "concat_fewrl_dev"]:
         run_concat_fewrl(args)
