@@ -110,11 +110,11 @@ do
 done
 '''
 
-fold_num=5
-fold_data_id=4
-step=14700
-CUDA_VISIBLE_DEVICES=0 python3.7 src/re_gold_qa_train.py \
-	--mode fewrl_dev \
+#fold_num=5
+#fold_data_id=4
+#step=14700
+#CUDA_VISIBLE_DEVICES=0 python3.7 src/re_gold_qa_train.py \
+#	--mode fewrl_dev \#
 	--model_path ~/may-20/fold_${fold_num}/ \
 	--answer_checkpoint _0_answer_step_${step} \
 	--question_checkpoint _0_question_step_${step} \

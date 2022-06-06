@@ -1,41 +1,20 @@
 import argparse
 import csv
 import io
-import json
 import math
 import os
 import time
 from configparser import ConfigParser
-from pathlib import Path
 from typing import Generator, Optional
 
 import numpy as np
-import torch
 
-# from src.question_response_generation.question_utils import \
-#    create_question_pretrain_dataset
-# from src.question_response_generation.response_utils import \
-#    create_response_dataset
+from src.question_response_generation.question_utils import \
+    create_question_pretrain_dataset
+from src.question_response_generation.response_utils import \
+    create_response_dataset
 from src.question_response_generation.t5_model import T5QA, HyperParameters
-from src.re_qa_model import load_module, set_random_seed
-
-
-def read_squad_refs(path):
-    path = Path(path)
-    with open(path, "rb") as f:
-        squad_dict = json.load(f)
-
-    all_refs = []
-    for group in squad_dict["data"]:
-        for passage in group["paragraphs"]:
-            for qa in passage["qas"]:
-                temp = []
-                for answer in qa["answers"]:
-                    temp.append(answer["text"])
-                if temp:
-                    all_refs.append(temp)
-
-    return all_refs
+from src.re_qa_model import set_random_seed
 
 
 def run_train_epoch(
@@ -132,7 +111,7 @@ def run_model(
                         step, loss, mean_loss
                     )
                 )
-                if step > 0 and save_always and (step % 200 == 0):
+                if step > 0 and save_always and (step % 100 == 0):
                     model.save(str(epoch) + "_step_" + str(step))
 
             if save_always:
