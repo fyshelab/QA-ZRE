@@ -1,5 +1,6 @@
 #!/bin/bash
 
+'''
 #SBATCH --job-name=mml-pgg-off-sim
 #SBATCH --account=def-afyshe-ab
 #SBATCH --nodes=1
@@ -23,6 +24,7 @@ echo "r$SLURM_NODEID master: $MASTER_ADDR"
 echo "r$SLURM_NODEID Launching python script"
 
 echo "All the allocated nodes: $SLURM_JOB_NODELIST"
+'''
 
 steps=(4700 400 3600 800 7900 700 2100 6800 4300 1600)
 for i in ${!steps[@]};
@@ -30,9 +32,9 @@ do
 	fold_num=$((i+1))
 	fold_data_id=$((fold_num-1))
 	step=${steps[$i]}
-	srun python src/re_gold_qa_train.py \
+	CUDA_VISIBLE_DEVICES=3 python3.7 src/re_gold_qa_train.py \
 		--mode reqa_mml_eval \
-		--model_path ~/scratch/feb-15-2022-arr/fold_${fold_num}/mml-pgg-off-sim/ \
+		--model_path ~/may-20/fold_${fold_num}/ \
 		--answer_checkpoint _0_answer_step_${step} \
 		--question_checkpoint _0_question_step_${step} \
 		--num_search_samples 8 \
@@ -41,6 +43,6 @@ do
 		--test ./zero-shot-extraction/relation_splits/test.${fold_data_id} \
 		--gpu_device 0 \
 		--seed 12321 \
-		--prediction_file ~/scratch/feb-15-2022-arr/fold_${fold_num}/relation.mml-pgg-off-sim.run.fold_${fold_num}.test.predictions.step.${step}.csv \
+		--prediction_file ~/may-20/fold_${fold_num}/relation.mml-pgg-off-sim.run.fold_${fold_num}.test.predictions.step.${step}.csv \
 		--predict_type relation
 done

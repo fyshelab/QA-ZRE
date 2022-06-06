@@ -293,7 +293,6 @@ def run_fewrl(args):
         question_checkpoint=args.question_checkpoint,
         num_search_samples=int(args.num_search_samples),
         seed=args.seed,
-        num_unseen_relations=args.num_unseen_relations,
         predict_type=args.predict_type,
     )
     set_random_seed(config.seed)
@@ -340,7 +339,7 @@ def run_fewrl(args):
             current_device=0,
         )
 
-    if args.mode == ["fewrl_test", "reqa_mml_eval"]:
+    if args.mode in ["fewrl_test", "reqa_mml_eval"]:
         (loader, dataset) = create_relation_qq_dataset(
             question_tokenizer=model.question_tokenizer,
             answer_tokenizer=model.answer_tokenizer,
