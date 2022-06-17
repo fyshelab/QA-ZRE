@@ -1149,9 +1149,9 @@ def read_fewrl_dataset(fewrel_path, seed=10, m=5):
         data = json.load(json_file)
         r_ids = list(data.keys())
         random.shuffle(r_ids)
-        val_r_ids = r_ids[:m]
-        test_r_ids = r_ids[m : 4 * m]
-        train_r_ids = r_ids[4 * m :]
+        val_r_ids = r_ids[: m]
+        test_r_ids = r_ids[m: 4 * m]
+        train_r_ids = r_ids[4 * m:]
 
         train_id_df = pd.DataFrame(train_r_ids, columns=["relation_ids"])
         train_id_df.to_csv(
@@ -1176,7 +1176,7 @@ def read_fewrl_dataset(fewrel_path, seed=10, m=5):
             pos = min([p for p in pos if p >= 0])
             re_desc = desc[:pos]
 
-            for sent in data[r_id]:
+            for sent in data[r_id][:50]:
                 for second_r_id in val_r_ids:
                     second_r_name = rel_dict[second_r_id]
                     second_r_desc = rel_desc[second_r_id]

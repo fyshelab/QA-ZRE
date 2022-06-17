@@ -380,7 +380,6 @@ def run_concat_fewrl(args):
         checkpoint=args.checkpoint,
         training_steps=args.training_steps,
         seed=args.seed,
-        num_unseen_relations=args.num_unseen_relations,
         predict_type=args.predict_type,
     )
 

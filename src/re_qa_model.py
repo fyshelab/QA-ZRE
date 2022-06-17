@@ -150,7 +150,7 @@ def prob_of_sampled_predictions(loss_fct, sample_outputs):
     return sampled_predictions, log_p
 
 
-MODEL_NAME = "t5-small"
+MODEL_NAME = "t5-base"
 
 
 class REQA(torch.nn.Module):
@@ -166,32 +166,32 @@ class REQA(torch.nn.Module):
 
         # Answer Model tokenizer
         answer_tokenizer = T5Tokenizer.from_pretrained(
-            MODEL_NAME, local_files_only=True
+            MODEL_NAME#, local_files_only=True
         )
 
         # Construct the answer model
         answer_model = T5ForConditionalGeneration.from_pretrained(
-            MODEL_NAME, local_files_only=True
+            MODEL_NAME#, local_files_only=True
         )
 
         # Question Model tokenizer
         question_tokenizer = T5Tokenizer.from_pretrained(
-            MODEL_NAME, local_files_only=True
+            MODEL_NAME#, local_files_only=True
         )
 
         # Construct the question model
         question_model = T5ForConditionalGeneration.from_pretrained(
-            MODEL_NAME, local_files_only=True
+            MODEL_NAME#, local_files_only=True
         )
 
         # Pretrained question model tokenizer
         self.init_question_tokenizer = T5Tokenizer.from_pretrained(
-            MODEL_NAME, local_files_only=True
+            MODEL_NAME#, local_files_only=True
         )
 
         # Construct the pretrained question model
         self.init_question_model = T5ForConditionalGeneration.from_pretrained(
-            MODEL_NAME, local_files_only=True
+            MODEL_NAME#, local_files_only=True
         )
 
         if cfg.mode == "train":
