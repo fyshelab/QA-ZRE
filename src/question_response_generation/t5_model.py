@@ -18,7 +18,7 @@ def save(model: torch.nn.Module, path: str) -> None:
     torch.save(model.state_dict(), path)
 
 
-MODEL_NAME = "t5-base"
+# MODEL_NAME = "t5-base"
 
 
 class T5QA(object):
@@ -26,6 +26,8 @@ class T5QA(object):
 
     def __init__(self, cfg: HyperParameters):
         self.config = cfg
+
+        MODEL_NAME = self.config.model_name
 
         set_random_seed(cfg.seed)
 
@@ -55,6 +57,7 @@ class T5QA(object):
                 scale_parameter=False,
                 warmup_init=False,
             )
+
             if not os.path.exists(cfg.model_path):
                 os.makedirs(cfg.model_path)
             self.model_path = os.path.join(cfg.model_path, "model")

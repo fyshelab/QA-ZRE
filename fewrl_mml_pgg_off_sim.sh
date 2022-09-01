@@ -1,38 +1,35 @@
 #!/bin/bash
 
-source env/bin/activate
-
-'''
-CUDA_VISIBLE_DEVICES=0 python src/re_gold_qa_train.py \
+CUDA_VISIBLE_DEVICES=3 python3.7 src/re_gold_qa_train.py \
 	--mode fewrl_train \
-	--model_path ~/run_2/ \
+	--model_path /home/snajafi/june-19/wikizsl/run_1/ \
 	--answer_checkpoint _response_pretrained_model \
 	--question_checkpoint _question_second_pretrained_model \
-	--training_steps 2600 \
+	--training_steps 4300 \
 	--learning_rate 0.0005 \
-	--max_epochs 4 \
+	--max_epochs 2 \
 	--num_search_samples 6 \
-	--batch_size 16 \
+	--batch_size 4 \
 	--gpu True \
 	--num_workers 3 \
-	--train ./fewrl_data/train_data_943.csv \
-	--dev ./fewrl_data/val_data_943.csv \
-	--test ./fewrl_data/test_data_943.csv \
+	--train ~/codes/QA-ZRE/wikizsl_dataset/train_data_12321.csv \
+	--dev  ~/codes/QA-ZRE/wikizsl_dataset/small.val_data_12321.csv \
+	--test  ~/codes/QA-ZRE/wikizsl_dataset/test_data_12321.csv \
 	--gpu_device 0 \
-	--seed 943 \
+	--seed 12321 \
 	--train_method MML-PGG-Off-Sim
-'''
 
-# test for run 4.
-for (( i=10; i<=10; i++ ))
+'''
+# test for run 5.
+for (( i=12; i<=12; i++ ))
 do
-	for (( e=2; e<=2; e++ ))
+	for (( e=0; e<=0; e++ ))
 	do
 		step=$((i * 200))
 		printf "step ${step} on epoch ${e}\r\n"
-		CUDA_VISIBLE_DEVICES=1 python src/re_gold_qa_train.py \
+		CUDA_VISIBLE_DEVICES=0 python3.7 src/re_gold_qa_train.py \
 			--mode fewrl_test \
-			--model_path ~/run_4/ \
+			--model_path ~/june-16/fewrl/run_5/ \
 			--answer_checkpoint _${e}_answer_step_${step} \
 			--question_checkpoint _${e}_question_step_${step} \
 			--training_steps 2600 \
@@ -41,17 +38,16 @@ do
 			--num_search_samples 8 \
 			--batch_size 32 --gpu True \
 			--ignore_unknowns True \
-			--train ./fewrl_data/train_data_300.csv \
-			--dev ./fewrl_data/val_data_300.csv \
-			--test ./fewrl_data/test_data_300.csv \
+			--train ./small_fewrl_data/train_data_1300.csv \
+			--dev ./small_fewrl_data/val_data_1300.csv \
+			--test ./small_fewrl_data/test_data_1300.csv \
 			--gpu_device 0 \
-			--seed 300 \
-			--prediction_file ~/run_4/relation.mml-pgg-off-sim.run.${e}.test.predictions.step.${step}.csv \
-			--predict_type relation 
+			--seed 1300 \
+			--prediction_file ~/june-16/fewrl/run_5/relation.mml-pgg-off-sim.run.${e}.test.predictions.step.${step}.csv \
+			--predict_type relation
 	done
 done
 
-'''
 CUDA_VISIBLE_DEVICES=1 python src/re_gold_qa_train.py \
     --mode concat_fewrl_train \
     --model_path ~/concat_run_2/ \

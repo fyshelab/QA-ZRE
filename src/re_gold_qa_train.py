@@ -264,7 +264,7 @@ def run_re_qa(args):
 
 def run_fewrl(args):
     """Run the relation-extraction qa models using the question generator and
-    the response generator explored with some search algorithm."""
+    the response generator explored with some search algorithm on the fewrel dataset."""
     if args.mode == "fewrl_train":
         mode = "train"
         for_fewrl = True
@@ -378,9 +378,9 @@ def run_concat_fewrl(args):
         mode=mode,
         prediction_file=args.prediction_file,
         checkpoint=args.checkpoint,
-        training_steps=args.training_steps,
         seed=args.seed,
         predict_type=args.predict_type,
+        model_name="t5-small"
     )
 
     set_random_seed(config.seed)
@@ -394,7 +394,7 @@ def run_concat_fewrl(args):
         test_loader,
         train_dataset,
         val_dataset,
-        test_loader,
+        test_dataset,
     ) = create_fewrl_dataset(
         question_tokenizer=model.tokenizer,
         answer_tokenizer=model.tokenizer,

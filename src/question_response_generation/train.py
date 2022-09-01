@@ -15,12 +15,12 @@ from src.question_response_generation.response_utils import \
     create_response_dataset
 from src.question_response_generation.t5_model import T5QA, HyperParameters
 from src.re_qa_model import set_random_seed
-
+from src.zero_extraction_utils import create_prompt_zero_re_qa_dataset
 
 def run_train_epoch(
     model,
     train_dataloader,
-) -> Generator:
+):
     """Train the model and return the loss for each step.
     Randomly pick a batch from the train_dataset.
     """
@@ -41,7 +41,7 @@ def run_predict(
         writer = csv.writer(out_fp, **writerparams)
         header_written = False
         for batch in dev_dataloader:
-            if prediction_type == "entity":
+            if prediction_type in ["entity", "prompt"]:
                 for ret_row in model.predict(batch):
                     if not header_written:
                         headers = ret_row.keys()
@@ -263,6 +263,69 @@ def run_pretrain_question_generator(args):
         save_always=True,
     )
 
+def run_prompt_qa(args):
+    """Run UnifiedQA model with prompts."""
+    model_name = "allenai/unifiedqa-t5-small"
+    if args.mode == "prompt_qa_train":
+        mode = "train"
+        for_evaluation = False
+        file = args.train
+
+    elif args.mode in ["prompt_qa_dev"]:
+        mode = "test"
+        for_evaluation = True
+        file = args.dev
+
+    elif args.mode in ["prompt_qa_test"]:
+        mode = "test"
+        for_evaluation = True
+        file = args.test
+
+    config = HyperParameters(
+        model_path=args.model_path,
+        batch_size=args.batch_size,
+        source_max_length=512,
+        decoder_max_length=128,
+        gpu=args.gpu,
+        learning_rate=args.learning_rate,
+        max_epochs=args.max_epochs,
+        mode=mode,
+        prediction_file=args.prediction_file,
+        checkpoint=args.checkpoint,
+        seed=args.seed,
+        predict_type="prompt",
+        model_name=model_name
+    )
+
+    set_random_seed(config.seed)
+
+    model = T5QA(config)
+
+    loader, dataset = create_prompt_zero_re_qa_dataset(
+        tokenizer=model.tokenizer, 
+        batch_size=config.batch_size,
+        source_max_length=config.source_max_length,
+        decoder_max_length=config.decoder_max_length,
+        file_path=file,
+        for_evaluation=for_evaluation)
+
+    if mode == "train":
+        run_model(
+            model,
+            config=config,
+            train_dataloader=loader,
+            test_dataloader=None,
+            save_always=True,
+        )
+
+    else:
+        run_model(
+            model,
+            config=config,
+            train_dataloader=None,
+            test_dataloader=loader,
+            save_always=True,
+        )
 
 def run_main(args):
     """Decides what to do in the code."""
@@ -272,7 +335,8 @@ def run_main(args):
         run_squad_test(args)
     if args.mode in ["question_generation_pretrain"]:
         run_pretrain_question_generator(args)
-
+    if args.mode in ["prompt_qa_train", "prompt_qa_test", "prompt_qa_dev"]:
+        run_prompt_qa(args)
 
 def argument_parser():
     """Augments arguments for protein-gene model."""

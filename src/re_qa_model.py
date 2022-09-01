@@ -45,6 +45,7 @@ class HyperParameters:
     no_repeat_ngram_size: Optional[int] = 2
     num_search_samples: Optional[int] = 8
     num_neg_samples: Optional[int] = 3
+    model_name: str = "MODEL_NAME"
 
 
 def tuple_of_tensors_to_tensor(tuple_of_tensors):
