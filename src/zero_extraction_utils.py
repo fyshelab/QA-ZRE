@@ -101,6 +101,36 @@ def find_all_relation_ids_in_reqa(path):
                 rel_dict[rel_token] = "none"
     return rel_dict, rel_desc_dict
 
+def convert_fewrel_to_promptZRE_format(path, output_path):
+    path = Path(path)
+
+    id_to_label = {}
+    with open("./relation_descriptions.json", "r") as fd:
+        re_desc_data = json.load(fd)
+        for row in re_desc_data:
+            re_label = row["relation_label"]
+            re_id = row["relation_id"]
+            id_to_label[re_id] = re_label
+
+    with open(output_path, "w") as out_fd:
+        with open(path, "r") as fd:
+            fewrel_data = json.load(fd)
+            data = []
+            for k, v in fewrel_data.items():
+                for i in v:
+                    i['relation'] = k
+                    data_row = {
+                        "triplets" : [{
+                            "tokens": i["tokens"],
+                            "head": i["h"][2][0],
+                            "tail": i["t"][2][0],
+                            "label_id": i["relation"],
+                            "label": id_to_label[i["relation"]]
+                        }]
+                    }
+                    data.append(data_row)
+        json.dump(data, out_fd)
+
 def convert_reqa_to_fewrel_format(path, output_path):
     path = Path(path)
 
