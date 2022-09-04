@@ -259,20 +259,12 @@ def read_gold_re_qa_relation_data(path, concat=False, for_question_generation=Fa
     gold_templates."""
     path = Path(path)
 
-    rel_dict = {}
-    with open("./props.json", "r") as fd:
+    label_to_desc = {}
+    with open("./relation_descriptions.json", "r") as fd:
         re_desc_data = json.load(fd)
-        sentence_delimiters = [". ", ".\n", "? ", "?\n", "! ", "!\n"]
         for row in re_desc_data:
-            desc = row["description"]
-            if desc == {}:
-                continue
-            desc = desc.strip(".") + ". "
-            pos = [desc.find(delimiter) for delimiter in sentence_delimiters]
-            pos = min([p for p in pos if p >= 0])
-            re_desc = desc[:pos]
-            re_id = row["label"]
-            rel_dict[white_space_fix(re_id).lower()] = white_space_fix(re_desc)
+            re_label = row["relation_label"]
+            label_to_desc[re_label] = row["relation_description"]
 
     all_relations = {}
     with open(path, "r") as fd:
@@ -318,14 +310,14 @@ def read_gold_re_qa_relation_data(path, concat=False, for_question_generation=Fa
                 entity_relations.append(white_space_fix(line_arr[2] + " " + rel_type))
                 entities.append(white_space_fix(line_arr[2]))
                 if for_question_generation:
-                    if white_space_fix(rel_type).lower() in rel_dict:
+                    if rel_type in label_to_desc:
                         contexts.append(
                             "answer: "
                             + white_space_fix(line_arr[2])
                             + " <SEP> "
                             + white_space_fix(rel_type)
                             + " ; "
-                            + rel_dict[white_space_fix(rel_type).lower()]
+                            + label_to_desc[rel_type]
                             + " context: "
                             + white_space_fix(passage)
                             + " </s>"
@@ -336,28 +328,7 @@ def read_gold_re_qa_relation_data(path, concat=False, for_question_generation=Fa
                             + " <SEP> "
                             + white_space_fix(rel_type)
                             + " ; "
-                            + rel_dict[white_space_fix(rel_type).lower()]
-                            + " "
-                            + white_space_fix(" and ".join(gold_answers))
-                            + " context: "
-                            + white_space_fix(passage)
-                            + " </s>"
-                        )
-                    else:
-                        contexts.append(
-                            "answer: "
-                            + white_space_fix(line_arr[2])
-                            + " <SEP> "
-                            + white_space_fix(rel_type)
-                            + " context: "
-                            + white_space_fix(passage)
-                            + " </s>"
-                        )
-                        posterier_contexts.append(
-                            "answer: "
-                            + white_space_fix(line_arr[2])
-                            + " <SEP> "
-                            + white_space_fix(rel_type)
+                            + label_to_desc[rel_type]
                             + " "
                             + white_space_fix(" and ".join(gold_answers))
                             + " context: "
@@ -489,20 +460,12 @@ def read_zero_re_qa(path, ignore_unknowns=False, gold_question=False, concat=Fal
     """Main function to read the zero re qa dataset."""
     path = Path(path)
 
-    rel_dict = {}
-    with open("./props.json", "r") as fd:
+    label_to_desc = {}
+    with open("./relation_descriptions.json", "r") as fd:
         re_desc_data = json.load(fd)
-        sentence_delimiters = [". ", ".\n", "? ", "?\n", "! ", "!\n"]
         for row in re_desc_data:
-            desc = row["description"]
-            if desc == {}:
-                continue
-            desc = desc.strip(".") + ". "
-            pos = [desc.find(delimiter) for delimiter in sentence_delimiters]
-            pos = min([p for p in pos if p >= 0])
-            re_desc = desc[:pos]
-            re_id = row["label"]
-            rel_dict[white_space_fix(re_id).lower()] = white_space_fix(re_desc)
+            re_label = row["relation_label"]
+            label_to_desc[re_label] = row["relation_description"]
 
     with open(path, "r") as fd:
         uniq_relations = set()
@@ -555,14 +518,14 @@ def read_zero_re_qa(path, ignore_unknowns=False, gold_question=False, concat=Fal
                     + " </s>"
                 )
             else:
-                if white_space_fix(line_arr[0]).lower() in rel_dict:
+                if line_arr[0] in label_to_desc:
                     contexts.append(
                         "answer: "
                         + white_space_fix(line_arr[2])
                         + " <SEP> "
                         + white_space_fix(line_arr[0])
                         + " ; "
-                        + rel_dict[white_space_fix(line_arr[0]).lower()]
+                        + label_to_desc[line_arr[0]]
                         + " context: "
                         + white_space_fix(passage)
                         + " </s>"
@@ -573,28 +536,7 @@ def read_zero_re_qa(path, ignore_unknowns=False, gold_question=False, concat=Fal
                         + " <SEP> "
                         + white_space_fix(line_arr[0])
                         + " ; "
-                        + rel_dict[white_space_fix(line_arr[0]).lower()]
-                        + " "
-                        + white_space_fix(" and ".join(gold_answers))
-                        + " context: "
-                        + white_space_fix(passage)
-                        + " </s>"
-                    )
-                else:
-                    contexts.append(
-                        "answer: "
-                        + white_space_fix(line_arr[2])
-                        + " <SEP> "
-                        + white_space_fix(line_arr[0])
-                        + " context: "
-                        + white_space_fix(passage)
-                        + " </s>"
-                    )
-                    posterier_contexts.append(
-                        "answer: "
-                        + white_space_fix(line_arr[2])
-                        + " <SEP> "
-                        + white_space_fix(line_arr[0])
+                        + label_to_desc[line_arr[0]]
                         + " "
                         + white_space_fix(" and ".join(gold_answers))
                         + " context: "
