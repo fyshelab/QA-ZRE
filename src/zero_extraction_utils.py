@@ -101,6 +101,30 @@ def find_all_relation_ids_in_reqa(path):
                 rel_dict[rel_token] = "none"
     return rel_dict, rel_desc_dict
 
+import ujson
+from pathlib import Path
+
+def read_jsonl(file_path):
+    """Read a .jsonl file and yield its contents line by line.
+    file_path (unicode / Path): The file path.
+    YIELDS: The loaded JSON contents of each line.
+    """
+    with Path(file_path).open('r', encoding='utf8') as f:
+        for line in f:
+            try:  # hack to handle broken jsonl
+                yield ujson.loads(line.strip())
+            except ValueError:
+                continue
+
+
+def write_jsonl(file_path, lines):
+    """Create a .jsonl file and dump contents.
+    file_path (unicode / Path): The path to the output file.
+    lines (list): The JSON-serializable contents of each line.
+    """
+    data = [ujson.dumps(line, escape_forward_slashes=False) for line in lines]
+    Path(file_path).open('w', encoding='utf-8').write('\n'.join(data))
+
 def convert_fewrel_to_promptZRE_format(path, output_path):
     path = Path(path)
 
@@ -112,24 +136,23 @@ def convert_fewrel_to_promptZRE_format(path, output_path):
             re_id = row["relation_id"]
             id_to_label[re_id] = re_label
 
-    with open(output_path, "w") as out_fd:
-        with open(path, "r") as fd:
-            fewrel_data = json.load(fd)
-            data = []
-            for k, v in fewrel_data.items():
-                for i in v:
-                    i['relation'] = k
-                    data_row = {
-                        "triplets" : [{
-                            "tokens": i["tokens"],
-                            "head": i["h"][2][0],
-                            "tail": i["t"][2][0],
-                            "label_id": i["relation"],
-                            "label": id_to_label[i["relation"]]
-                        }]
-                    }
-                    data.append(data_row)
-        json.dump(data, out_fd)
+    with open(path, "r") as fd:
+        fewrel_data = json.load(fd)
+        data = []
+        for k, v in fewrel_data.items():
+            for i in v:
+                i['relation'] = k
+                data_row = {
+                    "triplets" : [{
+                        "tokens": i["tokens"],
+                        "head": i["h"][2][0],
+                        "tail": i["t"][2][0],
+                        "label_id": i["relation"],
+                        "label": id_to_label[i["relation"]]
+                    }]
+                }
+                data.append(data_row)
+    write_jsonl(output_path, data)
 
 def convert_reqa_to_fewrel_format(path, output_path):
     path = Path(path)
