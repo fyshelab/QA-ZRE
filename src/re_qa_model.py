@@ -151,7 +151,7 @@ def prob_of_sampled_predictions(loss_fct, sample_outputs):
     return sampled_predictions, log_p
 
 
-MODEL_NAME = "t5-base"
+MODEL_NAME = "t5-small"
 
 
 class REQA(torch.nn.Module):

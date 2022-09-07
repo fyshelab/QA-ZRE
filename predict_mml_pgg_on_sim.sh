@@ -1,7 +1,5 @@
 #!/bin/bash
 
-source env/bin/activate
-
 '''
 
 #SBATCH --job-name=test_fold_10
@@ -40,36 +38,11 @@ srun python src/re_gold_qa_train.py \
     --gpu_device 0 \
     --seed 12321 \
     --train_method MML-PGG-On-Sim
+'''
 
-for ((j=17; j<=24; j++))
-do
-	k=$((j * 4))
-	end_k=$((k+3))
-	for (( i=${k}; i<=${end_k}; i++ ))
-	do
-		step=$(((i+1) * 100))
-		printf "step ${step}\r\n"
-		python src/re_gold_qa_train.py \
-			--mode re_qa_test \
-		    	--model_path ~/fold_2/mml-mml-off-sim/ \
-		    	--answer_checkpoint _0_answer_step_${step} \
-		    	--question_checkpoint _0_question_step_${step} \
-		    	--training_steps 10000 \
-		    	--learning_rate 0.0005 \
-		    	--max_epochs 1 \
-		    	--num_search_samples 8 \
-		    	--batch_size 32 \
-		    	--gpu True \
-		    	--dev ./zero-shot-extraction/relation_splits/dev.1 \
-		    	--train ./zero-shot-extraction/relation_splits/train.1 \
-		    	--gpu_device 0 \
-		    	--seed 12321 \
-			--prediction_file ~/fold_2/mml-mml-off-sim/mml-mml-off-sim.dev.predictions.fold.2.step.${step}.csv &
-	done
-	wait
-done
+`
 
-
+'''
 python src/re_gold_qa_train.py \
 	--mode re_qa_test \
 	--model_path ~/fold_8/mml-pgg-off-sim/ \
@@ -86,8 +59,6 @@ python src/re_gold_qa_train.py \
 	--gpu_device 0 \
 	--seed 12321 \
 	--prediction_file ~/fold_8/mml-pgg-off-sim/mml-pgg-off-sim.dev.predictions.fold.8.step.8600.csv
-
-'''
 
 python src/re_gold_qa_train.py \
 	--mode re_qa_test \
@@ -142,7 +113,6 @@ python src/re_gold_qa_train.py \
 
 wait
 
-'''
 python src/re_gold_qa_train.py \
 	--mode re_qa_test \
 	--model_path ~/fold_2/mml-pgg-on-sim/ \
@@ -511,5 +481,4 @@ python src/re_gold_qa_train.py \
 	--gpu_device 0 \
 	--seed 12321 \
 	--prediction_file ~/fold_5/mml-mml-off-sim/mml-mml-off-sim.test.predictions.fold.5.step.3000.csv &
-
 '''
