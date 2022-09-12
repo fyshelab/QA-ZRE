@@ -357,6 +357,60 @@ def run_fewrl(args):
             current_device=0,
         )
 
+def run_multi_concat_fewrl_dev(args):
+    """Run concat model on the fewrl dataset for multiple checkpoints."""
+    mode = "test"
+
+    config = HyperParameters(
+        model_path=args.model_path,
+        batch_size=args.batch_size,
+        source_max_length=256,
+        decoder_max_length=32,
+        gpu=args.gpu,
+        learning_rate=args.learning_rate,
+        max_epochs=args.max_epochs,
+        mode=mode,
+        seed=args.seed,
+        predict_type=args.predict_type,
+        model_name="t5-small"
+    )
+    set_random_seed(config.seed)
+    model = T5QA(config)
+
+    (
+        train_loader,
+        val_loader,
+        test_loader,
+        train_dataset,
+        val_dataset,
+        test_dataset,
+    ) = create_fewrl_dataset(
+        question_tokenizer=model.tokenizer,
+        answer_tokenizer=model.tokenizer,
+        batch_size=config.batch_size,
+        source_max_length=config.source_max_length,
+        decoder_max_length=config.decoder_max_length,
+        train_fewrel_path=args.train,
+        dev_fewrel_path=args.dev,
+        test_fewrel_path=args.test,
+        concat=True
+    )
+
+    for ep in range(args.start_epoch, args.end_epoch+1, 1):
+        for step in range(args.start_step, args.end_step + args.step_up, args.step_up):
+            prediction_file = args.model_path + "relation.concat.run.epoch.{}.dev.predictions.step.{}.csv".format(ep, step)
+            checkpoint="_{}_step_{}_model".format(ep, step)
+            config.checkpoint = checkpoint
+            config.prediction_file = prediction_file
+            load_module(model.model, model.model_path, config.checkpoint)
+            run_model(
+                model,
+                config=config,
+                train_dataloader=train_loader,
+                test_dataloader=val_loader,
+                save_always=True,
+            )
+
 
 def run_concat_fewrl(args):
     """Run concat model on the fewrl dataset."""
@@ -449,6 +503,8 @@ def run_main(args):
         run_fewrl(args)
     if args.mode in ["concat_fewrl_train", "concat_fewrl_test", "concat_fewrl_dev"]:
         run_concat_fewrl(args)
+    if args.mode in ["multi_concat_fewrl_dev"]:
+        run_multi_concat_fewrl_dev(args)
 
 
 def argument_parser():
@@ -493,6 +549,16 @@ def argument_parser():
     parser.add_argument("--learning_rate", type=float, default=0.0005)
 
     parser.add_argument("--batch_size", type=int, default=8, help="static batch size")
+
+    parser.add_argument("--start_epoch", type=int, default=0)
+
+    parser.add_argument("--end_epoch", type=int, default=0)
+
+    parser.add_argument("--start_step", type=int, default=0)
+
+    parser.add_argument("--end_step", type=int, default=0)
+
+    parser.add_argument("--step_up", type=int, default=0)
 
     parser.add_argument(
         "--num_unseen_relations",

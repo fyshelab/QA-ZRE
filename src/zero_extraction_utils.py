@@ -1152,7 +1152,7 @@ def read_wikizsl_dataset(zsl_path, seed=10, m=5):
     )
 
 
-def read_fewrl_dataset(fewrel_path, seed=10, m=5):
+def read_fewrl_dataset(fewrel_path, seed=10, m=5, augment_with_unks=True):
 
     set_random_seed(seed)
 
@@ -1160,12 +1160,49 @@ def read_fewrl_dataset(fewrel_path, seed=10, m=5):
 
     id_to_desc = {}
     id_to_label = {}
+    label_to_id = {}
     with open(path, "r") as fd:
         re_desc_data = json.load(fd)
         for row in re_desc_data:
             re_id = row["relation_id"]
             id_to_desc[re_id] = row["relation_description"]
             id_to_label[re_id] = row["relation_label"]
+            label_to_id[row["relation_label"]] = re_id
+
+    if augment_with_unks:
+        unk_relation_ids = {}
+        with open("./zero-shot-extraction/relation_splits/train.0", "r") as fd:
+            for line in fd:
+                line = line.strip()
+                line_arr = line.split("\t")
+                if len(line_arr) <= 4:
+                    # negative example
+                    if label_to_id[line_arr[0]] not in unk_relation_ids:
+                        unk_relation_ids[label_to_id[line_arr[0]]] = [line_arr]
+                    else:
+                        unk_relation_ids[label_to_id[line_arr[0]]].append(line_arr)
+
+        with open("./zero-shot-extraction/relation_splits/dev.0", "r") as fd:
+            for line in fd:
+                line = line.strip()
+                line_arr = line.split("\t")
+                if len(line_arr) <= 4:
+                    # negative example
+                    if label_to_id[line_arr[0]] not in unk_relation_ids:
+                        unk_relation_ids[label_to_id[line_arr[0]]] = [line_arr]
+                    else:
+                        unk_relation_ids[label_to_id[line_arr[0]]].append(line_arr)
+
+        with open("./zero-shot-extraction/relation_splits/test.0", "r") as fd:
+            for line in fd:
+                line = line.strip()
+                line_arr = line.split("\t")
+                if len(line_arr) <= 4:
+                    # negative example
+                    if label_to_id[line_arr[0]] not in unk_relation_ids:
+                        unk_relation_ids[label_to_id[line_arr[0]]] = [line_arr]
+                    else:
+                        unk_relation_ids[label_to_id[line_arr[0]]].append(line_arr)
 
     train_contexts = []
     train_posterier_contexts = []
@@ -1354,6 +1391,86 @@ def read_fewrl_dataset(fewrel_path, seed=10, m=5):
                 train_answers.append(
                     white_space_fix(gold_answers) + " </s>"
                 )
+            
+                # Add the negative example.
+                temp_ids = list(train_r_ids)
+                temp_ids.remove(r_id)
+                other_r_id = random.sample(temp_ids, 1)[0]
+                other_r_name = id_to_label[other_r_id]
+                other_r_desc = id_to_desc[other_r_id]
+
+                train_passages.append(sentence)
+                train_entity_relations.append(
+                    white_space_fix(head_entity + " <SEP> " + other_r_name)
+                )
+                train_entities.append(white_space_fix(head_entity))
+                train_contexts.append(
+                    "answer: "
+                    + white_space_fix(head_entity)
+                    + " <SEP> "
+                    + white_space_fix(other_r_name)
+                    + " ; "
+                    + white_space_fix(other_r_desc)
+                    + " context: "
+                    + white_space_fix(sentence)
+                    + " </s>"
+                )
+                train_posterier_contexts.append(
+                    "answer: "
+                    + white_space_fix(head_entity)
+                    + " <SEP> "
+                    + white_space_fix(other_r_name)
+                    + " ; "
+                    + white_space_fix(other_r_desc)
+                    + " "
+                    + white_space_fix("no_answer")
+                    + " context: "
+                    + white_space_fix(sentence)
+                    + " </s>"
+                )
+                train_answers.append(
+                    white_space_fix("no_answer") + " </s>"
+                )
+
+            if augment_with_unks:
+                # add negative examples for the train r_id if exists in the RE-QA dataset.
+                if r_id in unk_relation_ids:
+                    num_samples = min([len(data[r_id]), len(unk_relation_ids[r_id])])
+                    for line_arr in random.sample(unk_relation_ids[r_id], num_samples):
+                        sentence = line_arr[3]
+                        head_entity = line_arr[2]
+                        tail_entity = "no_answer"
+                        gold_answers = "no_answer"
+                        train_passages.append(sentence)
+                        train_entity_relations.append(white_space_fix(head_entity + " <SEP> " + r_name))
+                        train_entities.append(white_space_fix(head_entity))
+                        train_contexts.append(
+                            "answer: "
+                            + white_space_fix(head_entity)
+                            + " <SEP> "
+                            + white_space_fix(r_name)
+                            + " ; "
+                            + white_space_fix(r_desc)
+                            + " context: "
+                            + white_space_fix(sentence)
+                            + " </s>"
+                        )
+                        train_posterier_contexts.append(
+                            "answer: "
+                            + white_space_fix(head_entity)
+                            + " <SEP> "
+                            + white_space_fix(r_name)
+                            + " ; "
+                            + white_space_fix(r_desc)
+                            + " "
+                            + white_space_fix(gold_answers)
+                            + " context: "
+                            + white_space_fix(sentence)
+                            + " </s>"
+                        )
+                        train_answers.append(
+                            white_space_fix(gold_answers) + " </s>"
+                        )
 
     train_df = pd.DataFrame(
         {
