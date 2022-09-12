@@ -372,7 +372,8 @@ def run_multi_concat_fewrl_dev(args):
         mode=mode,
         seed=args.seed,
         predict_type=args.predict_type,
-        model_name="t5-small"
+        model_name="t5-small",
+        checkpoint=args.checkpoint, # to avoid error otherwise it is not being used in this multi eval.
     )
     set_random_seed(config.seed)
     model = T5QA(config)
