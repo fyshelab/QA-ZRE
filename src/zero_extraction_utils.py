@@ -1152,7 +1152,7 @@ def read_wikizsl_dataset(zsl_path, seed=10, m=5):
     )
 
 
-def read_fewrl_dataset(fewrel_path, seed=10, m=5, augment_with_unks=True):
+def read_fewrl_dataset(fewrel_path, seed=10, m=5):#, augment_with_unks=True):
 
     set_random_seed(seed)
 
@@ -1169,6 +1169,7 @@ def read_fewrl_dataset(fewrel_path, seed=10, m=5, augment_with_unks=True):
             id_to_label[re_id] = row["relation_label"]
             label_to_id[row["relation_label"]] = re_id
 
+    '''
     if augment_with_unks:
         unk_relation_ids = {}
         with open("./zero-shot-extraction/relation_splits/train.0", "r") as fd:
@@ -1203,6 +1204,7 @@ def read_fewrl_dataset(fewrel_path, seed=10, m=5, augment_with_unks=True):
                         unk_relation_ids[label_to_id[line_arr[0]]] = [line_arr]
                     else:
                         unk_relation_ids[label_to_id[line_arr[0]]].append(line_arr)
+    '''
 
     train_contexts = []
     train_posterier_contexts = []
@@ -1432,6 +1434,7 @@ def read_fewrl_dataset(fewrel_path, seed=10, m=5, augment_with_unks=True):
                     white_space_fix("no_answer") + " </s>"
                 )
 
+            '''
             if augment_with_unks:
                 # add negative examples for the train r_id if exists in the RE-QA dataset.
                 if r_id in unk_relation_ids:
@@ -1471,6 +1474,7 @@ def read_fewrl_dataset(fewrel_path, seed=10, m=5, augment_with_unks=True):
                         train_answers.append(
                             white_space_fix(gold_answers) + " </s>"
                         )
+            '''
 
     train_df = pd.DataFrame(
         {

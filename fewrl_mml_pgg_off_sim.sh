@@ -1,23 +1,32 @@
 #!/bin/bash
 
-CUDA_VISIBLE_DEVICES=3 python3.7 src/re_gold_qa_train.py \
-	--mode fewrl_train \
-	--model_path /home/snajafi/june-19/wikizsl/run_1/ \
-	--answer_checkpoint _response_pretrained_model \
-	--question_checkpoint _question_second_pretrained_model \
-	--training_steps 4300 \
-	--learning_rate 0.0005 \
-	--max_epochs 2 \
-	--num_search_samples 6 \
-	--batch_size 4 \
-	--gpu True \
-	--num_workers 3 \
-	--train ~/codes/QA-ZRE/wikizsl_dataset/train_data_12321.csv \
-	--dev  ~/codes/QA-ZRE/wikizsl_dataset/small.val_data_12321.csv \
-	--test  ~/codes/QA-ZRE/wikizsl_dataset/test_data_12321.csv \
-	--gpu_device 0 \
-	--seed 12321 \
-	--train_method MML-PGG-Off-Sim
+seeds=(12321 943 111 300 1300)
+gpu_ids=(0 0 0 0 0)
+
+source ~/env/bin/activate
+
+for i in ${!seeds[@]};
+do
+	cuda_gpu=${gpu_ids[$i]}
+        seed=${seeds[$i]}
+        CUDA_VISIBLE_DEVICES=${cuda_gpu} python3 src/re_gold_qa_train.py \
+                --mode fewrl_train \
+		--model_path ~/fewrl-offmml-pgg-with-unks/run_${seed}/ \
+		--answer_checkpoint _response_pretrained \
+		--question_checkpoint _fold_1_question_pretrained \
+		--learning_rate 0.0005 \
+		--training_steps 10600 \
+		--max_epochs 1\
+		--num_search_samples 8 \
+		--batch_size 4 \
+		--gpu True \
+		--train ~/QA-ZRE/fewrl_data_unks/train_data_${seed}.csv \
+		--dev  ~/QA-ZRE/fewrl_data_unks/val_data_${seed}.csv \
+		--test  ~/QA-ZRE/fewrl_data_unks/test_data_${seed}.csv \
+		--gpu_device 0 \
+		--seed ${seed} \
+		--train_method MML-PGG-Off-Sim &
+done
 
 '''
 # test for run 5.

@@ -77,3 +77,4 @@ do
                 --gpu_device 0 \
                 --seed ${seed} &
 done
+'''
