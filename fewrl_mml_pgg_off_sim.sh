@@ -15,7 +15,7 @@ do
 		--answer_checkpoint _response_pretrained \
 		--question_checkpoint _fold_1_question_pretrained \
 		--learning_rate 0.0005 \
-		--training_steps 10600 \
+		--training_steps 22000 \
 		--max_epochs 1\
 		--num_search_samples 8 \
 		--batch_size 4 \
