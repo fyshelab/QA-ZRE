@@ -271,6 +271,9 @@ def run_fewrl(args):
     elif args.mode == "fewrl_dev":
         mode = "test"
         for_fewrl = True
+    elif args.mode == "multi_fewrl_dev":
+        mode = "test"
+        for_fewrl = True
     elif args.mode == "fewrl_test":
         mode = "test"
         for_fewrl = True
@@ -278,84 +281,131 @@ def run_fewrl(args):
         mode = "test"
         for_fewrl = False
 
-    config = HyperParameters(
-        model_path=args.model_path,
-        batch_size=args.batch_size,
-        source_max_length=256,
-        decoder_max_length=32,
-        gpu=args.gpu,
-        learning_rate=args.learning_rate,
-        max_epochs=args.max_epochs,
-        mode=mode,
-        prediction_file=args.prediction_file,
-        training_steps=int(args.training_steps),
-        answer_checkpoint=args.answer_checkpoint,
-        question_checkpoint=args.question_checkpoint,
-        num_search_samples=int(args.num_search_samples),
-        seed=args.seed,
-        predict_type=args.predict_type,
-    )
-    set_random_seed(config.seed)
-    model = REQA(config)
-    model = model.to("cuda:0")
+    if args.mode == "multi_fewrl_dev":
+        config = HyperParameters(
+            model_path=args.model_path,
+            batch_size=args.batch_size,
+            source_max_length=256,
+            decoder_max_length=32,
+            gpu=args.gpu,
+            learning_rate=args.learning_rate,
+            max_epochs=args.max_epochs,
+            mode=mode,
+            prediction_file=args.prediction_file,
+            training_steps=int(args.training_steps),
+            answer_checkpoint=args.answer_checkpoint, # will be ignored.
+            question_checkpoint=args.question_checkpoint, # will be ignored.
+            num_search_samples=int(args.num_search_samples),
+            seed=args.seed,
+            predict_type=args.predict_type,
+        )
+        set_random_seed(config.seed)
+        model = REQA(config)
+        model = model.to("cuda:0")
 
-    if args.mode == "fewrl_train":
         (loader, dataset) = create_relation_qq_dataset(
-            question_tokenizer=model.question_tokenizer,
-            answer_tokenizer=model.answer_tokenizer,
-            batch_size=config.batch_size,
-            source_max_length=config.source_max_length,
-            decoder_max_length=config.decoder_max_length,
-            train_fewrel_path=args.train,
-            shuffle=True,
-            for_fewrel_dataset=for_fewrl
+                question_tokenizer=model.question_tokenizer,
+                answer_tokenizer=model.answer_tokenizer,
+                batch_size=config.batch_size,
+                source_max_length=config.source_max_length,
+                decoder_max_length=config.decoder_max_length,
+                train_fewrel_path=args.dev,
+                shuffle=False,
+                for_fewrel_dataset=for_fewrl
         )
+        for ep in range(args.start_epoch, args.end_epoch+1, 1):
+            for step in range(args.start_step, args.end_step + args.step_up, args.step_up):
+                prediction_file = args.model_path + "relation.offmml-pgg.run.epoch.{}.dev.predictions.step.{}.csv".format(ep, step)
+                answer_checkpoint="_{}_answer_step_{}".format(ep, step)
+                question_checkpoint="_{}_question_step_{}".format(ep, step)
+                config.prediction_file = prediction_file
+                load_module(model.answer_model, model.model_path, answer_checkpoint)
+                load_module(model.question_model, model.model_path, question_checkpoint)
+                iterative_run_model(
+                    model,
+                    config=config,
+                    test_dataloader=loader,
+                    current_device=0,
+                )
+    else:
+        config = HyperParameters(
+            model_path=args.model_path,
+            batch_size=args.batch_size,
+            source_max_length=256,
+            decoder_max_length=32,
+            gpu=args.gpu,
+            learning_rate=args.learning_rate,
+            max_epochs=args.max_epochs,
+            mode=mode,
+            prediction_file=args.prediction_file,
+            training_steps=int(args.training_steps),
+            answer_checkpoint=args.answer_checkpoint,
+            question_checkpoint=args.question_checkpoint,
+            num_search_samples=int(args.num_search_samples),
+            seed=args.seed,
+            predict_type=args.predict_type,
+        )
+        set_random_seed(config.seed)
+        model = REQA(config)
+        model = model.to("cuda:0")
 
-        iterative_run_model(
-            model,
-            config=config,
-            train_dataloader=loader,
-            test_dataloader=None,
-            save_always=True,
-            current_device=0,
-            train_method=args.train_method,
-        )
+        if args.mode == "fewrl_train":
+            (loader, dataset) = create_relation_qq_dataset(
+                question_tokenizer=model.question_tokenizer,
+                answer_tokenizer=model.answer_tokenizer,
+                batch_size=config.batch_size,
+                source_max_length=config.source_max_length,
+                decoder_max_length=config.decoder_max_length,
+                train_fewrel_path=args.train,
+                shuffle=True,
+                for_fewrel_dataset=for_fewrl
+            )
 
-    if args.mode == "fewrl_dev":
-        (loader, dataset) = create_relation_qq_dataset(
-            question_tokenizer=model.question_tokenizer,
-            answer_tokenizer=model.answer_tokenizer,
-            batch_size=config.batch_size,
-            source_max_length=config.source_max_length,
-            decoder_max_length=config.decoder_max_length,
-            train_fewrel_path=args.dev,
-            shuffle=False,
-            for_fewrel_dataset=for_fewrl
-        )
-        iterative_run_model(
-            model,
-            config=config,
-            test_dataloader=loader,
-            current_device=0,
-        )
+            iterative_run_model(
+                model,
+                config=config,
+                train_dataloader=loader,
+                test_dataloader=None,
+                save_always=True,
+                current_device=0,
+                train_method=args.train_method,
+            )
 
-    if args.mode in ["fewrl_test", "reqa_mml_eval"]:
-        (loader, dataset) = create_relation_qq_dataset(
-            question_tokenizer=model.question_tokenizer,
-            answer_tokenizer=model.answer_tokenizer,
-            batch_size=config.batch_size,
-            source_max_length=config.source_max_length,
-            decoder_max_length=config.decoder_max_length,
-            train_fewrel_path=args.test,
-            shuffle=False,
-            for_fewrel_dataset=for_fewrl
-        )
-        iterative_run_model(
-            model,
-            config=config,
-            test_dataloader=loader,
-            current_device=0,
-        )
+        if args.mode == "fewrl_dev":
+            (loader, dataset) = create_relation_qq_dataset(
+                question_tokenizer=model.question_tokenizer,
+                answer_tokenizer=model.answer_tokenizer,
+                batch_size=config.batch_size,
+                source_max_length=config.source_max_length,
+                decoder_max_length=config.decoder_max_length,
+                train_fewrel_path=args.dev,
+                shuffle=False,
+                for_fewrel_dataset=for_fewrl
+            )
+            iterative_run_model(
+                model,
+                config=config,
+                test_dataloader=loader,
+                current_device=0,
+            )
+
+        if args.mode in ["fewrl_test", "reqa_mml_eval"]:
+            (loader, dataset) = create_relation_qq_dataset(
+                question_tokenizer=model.question_tokenizer,
+                answer_tokenizer=model.answer_tokenizer,
+                batch_size=config.batch_size,
+                source_max_length=config.source_max_length,
+                decoder_max_length=config.decoder_max_length,
+                train_fewrel_path=args.test,
+                shuffle=False,
+                for_fewrel_dataset=for_fewrl
+            )
+            iterative_run_model(
+                model,
+                config=config,
+                test_dataloader=loader,
+                current_device=0,
+            )
 
 def run_multi_concat_fewrl_dev(args):
     """Run concat model on the fewrl dataset for multiple checkpoints."""
@@ -500,7 +550,7 @@ def run_main(args):
         run_re_concat_qa(args)
     if args.mode in ["re_qa_train", "re_qa_test"]:
         run_re_qa(args)
-    if args.mode in ["reqa_mml_eval", "fewrl_train", "fewrl_test", "fewrl_dev"]:
+    if args.mode in ["multi_fewrl_dev", "reqa_mml_eval", "fewrl_train", "fewrl_test", "fewrl_dev"]:
         run_fewrl(args)
     if args.mode in ["concat_fewrl_train", "concat_fewrl_test", "concat_fewrl_dev"]:
         run_concat_fewrl(args)

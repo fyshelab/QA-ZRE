@@ -10,7 +10,7 @@ do
 	cuda_gpu=${gpu_ids[$i]}
         seed=${seeds[$i]}
         CUDA_VISIBLE_DEVICES=${cuda_gpu} python3 src/re_gold_qa_train.py \
-                --mode fewrl_train \
+        --mode fewrl_train \
 		--model_path ~/fewrl-offmml-pgg-with-unks/run_${seed}/ \
 		--answer_checkpoint _response_pretrained \
 		--question_checkpoint _fold_1_question_pretrained \
