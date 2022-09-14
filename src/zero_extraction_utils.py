@@ -125,8 +125,8 @@ def write_jsonl(file_path, lines):
     data = [ujson.dumps(line, escape_forward_slashes=False) for line in lines]
     Path(file_path).open('w', encoding='utf-8').write('\n'.join(data))
 
-def convert_fewrel_to_promptZRE_format(path, output_path):
-    path = Path(path)
+def convert_fewrel_to_promptZRE_format(output_path, seed=12321, m=5):
+    set_random_seed(seed)
 
     id_to_label = {}
     with open("./relation_descriptions.json", "r") as fd:
@@ -136,13 +136,35 @@ def convert_fewrel_to_promptZRE_format(path, output_path):
             re_id = row["relation_id"]
             id_to_label[re_id] = re_label
 
-    with open(path, "r") as fd:
-        fewrel_data = json.load(fd)
-        data = []
-        for k, v in fewrel_data.items():
-            for i in v:
-                i['relation'] = k
-                data_row = {
+    with open("./fewrel_all.json") as f:
+        raw_train = json.load(f)
+
+    all_keys = list(raw_train.keys())
+    random.shuffle(all_keys)
+
+    val_keys = all_keys[:m]
+    print(val_keys)
+
+    test_keys = all_keys[m: 4 * m]
+
+    print(test_keys)
+
+    train_keys = all_keys[4 * m:]
+
+    test_values = [raw_train[k] for k in test_keys]
+    raw_test = dict(zip(test_keys, test_values))
+
+    val_values = [raw_train[k] for k in val_keys]
+    raw_val = dict(zip(val_keys, val_values))
+
+    train_values = [raw_train[k] for k in train_keys]
+    raw_train = dict(zip(train_keys, train_values))
+
+    val_data = []
+    for k, v in raw_val.items():
+        for i in v:
+            i['relation'] = k
+            data_row = {
                     "triplets" : [{
                         "tokens": i["tokens"],
                         "head": i["h"][2][0],
@@ -150,9 +172,44 @@ def convert_fewrel_to_promptZRE_format(path, output_path):
                         "label_id": i["relation"],
                         "label": id_to_label[i["relation"]]
                     }]
-                }
-                data.append(data_row)
-    write_jsonl(output_path, data)
+            }
+            val_data.append(data_row)
+
+    
+    train_data = []
+    for k, v in raw_train.items():
+        for i in v:
+            i['relation'] = k
+            data_row = {
+                    "triplets" : [{
+                        "tokens": i["tokens"],
+                        "head": i["h"][2][0],
+                        "tail": i["t"][2][0],
+                        "label_id": i["relation"],
+                        "label": id_to_label[i["relation"]]
+                    }]
+            }
+            train_data.append(data_row)
+
+
+    test_data = []
+    for k, v in raw_test.items():
+        for i in v:
+            i['relation'] = k
+            data_row = {
+                    "triplets" : [{
+                        "tokens": i["tokens"],
+                        "head": i["h"][2][0],
+                        "tail": i["t"][2][0],
+                        "label_id": i["relation"],
+                        "label": id_to_label[i["relation"]]
+                    }]
+            }
+            test_data.append(data_row)
+
+    write_jsonl(output_path+'.train.jsonl', train_data)
+    write_jsonl(output_path+'.dev.jsonl', val_data)
+    write_jsonl(output_path+'.test.jsonl', test_data)
 
 def convert_reqa_to_fewrel_format(path, output_path):
     path = Path(path)
