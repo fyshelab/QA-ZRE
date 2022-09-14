@@ -33,7 +33,6 @@ do
         done
         wait
 done
-'''
 
 for i in ${!seeds[@]};
 do
@@ -57,23 +56,24 @@ do
                 --predict_type relation \
                 --seed ${seed} &
 done
-
 '''
+
+
 for i in ${!seeds[@]};
 do
         cuda_gpu=${gpu_ids[$i]}
         seed=${seeds[$i]}
         CUDA_VISIBLE_DEVICES=${cuda_gpu} python3.7 src/re_gold_qa_train.py \
                 --mode concat_fewrl_train \
-                --model_path ~/sep-1/fewrel/concat_run_${seed}_with_unks_more_unks/ \
+                --model_path ~/sep-1/fewrel/concat_run_${seed}_with_unks/ \
                 --batch_size 4 \
                 --max_epochs 1 \
                 --checkpoint _response_pretrained \
                 --learning_rate 0.0005 \
                 --gpu True \
-                --train ./fewrl_data_unks_more_unks/train_data_${seed}.csv \
-                --dev ./fewrl_data_unks_more_unks/val_data_${seed}.csv \
-                --test ./fewrl_data_unks_more_unks/test_data_${seed}.csv \
+                --train ./fewrl_data_unks/train_data_${seed}.csv \
+                --dev ./fewrl_data_unks/val_data_${seed}.csv \
+                --test ./fewrl_data_unks/test_data_${seed}.csv \
                 --gpu_device 0 \
                 --seed ${seed} &
 done
