@@ -1,5 +1,33 @@
 #!/bin/bash
 
+# test predictions
+seeds=(12321 943 111 300 1300)
+gpu_ids=(0 0 0 0 0)
+steps=(1800 1900 8800 1900 7900)
+
+for i in ${!seeds[@]};
+do
+    cuda_gpu=${gpu_ids[$i]}
+    seed=${seeds[$i]}
+	step=${steps[$i]}
+    CUDA_VISIBLE_DEVICES=${cuda_gpu} python3.7 src/re_gold_qa_train.py \
+		--mode fewrl_test \
+		--model_path ~/sep-1/fewrel/run_${seed}/ \
+		--answer_checkpoint _0_answer_step_${step} \
+		--question_checkpoint _0_question_step_${step} \
+		--num_search_samples 8 \
+		--batch_size 128 \
+		--gpu True \
+		--train ./fewrl_data/train_data_${seed}.csv \
+		--dev  ./fewrl_data/val_data_${seed}.csv \
+		--test  ./fewrl_data/test_data_${seed}.csv \
+		--gpu_device 0 \
+		--predict_type relation \
+		--prediction_file ~/sep-1/fewrel/run_${seed}/relation.offmml-pgg.run.epoch.0.test.predictions.step.${step}.csv \
+		--seed ${seed}
+done
+
+'''
 seeds=(12321 943 111 300 1300)
 gpu_ids=(0 0 0 0 0)
 
@@ -28,7 +56,6 @@ do
 		--train_method MML-PGG-Off-Sim &
 done
 
-'''
 # test for run 5.
 for (( i=12; i<=12; i++ ))
 do
@@ -97,8 +124,7 @@ echo "r$SLURM_NODEID master: $MASTER_ADDR"
 echo "r$SLURM_NODEID Launching python script"
 
 echo "All the allocated nodes: $SLURM_JOB_NODELIST"
-'''
-'''
+
 steps=(4700 400 3600 800 7900 700 2100 6800 4300 1600)
 for i in ${!steps[@]};
 do

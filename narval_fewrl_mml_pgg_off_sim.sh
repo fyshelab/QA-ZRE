@@ -1,5 +1,6 @@
 #!/bin/bash
 
+'''
 #SBATCH --job-name=943-offmml-g-fewrel-without-unks
 #SBATCH --account=def-afyshe-ab
 #SBATCH --nodes=1
@@ -26,17 +27,18 @@ echo "All the allocated nodes: $SLURM_JOB_NODELIST"
 
 # seeds=(12321 943 111 300 1300)
 # gpu_ids=(0 0 0 0 0)
+'''
 
-seeds=(943)
+seeds=(111)
 gpu_ids=(0)
 
 for i in ${!seeds[@]};
 do
     cuda_gpu=${gpu_ids[$i]}
     seed=${seeds[$i]}
-    CUDA_VISIBLE_DEVICES=${cuda_gpu} python src/re_gold_qa_train.py \
+    CUDA_VISIBLE_DEVICES=${cuda_gpu} python3.7 src/re_gold_qa_train.py \
 		--mode multi_fewrl_dev \
-		--model_path ~/scratch/fewrl-runs-sep-13/fewrl-offmml-pgg/run_${seed}/ \
+		--model_path ~/sep-1/fewrel/run_${seed}/ \
 		--answer_checkpoint _response_pretrained \
 		--question_checkpoint _fold_1_question_pretrained \
 		--learning_rate 0.0005 \
