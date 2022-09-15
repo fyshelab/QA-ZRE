@@ -35,6 +35,35 @@ source ~/env/bin/activate
 
 for i in ${!seeds[@]};
 do
+    cuda_gpu=${gpu_ids[$i]}
+    seed=${seeds[$i]}
+    CUDA_VISIBLE_DEVICES=${cuda_gpu} python3 src/re_gold_qa_train.py \
+		--mode multi_fewrl_dev \
+		--model_path ~/fewrl-offmml-pgg-with-unks/run_${seed}/ \
+		--answer_checkpoint _response_pretrained \
+		--question_checkpoint _fold_1_question_pretrained \
+		--learning_rate 0.0005 \
+		--training_steps 21000 \
+		--start_epoch 0 \
+		--end_epoch 0 \
+		--start_step 100 \
+		--end_step 20500 \
+		--step_up 100 \
+		--max_epochs 1 \
+		--num_search_samples 8 \
+		--batch_size 128 \
+		--gpu True \
+		--train ./fewrl_data_unks/train_data_${seed}.csv \
+		--dev  ./fewrl_data_unks/val_data_${seed}.csv \
+		--test  ./fewrl_data_unks/test_data_${seed}.csv \
+		--gpu_device 0 \
+		--predict_type relation \
+		--seed ${seed}
+done
+
+'''
+for i in ${!seeds[@]};
+do
 	cuda_gpu=${gpu_ids[$i]}
         seed=${seeds[$i]}
         CUDA_VISIBLE_DEVICES=${cuda_gpu} python3 src/re_gold_qa_train.py \
@@ -43,7 +72,7 @@ do
 		--answer_checkpoint _response_pretrained \
 		--question_checkpoint _fold_1_question_pretrained \
 		--learning_rate 0.0005 \
-		--training_steps 10600 \
+		--training_steps 22000 \
 		--max_epochs 1\
 		--num_search_samples 8 \
 		--batch_size 4 \
