@@ -1,29 +1,33 @@
 #!/bin/bash
 
 # test predictions
-seeds=(12321 943 111 300 1300)
-gpu_ids=(0 0 0 0 0)
-steps=(1800 1900 8800 1900 7900)
+#seeds=(12321 943 111 300 1300)
+#gpu_ids=(0 0 0 0 0)
+#steps=(7700 5900 11000 10700 15200)
+
+seeds=(12321)
+gpu_ids=(0)
+steps=(7700)
 
 for i in ${!seeds[@]};
 do
     cuda_gpu=${gpu_ids[$i]}
     seed=${seeds[$i]}
-	step=${steps[$i]}
+    step=${steps[$i]}
     CUDA_VISIBLE_DEVICES=${cuda_gpu} python3.7 src/re_gold_qa_train.py \
 		--mode fewrl_test \
-		--model_path ~/sep-1/fewrel/run_${seed}/ \
+		--model_path ~/sep-1/fewrel/run_${seed}_with_unks/ \
 		--answer_checkpoint _0_answer_step_${step} \
 		--question_checkpoint _0_question_step_${step} \
 		--num_search_samples 8 \
 		--batch_size 128 \
 		--gpu True \
-		--train ./fewrl_data/train_data_${seed}.csv \
-		--dev  ./fewrl_data/val_data_${seed}.csv \
-		--test  ./fewrl_data/test_data_${seed}.csv \
+		--train ./fewrl_data_unks/train_data_${seed}.csv \
+		--dev  ./fewrl_data_unks/val_data_${seed}.csv \
+		--test  ./fewrl_data_unks/test_data_${seed}.csv \
 		--gpu_device 0 \
-		--predict_type relation \
-		--prediction_file ~/sep-1/fewrel/run_${seed}/relation.offmml-pgg.run.epoch.0.test.predictions.step.${step}.csv \
+		--predict_type entity \
+		--prediction_file ~/sep-1/fewrel/run_${seed}_with_unks/entity.offmml-pgg.run.epoch.0.test.predictions.step.${step}.csv \
 		--seed ${seed}
 done
 
@@ -61,7 +65,6 @@ do
 		--seed ${seed}
 done
 
-'''
 for i in ${!seeds[@]};
 do
 	cuda_gpu=${gpu_ids[$i]}
