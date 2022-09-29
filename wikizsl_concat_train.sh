@@ -65,15 +65,15 @@ do
         seed=${seeds[$i]}
         CUDA_VISIBLE_DEVICES=${cuda_gpu} python3.7 src/re_gold_qa_train.py \
                 --mode concat_fewrl_train \
-                --model_path ~/sep-28/wikizsl/concat_run_${seed}/ \
+                --model_path ~/sep-28/wikizsl/concat_run_${seed}_with_unks/ \
                 --batch_size 16 \
                 --max_epochs 1 \
                 --checkpoint _response_pretrained \
                 --learning_rate 0.0005 \
                 --gpu True \
-                --train ./wikizsl_data/train_data_${seed}.csv \
-                --dev ./wikizsl_data/val_data_${seed}.csv \
-                --test ./wikizsl_data/test_data_${seed}.csv \
+                --train ./wikizsl_data_unks/train_data_${seed}.csv \
+                --dev ./wikizsl_data_unks/val_data_${seed}.csv \
+                --test ./wikizsl_data_unks/test_data_${seed}.csv \
                 --gpu_device 0 \
                 --seed ${seed} 
 done

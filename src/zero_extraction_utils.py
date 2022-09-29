@@ -961,25 +961,21 @@ def create_zero_re_qa_dataset(
     val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False)
     return train_loader, val_loader, train_dataset, val_dataset
 
-def read_wikizsl_dataset(zsl_path, seed=10, m=5):
-    rel_names = {}
-    rel_descs = {}
-    with open("./props.json", "r") as fd:
-        re_desc_data = json.load(fd)
-        sentence_delimiters = [". ", ".\n", "? ", "?\n", "! ", "!\n"]
-        for row in re_desc_data:
-            desc = row["description"]
-            if desc == {}:
-                desc = "no relation description"
-            desc = desc.strip(".") + ". "
-            pos = [desc.find(delimiter) for delimiter in sentence_delimiters]
-            pos = min([p for p in pos if p >= 0])
-            re_desc = desc[:pos]
-            re_id = row["id"]
-            rel_names[re_id] = white_space_fix(row["label"]).lower()
-            rel_descs[re_id] = white_space_fix(re_desc)
+
+def read_wikizsl_dataset(zsl_path, seed=10, m=5, add_negs=False):
 
     set_random_seed(seed)
+
+    path = Path("./relation_descriptions.json")
+
+    id_to_desc = {}
+    id_to_label = {}
+    with open(path, "r") as fd:
+        re_desc_data = json.load(fd)
+        for row in re_desc_data:
+            re_id = row["relation_id"]
+            id_to_desc[re_id] = row["relation_description"]
+            id_to_label[re_id] = row["relation_label"]
 
     train_contexts = []
     train_posterier_contexts = []
@@ -1006,14 +1002,18 @@ def read_wikizsl_dataset(zsl_path, seed=10, m=5):
 
     with open(zsl_path, "r") as json_file:
         data = json.load(json_file)
-        r_ids = set()
+        # preserve order after shuffle.
+        relation_ids = []
+        relation_set = set()
         for row in data:
             relation_id = row["edgeSet"][0]["kbID"]
-            r_ids.add(relation_id)
+            if relation_id not in relation_set:
+                relation_ids.append(relation_id)
+                relation_set.add(relation_id)
 
-        r_ids = list(r_ids)
+        r_ids = relation_ids
         random.shuffle(r_ids)
-        val_r_ids = r_ids[:m]
+        val_r_ids = r_ids[: m]
         test_r_ids = r_ids[m : 4 * m]
         train_r_ids = r_ids[4 * m :]
 
@@ -1036,7 +1036,6 @@ def read_wikizsl_dataset(zsl_path, seed=10, m=5):
             "./test_ids_" + str(seed) + ".csv", sep=",", header=True, index=False
         )
 
-        random.shuffle(data)
         for row in data:
             sentence = " ".join(row["tokens"])
             relation_id = row["edgeSet"][0]["kbID"]
@@ -1046,14 +1045,14 @@ def read_wikizsl_dataset(zsl_path, seed=10, m=5):
             tail_entity = " ".join(
                 [row["tokens"][int(i)] for i in row["edgeSet"][0]["right"]]
             )
-            r_name = rel_names[relation_id]
-            re_desc = rel_descs[relation_id]
+            r_name = id_to_label[relation_id]
+            re_desc = id_to_desc[relation_id]
             gold_answers = [tail_entity]
             if relation_id in set_val_r_ids:
                 for second_relation_id in set_val_r_ids:
                     val_actual_ids.append(relation_id)
-                    r_name = rel_names[second_relation_id]
-                    re_desc = rel_descs[second_relation_id]
+                    r_name = id_to_label[second_relation_id]
+                    re_desc = id_to_desc[second_relation_id]
                     val_passages.append(sentence)
                     val_entity_relations.append(white_space_fix(head_entity + " <SEP> " + r_name))
                     val_entities.append(white_space_fix(head_entity))
@@ -1089,8 +1088,8 @@ def read_wikizsl_dataset(zsl_path, seed=10, m=5):
                 for second_relation_id in set_test_r_ids:
                     test_actual_ids.append(relation_id)
                     test_passages.append(sentence)
-                    r_name = rel_names[second_relation_id]
-                    re_desc = rel_descs[second_relation_id]
+                    r_name = id_to_label[second_relation_id]
+                    re_desc = id_to_desc[second_relation_id]
                     test_entity_relations.append(
                         white_space_fix(head_entity + " <SEP> " + r_name)
                     )
@@ -1156,6 +1155,47 @@ def read_wikizsl_dataset(zsl_path, seed=10, m=5):
                 train_answers.append(
                     white_space_fix(" and ".join(gold_answers)) + " </s>"
                 )
+
+                # add the negative example.
+                if add_negs:
+                    temp_ids = list(set_train_r_ids)
+                    temp_ids.remove(relation_id)
+                    other_r_id = random.sample(temp_ids, 1)[0]
+                    other_r_name = id_to_label[other_r_id]
+                    other_r_desc = id_to_desc[other_r_id]
+                    gold_answers = ["no_answer"]
+                    train_passages.append(sentence)
+                    train_entity_relations.append(
+                        white_space_fix(head_entity + " <SEP> " + other_r_name)
+                    )
+                    train_entities.append(white_space_fix(head_entity))
+                    train_contexts.append(
+                        "answer: "
+                        + white_space_fix(head_entity)
+                        + " <SEP> "
+                        + white_space_fix(other_r_name)
+                        + " ; "
+                        + white_space_fix(other_r_desc)
+                        + " context: "
+                        + white_space_fix(sentence)
+                        + " </s>"
+                    )
+                    train_posterier_contexts.append(
+                        "answer: "
+                        + white_space_fix(head_entity)
+                        + " <SEP> "
+                        + white_space_fix(other_r_name)
+                        + " ; "
+                        + white_space_fix(other_r_desc)
+                        + " "
+                        + white_space_fix(" and ".join(gold_answers))
+                        + " context: "
+                        + white_space_fix(sentence)
+                        + " </s>"
+                    )
+                    train_answers.append(
+                        white_space_fix(" and ".join(gold_answers)) + " </s>"
+                    )
 
     train_df = pd.DataFrame(
         {
