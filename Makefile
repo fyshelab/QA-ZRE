@@ -10,6 +10,7 @@ install:
 	pip3 install pyarrow==5.0.0; \
 	pip3 install datasets; \
 	pip3 install spacy; \
+	pip3 install ujson; \
 
 .PHONY: clean_code
 clean_code:
@@ -37,3 +38,4 @@ install:
 	pip3 install nltk rouge-score sentencepiece absl-py; \
 	pip3 install datasets; \
 	pip3 install spacy; \
+	pip3 install ujson; \
