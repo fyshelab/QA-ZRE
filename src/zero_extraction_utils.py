@@ -3,7 +3,6 @@ import random
 from pathlib import Path
 from re import I
 
-
 import pandas as pd
 import torch
 # from datasets import load_dataset
@@ -11,6 +10,39 @@ from torch.utils.data import DataLoader
 
 from random import sample
 from src.re_qa_model import set_random_seed
+
+
+def sample_dev_rows(file_path, seed=12321):
+    set_random_seed(seed)
+    data_df = pd.read_csv(file_path, sep=",")
+    rel_id_data = {}
+    for index, row in data_df.iterrows():
+        rel_id = row["actual_ids"]
+        if rel_id not in rel_id_data:
+            rel_id_data[rel_id] = []
+        rel_id_data[rel_id].append(row)
+    
+    sampled_rows = []
+    for key, val in rel_id_data.items():
+        total_samples = int(len(val) / 5)
+        random_indices = random.sample(list(range(total_samples)), int(total_samples/10))
+        for sample_index in random_indices:
+            sampled_examples = val[sample_index*5: (sample_index+1)*5]
+            for sampled_example in sampled_examples:
+                ret = {
+                    "passages": sampled_example["passages"],
+                    "contexts": sampled_example["contexts"],
+                    "answers": sampled_example["answers"],
+                    "entity_relations": sampled_example["entity_relations"],
+                    "entities": sampled_example["entities"],
+                    "posterier_contexts": sampled_example["posterier_contexts"],
+                    "actual_ids": sampled_example["actual_ids"]
+                }
+                sampled_rows.append(ret)
+
+    output_df = pd.DataFrame(sampled_rows)
+    output_df.to_csv(file_path+".sampled.csv", sep=",", header=True, index=False)
+    return
 
 
 def white_space_fix(text):
