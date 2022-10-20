@@ -33,6 +33,7 @@ do
         done
         wait
 done
+'''
 
 for i in ${!seeds[@]};
 do
@@ -40,25 +41,24 @@ do
         seed=${seeds[$i]}
         CUDA_VISIBLE_DEVICES=${cuda_gpu} python3.7 src/re_gold_qa_train.py \
                 --mode multi_concat_fewrl_dev \
-                --model_path ~/sep-1/fewrel/concat_run_${seed}_with_unks/ \
+                --model_path ~/sep-28/wikizsl/concat_run_${seed}_with_unks/ \
                 --checkpoint _response_pretrained \
                 --start_epoch 0 \
                 --end_epoch 0 \
                 --start_step 100 \
-                --end_step 21000 \
+                --end_step 9600  \
                 --step_up 100 \
                 --batch_size 64 \
                 --gpu True \
-                --train ./fewrl_data_unks/train_data_${seed}.csv \
-                --dev ./fewrl_data_unks/val_data_${seed}.csv \
-                --test ./fewrl_data_unks/test_data_${seed}.csv \
+                --train ./wikizsl_data_unks/train_data_${seed}.csv \
+                --dev ./wikizsl_data_unks/val_data_${seed}.csv.sampled.csv \
+                --test ./wikizsl_data_unks/test_data_${seed}.csv \
                 --gpu_device 0 \
                 --predict_type relation \
                 --seed ${seed}
 done
 
 '''
-
 for i in ${!seeds[@]};
 do
         cuda_gpu=${gpu_ids[$i]}
@@ -75,5 +75,6 @@ do
                 --dev ./wikizsl_data_unks/val_data_${seed}.csv \
                 --test ./wikizsl_data_unks/test_data_${seed}.csv \
                 --gpu_device 0 \
-                --seed ${seed} 
+                --seed ${seed}
 done
+'''

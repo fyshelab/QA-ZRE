@@ -315,7 +315,7 @@ def run_fewrl(args):
         )
         for ep in range(args.start_epoch, args.end_epoch+1, 1):
             for step in range(args.start_step, args.end_step + args.step_up, args.step_up):
-                prediction_file = args.model_path + "relation.offmml-pgg.run.epoch.{}.dev.predictions.step.{}.csv".format(ep, step)
+                prediction_file = args.model_path + "relation.supp_data.offmml-pgg.run.epoch.{}.dev.predictions.step.{}.csv".format(ep, step)
                 answer_checkpoint="_{}_answer_step_{}".format(ep, step)
                 question_checkpoint="_{}_question_step_{}".format(ep, step)
                 config.prediction_file = prediction_file
