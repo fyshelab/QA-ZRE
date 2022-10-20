@@ -157,6 +157,196 @@ def write_jsonl(file_path, lines):
     data = [ujson.dumps(line, escape_forward_slashes=False) for line in lines]
     Path(file_path).open('w', encoding='utf-8').write('\n'.join(data))
 
+def convert_promptZRE_to_offmml_format(promptzsl_path, output_path):
+    path = Path("./relation_descriptions.json")
+
+    label_to_desc = {}
+    with open(path, "r") as fd:
+        re_desc_data = json.load(fd)
+        for row in re_desc_data:
+            label_to_desc[row["relation_label"]] = row["relation_description"]
+
+    train_contexts = []
+    train_posterier_contexts = []
+    train_answers = []
+    train_passages = []
+    train_entities = []
+    train_entity_relations = []
+    all_relation_labels = set()
+    for row in read_jsonl(promptzsl_path):
+        for triple_row in row["triplets"]:
+            tokens = triple_row["tokens"]
+            head_indices = triple_row["head"]
+            tail_indices = triple_row["tail"]
+            re_label = triple_row["label"]
+            all_relation_labels.add(re_label)
+            sentence = " ".join(tokens)
+            head_entity = " ".join([tokens[i] for i in head_indices])
+            tail_entity = " ".join([tokens[i] for i in tail_indices])
+
+            gold_answers = tail_entity
+            train_passages.append(sentence)
+            train_entity_relations.append(
+                white_space_fix(head_entity + " <SEP> " + re_label)
+            )
+            train_entities.append(white_space_fix(head_entity))
+            train_contexts.append(
+                    "answer: "
+                    + white_space_fix(head_entity)
+                    + " <SEP> "
+                    + white_space_fix(re_label)
+                    + " ; "
+                    + white_space_fix(label_to_desc[re_label])
+                    + " context: "
+                    + white_space_fix(sentence)
+                    + " </s>"
+            )
+            train_posterier_contexts.append(
+                    "answer: "
+                    + white_space_fix(head_entity)
+                    + " <SEP> "
+                    + white_space_fix(re_label)
+                    + " ; "
+                    + white_space_fix(label_to_desc[re_label])
+                    + " "
+                    + white_space_fix(gold_answers)
+                    + " context: "
+                    + white_space_fix(sentence)
+                    + " </s>"
+            )
+            train_answers.append(
+                    white_space_fix(gold_answers) + " </s>"
+            )
+    
+    # This time generate the negative data per example.
+    for row in read_jsonl(promptzsl_path):
+        for triple_row in row["triplets"]:
+            tokens = triple_row["tokens"]
+            head_indices = triple_row["head"]
+            tail_indices = triple_row["tail"]
+            re_label = triple_row["label"]
+
+            all_labels = list(all_relation_labels)
+            all_labels.remove(re_label)
+            neg_label = random.sample(all_labels, 1)[0]
+
+            sentence = " ".join(tokens)
+            head_entity = " ".join([tokens[i] for i in head_indices])
+            tail_entity = " ".join([tokens[i] for i in tail_indices])
+
+            gold_answers = "no_answer"
+            train_passages.append(sentence)
+            train_entity_relations.append(
+                white_space_fix(head_entity + " <SEP> " + neg_label)
+            )
+            train_entities.append(white_space_fix(head_entity))
+            train_contexts.append(
+                    "answer: "
+                    + white_space_fix(head_entity)
+                    + " <SEP> "
+                    + white_space_fix(neg_label)
+                    + " ; "
+                    + white_space_fix(label_to_desc[neg_label])
+                    + " context: "
+                    + white_space_fix(sentence)
+                    + " </s>"
+            )
+            train_posterier_contexts.append(
+                    "answer: "
+                    + white_space_fix(head_entity)
+                    + " <SEP> "
+                    + white_space_fix(neg_label)
+                    + " ; "
+                    + white_space_fix(label_to_desc[neg_label])
+                    + " "
+                    + white_space_fix(gold_answers)
+                    + " context: "
+                    + white_space_fix(sentence)
+                    + " </s>"
+            )
+            train_answers.append(
+                    white_space_fix(gold_answers) + " </s>"
+            )
+
+    shuffled_indices = list(range(len(train_passages)))
+    random.shuffle(shuffled_indices)
+
+    train_df = pd.DataFrame(
+        {
+            "passages": [train_passages[i] for i in shuffled_indices],
+            "contexts": [train_contexts[i] for i in shuffled_indices],
+            "answers": [train_answers[i] for i in shuffled_indices],
+            "entity_relations": [train_entity_relations[i] for i in shuffled_indices],
+            "entities": [train_entities[i] for i in shuffled_indices],
+            "posterier_contexts": [train_posterier_contexts[i] for i in shuffled_indices],
+        }
+    )
+
+    train_df.to_csv(
+       output_path, sep=",", header=True, index=False
+    )
+    return
+
+def convert_wikizsl_to_promptZRE_format(zsl_path, output_path, seed=12321, m=5):
+    set_random_seed(seed)
+
+    id_to_label = {}
+    with open("./relation_descriptions.json", "r") as fd:
+        re_desc_data = json.load(fd)
+        for row in re_desc_data:
+            re_label = row["relation_label"]
+            re_id = row["relation_id"]
+            id_to_label[re_id] = re_label
+
+    with open(zsl_path, "r") as json_file:
+        data = json.load(json_file)
+        # preserve order after shuffle.
+        relation_ids = []
+        relation_set = set()
+        for row in data:
+            relation_id = row["edgeSet"][0]["kbID"]
+            if relation_id not in relation_set:
+                relation_ids.append(relation_id)
+                relation_set.add(relation_id)
+
+        r_ids = relation_ids
+        random.shuffle(r_ids)
+        val_r_ids = r_ids[: m]
+        test_r_ids = r_ids[m : 4 * m]
+        train_r_ids = r_ids[4 * m :]
+
+        set_val_r_ids = set(val_r_ids)
+        set_test_r_ids = set(test_r_ids)
+        set_train_r_ids = set(train_r_ids)
+
+        val_data = []
+        train_data = []
+        test_data = []
+        for row in data:
+            relation_id = row["edgeSet"][0]["kbID"]
+            data_row = {
+                "triplets" : [{
+                        "tokens": row["tokens"],
+                        "head": row["edgeSet"][0]["left"],
+                        "tail": row["edgeSet"][0]["right"],
+                        "label_id": relation_id,
+                        "label": id_to_label[relation_id]
+                }]
+            }
+            if relation_id in set_val_r_ids:
+                val_data.append(data_row)
+            elif relation_id in set_test_r_ids:
+                test_data.append(data_row)
+            elif relation_id in set_train_r_ids:
+                train_data.append(data_row)
+
+        write_jsonl(output_path+'.train.jsonl', train_data)
+        write_jsonl(output_path+'.dev.jsonl', val_data)
+        write_jsonl(output_path+'.test.jsonl', test_data)
+
+def hash_tokens(tokens):
+    return "".join("".join(tokens).split()).replace('"', '').replace("'", "").strip().lower()
+
 def convert_fewrel_to_promptZRE_format(output_path, seed=12321, m=5):
     set_random_seed(seed)
 
@@ -242,25 +432,115 @@ def convert_fewrel_to_promptZRE_format(output_path, seed=12321, m=5):
             train_data.append(data_row)
             train_data.append(neg_data_row)
 
-
     test_data = []
+    count_tokens = {}
+    for k, v in raw_test.items():
+        for i in v:
+            hash = hash_tokens(i["tokens"])
+            count_tokens[hash] = count_tokens.get(hash, 0) + 1
+
     for k, v in raw_test.items():
         for i in v:
             i['relation'] = k
-            data_row = {
-                    "triplets" : [{
-                        "tokens": i["tokens"],
-                        "head": i["h"][2][0],
-                        "tail": i["t"][2][0],
-                        "label_id": i["relation"],
-                        "label": id_to_label[i["relation"]]
-                    }]
-            }
-            test_data.append(data_row)
+            hash = hash_tokens(i["tokens"])
+            if count_tokens[hash] == 1:
+                data_row = {
+                        "triplets" : [{
+                            "tokens": i["tokens"],
+                            "head": i["h"][2][0],
+                            "tail": i["t"][2][0],
+                            "label_id": i["relation"],
+                            "label": id_to_label[i["relation"]]
+                        }]
+                }
+                test_data.append(data_row)
 
     write_jsonl(output_path+'.train.jsonl', train_data)
     write_jsonl(output_path+'.dev.jsonl', val_data)
-    write_jsonl(output_path+'.test.jsonl', test_data)
+    write_jsonl(output_path+'.test.single_triple.jsonl', test_data)
+
+
+
+def convert_fewrel_to_RCL_format(output_path, seed=12321, m=5):
+    set_random_seed(seed)
+
+    id_to_label = {}
+    with open("./relation_descriptions.json", "r") as fd:
+        re_desc_data = json.load(fd)
+        for row in re_desc_data:
+            re_label = row["relation_label"]
+            re_id = row["relation_id"]
+            id_to_label[re_id] = re_label
+
+    with open("./fewrel_all.json") as f:
+        raw_train = json.load(f)
+
+    for k, v in raw_train.items():
+        print(k, len(v))
+
+    all_keys = list(raw_train.keys())
+    random.shuffle(all_keys)
+
+    val_keys = all_keys[:m]
+    print(val_keys)
+
+    test_keys = all_keys[m: 4 * m]
+
+    print(test_keys)
+
+    train_keys = all_keys[4 * m:]
+
+    test_values = [raw_train[k] for k in test_keys]
+    raw_test = dict(zip(test_keys, test_values))
+
+    val_values = [raw_train[k] for k in val_keys]
+    raw_val = dict(zip(val_keys, val_values))
+
+    train_values = [raw_train[k] for k in train_keys]
+    raw_train = dict(zip(train_keys, train_values))
+
+    def insert_markers(tokens, head_arr, tail_arr):
+        updated_tokens = []
+        i = 0
+        while i < len(tokens):
+            if i in head_arr:
+                updated_tokens.append("<e1>")
+                for head_i in head_arr:
+                    updated_tokens.append(tokens[head_i])
+                updated_tokens.append("</e1>")
+                i += len(head_arr)
+                continue
+            elif i in tail_arr:
+                updated_tokens.append("<e2>")
+                for tail_i in tail_arr:
+                    updated_tokens.append(tokens[tail_i])
+                updated_tokens.append("</e2>")
+                i += len(tail_arr)
+                continue
+            else:
+                updated_tokens.append(tokens[i])
+                i += 1
+
+        return updated_tokens
+
+    def save_split_to_file(raw_data, fold="train"):
+        data_tokens = []
+        data_labels = []
+        for k, v in raw_data.items():
+            for i in v:
+                i['relation'] = k
+                data_tokens.append(" ".join(insert_markers(i["tokens"], i["h"][2][0], i["t"][2][0])))
+                data_labels.append(id_to_label[i["relation"]])
+        df = pd.DataFrame({
+            "tokens": data_tokens,
+            "labels": data_labels
+        })
+        df.to_csv(output_path + "." + str(seed) + "." + fold + ".csv", sep=",", header=True, index=False)
+    
+    save_split_to_file(raw_val, fold='val')
+    save_split_to_file(raw_test, fold='test')
+    save_split_to_file(raw_train, fold='train')
+  
 
 def convert_reqa_to_fewrel_format(path, output_path):
     path = Path(path)
@@ -1452,7 +1732,7 @@ def read_fewrl_dataset(fewrel_path, seed=10, m=5):
                         + " ; "
                         + white_space_fix(second_r_desc)
                         + " "
-                        + white_space_fix(" and ".join(gold_answers))
+                        + white_space_fix(gold_answers)
                         + " context: "
                         + white_space_fix(sentence)
                         + " </s>"

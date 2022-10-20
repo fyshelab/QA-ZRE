@@ -234,8 +234,11 @@ class REQA(torch.nn.Module):
             )
 
         elif cfg.mode in ["test", "inference"]:
-            load_module(answer_model, self.model_path, cfg.answer_checkpoint)
-            load_module(question_model, self.model_path, cfg.question_checkpoint)
+            try:
+                load_module(answer_model, self.model_path, cfg.answer_checkpoint)
+                load_module(question_model, self.model_path, cfg.question_checkpoint)
+            except:
+                print("could not load the answer and question modules.")
 
         self.answer_model = answer_model
         self.answer_tokenizer = answer_tokenizer

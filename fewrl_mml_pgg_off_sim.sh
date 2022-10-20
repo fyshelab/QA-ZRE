@@ -1,19 +1,15 @@
 #!/bin/bash
 
 # test predictions
-#seeds=(12321 943 111 300 1300)
-#gpu_ids=(0 0 0 0 0)
-#steps=(7700 5900 11000 10700 15200)
-
-seeds=(12321)
-gpu_ids=(0)
-steps=(7700)
+seeds=(12321 943 111 300 1300)
+gpu_ids=(0 0 0 0 0)
+steps=(7700 5900 11000 10700 15200)
 
 for i in ${!seeds[@]};
 do
     cuda_gpu=${gpu_ids[$i]}
     seed=${seeds[$i]}
-    step=${steps[$i]}
+	step=${steps[$i]}
     CUDA_VISIBLE_DEVICES=${cuda_gpu} python3.7 src/re_gold_qa_train.py \
 		--mode fewrl_test \
 		--model_path ~/sep-1/fewrel/run_${seed}_with_unks/ \
@@ -26,32 +22,31 @@ do
 		--dev  ./fewrl_data_unks/val_data_${seed}.csv \
 		--test  ./fewrl_data_unks/test_data_${seed}.csv \
 		--gpu_device 0 \
-		--predict_type entity \
-		--prediction_file ~/sep-1/fewrel/run_${seed}_with_unks/entity.offmml-pgg.run.epoch.0.test.predictions.step.${step}.csv \
+		--predict_type relation \
+		--prediction_file ~/sep-1/fewrel/run_${seed}_with_unks/relation.offmml-pgg.run.epoch.0.test.predictions.step.${step}.csv \
 		--seed ${seed}
 done
 
 '''
 seeds=(12321 943 111 300 1300)
 gpu_ids=(0 0 0 0 0)
-
-source ~/env/bin/activate
+steps=(7700 5900 11000 10700 15200)
 
 for i in ${!seeds[@]};
 do
     cuda_gpu=${gpu_ids[$i]}
     seed=${seeds[$i]}
-    CUDA_VISIBLE_DEVICES=${cuda_gpu} python3 src/re_gold_qa_train.py \
+    CUDA_VISIBLE_DEVICES=${cuda_gpu} python3.7 src/re_gold_qa_train.py \
 		--mode multi_fewrl_dev \
-		--model_path ~/fewrl-offmml-pgg-with-unks/run_${seed}/ \
+		--model_path ~/sep-1/fewrel/run_${seed}_with_unks/ \
 		--answer_checkpoint _response_pretrained \
 		--question_checkpoint _fold_1_question_pretrained \
 		--learning_rate 0.0005 \
-		--training_steps 21000 \
+		--training_steps 2500 \
 		--start_epoch 0 \
 		--end_epoch 0 \
 		--start_step 100 \
-		--end_step 20500 \
+		--end_step 2500 \
 		--step_up 100 \
 		--max_epochs 1 \
 		--num_search_samples 8 \
@@ -65,22 +60,24 @@ do
 		--seed ${seed}
 done
 
+steps=(7700 5900 11000 10700 15200)
 for i in ${!seeds[@]};
 do
 	cuda_gpu=${gpu_ids[$i]}
-        seed=${seeds[$i]}
-        CUDA_VISIBLE_DEVICES=${cuda_gpu} python3 src/re_gold_qa_train.py \
+    seed=${seeds[$i]}
+    step=${steps[$i]}
+    CUDA_VISIBLE_DEVICES=${cuda_gpu} python3.7 src/re_gold_qa_train.py \
         --mode fewrl_train \
-		--model_path ~/fewrl-offmml-pgg-with-unks/run_${seed}/ \
-		--answer_checkpoint _response_pretrained \
-		--question_checkpoint _fold_1_question_pretrained \
-		--learning_rate 0.0005 \
-		--training_steps 22000 \
-		--max_epochs 1\
+		--model_path ~/sep-1/fewrel/run_${seed}_with_unks/ \
+		--answer_checkpoint _0_answer_step_${step} \
+		--question_checkpoint _0_question_step_${step} \
 		--num_search_samples 8 \
+		--learning_rate 0.0005 \
+		--training_steps 2500 \
+		--max_epochs 1\
 		--batch_size 4 \
 		--gpu True \
-		--train ~/QA-ZRE/fewrl_data_unks/train_data_${seed}.csv \
+		--train ~/codes/RelationPrompt/trained-fewrel-models/run_${seed}/synthetic_train.csv \
 		--dev  ~/QA-ZRE/fewrl_data_unks/val_data_${seed}.csv \
 		--test  ~/QA-ZRE/fewrl_data_unks/test_data_${seed}.csv \
 		--gpu_device 0 \
