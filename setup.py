@@ -1,10 +1,10 @@
-""" setup.py - Main setup module for configuring the development environment """
+""" setup.py - Main setup module """
 import os
 from setuptools import setup, find_packages
 
 HERE = os.path.abspath(os.path.dirname(__file__))
 README = open(os.path.join(HERE, 'README.md')).read()
-VERSION = '1.0'
+VERSION = '2.0'
 
 # Publicly Available Packages (PyPi)
 INSTALL_REQUIRES = [
@@ -21,9 +21,9 @@ INSTALL_REQUIRES = [
 ]
 
 setup(
-    name='src',
+    name='QA_ZRE',
     version=VERSION,
-    description="Codes developed during dreamscape project",
+    description="Codes developed during QA-ZRE project",
     long_description=README,
     classifiers=['Programming Language :: Python :: 3.7'],
     keywords="NLP, Machine Learning",
