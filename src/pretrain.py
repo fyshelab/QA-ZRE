@@ -83,7 +83,7 @@ def run_model(
     model: MyBaseT5,
     train_dataloader: Optional[torch.utils.data.DataLoader] = None,
     eval_dataloader: Optional[torch.utils.data.DataLoader] = None,
-    metric: Optional[Callable[[str, str], float]] = None,
+    metric: Optional[Callable[[str, str, str], float]] = None,
 ) -> None:
     """Run the model on input data; for training or inference."""
     if FLAGS.mode == "train":
@@ -95,25 +95,29 @@ def run_model(
         eval_file = os.path.join(FLAGS.model_path, "temp_eval.csv")
         while epoch < FLAGS.max_epochs:
             print("\nEpoch:{0}\n".format(epoch))
+            epoch_loss = []
             for step, loss in start_training(model, train_dataloader):
                 global_step += 1
                 total_loss.append(loss)
-                mean_loss = np.mean(total_loss)
+                epoch_loss.append(loss)
+                mean_total_loss = np.mean(total_loss)
+                mean_epoch_loss = np.mean(epoch_loss)
                 print(
-                    "\rEpoch:{0} | Batch:{1} | Mean Loss:{2} | Loss:{3}\n".format(
-                        epoch, step, mean_loss, loss
+                    "\rEpoch:{0} | Batch:{1} | Mean Loss:{2} | Epoch Loss:{3} | Loss:{4}\n".format(
+                        epoch, step, mean_total_loss, mean_epoch_loss, loss
                     )
                 )
                 if global_step % FLAGS.steps_per_checkpoint == 0:
                     if eval_dataloader is not None:
                         start_predicting(model, eval_dataloader, eval_file)
-                        score = metric(FLAGS.dev_file, eval_file)  # type: ignore
+                        score = metric(FLAGS.dev_file, eval_file, FLAGS.task_name)  # type: ignore
                         writer.add_scalar("Score/dev", score, global_step)
                         if score > best_score:
                             best_score = score
                             model.save("best_step")
 
-                writer.add_scalar("Mean_Loss/train", mean_loss, global_step)
+                writer.add_scalar("Mean_Total_Loss/train", mean_total_loss, global_step)
+                writer.add_scalar("Mean_Epoch_Loss/train", mean_epoch_loss, global_step)
                 writer.flush()
                 if global_step == FLAGS.training_steps:
                     # stop training in this epoch.
@@ -122,22 +126,22 @@ def run_model(
             if eval_dataloader is not None:
                 # do final evaluation on the dev data at the end of epoch.
                 start_predicting(model, eval_dataloader, eval_file)
-                score = metric(FLAGS.dev_file, eval_file)  # type: ignore
+                score = metric(FLAGS.dev_file, eval_file, FLAGS.task_name)  # type: ignore
                 writer.add_scalar("Score/dev", score, global_step)
                 if score > best_score:
                     best_score = score
                     model.save("best_step")
             else:
                 model.save(f"{global_step}_step")
-
             epoch += 1
+
         writer.close()
 
         if eval_dataloader is not None:
             # delete the eval_file
             os.remove(eval_file)
 
-    if FLAGS.mode in ["test", "inference", "eval"]:
+    if FLAGS.mode in ["test", "inference", "eval", "no_finetune_test"]:
         print("Predicting...")
         start_predicting(model, eval_dataloader, FLAGS.prediction_file)
 
