@@ -1,12 +1,10 @@
 import random
 
 import torch
-# from datasets import load_dataset
+from datasets import load_dataset
 from torch.utils.data import DataLoader
 
-
-def white_space_fix(text):
-    return " ".join(text.split())
+from zero_extraction_utils import white_space_fix
 
 
 def read_narrative_dataset():
@@ -184,11 +182,10 @@ def create_response_dataset(
     batch_size,
     source_max_length,
     decoder_max_length,
-    distributed=False,
-    num_workers=0,
     dataset="all",
 ):
-    """Function to mix and create the train/dev dataset for pytorch model."""
+    """Function to mix and create the train/dev dataset for t5 model used for
+    reponse generation pre-training."""
 
     def dataset_to_pytorch(train_dataset, dev_dataset, test_dataset):
         def process_data_to_model_inputs(batch):
@@ -212,15 +209,6 @@ def create_response_dataset(
             batch["attention_mask"] = inputs.attention_mask
             batch["target_attention_mask"] = outputs.attention_mask
             batch["labels"] = outputs.input_ids
-
-            # We have to make sure that the PAD token is ignored, -100 is being ignored in the loss function.
-
-            labels = [
-                [-100 if token == tokenizer.pad_token_id else token for token in labels]
-                for labels in batch["labels"]
-            ]
-            batch["labels"] = labels
-
             return batch
 
         train_dataset = train_dataset.map(
@@ -330,29 +318,8 @@ def create_response_dataset(
             sq_train_dataset, sq_dev_dataset, sq_test_dataset
         )
 
-    # Training
-    train_sampler = None
-    if distributed:
-        train_sampler = torch.utils.data.distributed.DistributedSampler(train_dataset)
-        train_loader = DataLoader(
-            train_dataset,
-            batch_size=batch_size,
-            num_workers=num_workers,
-            sampler=train_sampler,
-        )
-
-    if not distributed:
-        train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
-
+    train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
     val_loader = DataLoader(dev_dataset, batch_size=batch_size, shuffle=False)
     test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False)
 
-    return (
-        train_loader,
-        val_loader,
-        test_loader,
-        train_dataset,
-        dev_dataset,
-        test_dataset,
-        train_sampler,
-    )
+    return train_loader, val_loader, test_loader

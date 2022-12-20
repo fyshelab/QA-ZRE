@@ -5,8 +5,9 @@ from src.question_response_generation.train import run_model
 from src.re_qa_model import REQA, HyperParameters, load_module, set_random_seed
 from src.re_qa_train import iterative_run_model
 from src.zero_extraction_utils import (create_fewrl_dataset,
-    create_relation_qq_dataset, create_zero_re_qa_dataset,
-    create_zero_re_qa_gold_dataset)
+                                       create_relation_qq_dataset,
+                                       create_zero_re_qa_dataset,
+                                       create_zero_re_qa_gold_dataset)
 
 
 def run_relation_classification_qa(args):
@@ -264,7 +265,8 @@ def run_re_qa(args):
 
 def run_fewrl(args):
     """Run the relation-extraction qa models using the question generator and
-    the response generator explored with some search algorithm on the fewrel dataset."""
+    the response generator explored with some search algorithm on the fewrel
+    dataset."""
     if args.mode == "fewrl_train":
         mode = "train"
         for_fewrl = True
@@ -277,7 +279,7 @@ def run_fewrl(args):
     elif args.mode == "fewrl_test":
         mode = "test"
         for_fewrl = True
-    elif args.mode == 'reqa_mml_eval':
+    elif args.mode == "reqa_mml_eval":
         mode = "test"
         for_fewrl = False
 
@@ -293,8 +295,8 @@ def run_fewrl(args):
             mode=mode,
             prediction_file=args.prediction_file,
             training_steps=int(args.training_steps),
-            answer_checkpoint=args.answer_checkpoint, # will be ignored.
-            question_checkpoint=args.question_checkpoint, # will be ignored.
+            answer_checkpoint=args.answer_checkpoint,  # will be ignored.
+            question_checkpoint=args.question_checkpoint,  # will be ignored.
             num_search_samples=int(args.num_search_samples),
             seed=args.seed,
             predict_type=args.predict_type,
@@ -304,20 +306,27 @@ def run_fewrl(args):
         model = model.to("cuda:0")
 
         (loader, dataset) = create_relation_qq_dataset(
-                question_tokenizer=model.question_tokenizer,
-                answer_tokenizer=model.answer_tokenizer,
-                batch_size=config.batch_size,
-                source_max_length=config.source_max_length,
-                decoder_max_length=config.decoder_max_length,
-                train_fewrel_path=args.dev,
-                shuffle=False,
-                for_fewrel_dataset=for_fewrl
+            question_tokenizer=model.question_tokenizer,
+            answer_tokenizer=model.answer_tokenizer,
+            batch_size=config.batch_size,
+            source_max_length=config.source_max_length,
+            decoder_max_length=config.decoder_max_length,
+            train_fewrel_path=args.dev,
+            shuffle=False,
+            for_fewrel_dataset=for_fewrl,
         )
-        for ep in range(args.start_epoch, args.end_epoch+1, 1):
-            for step in range(args.start_step, args.end_step + args.step_up, args.step_up):
-                prediction_file = args.model_path + "relation.supp_data.offmml-pgg.run.epoch.{}.dev.predictions.step.{}.csv".format(ep, step)
-                answer_checkpoint="_{}_answer_step_{}".format(ep, step)
-                question_checkpoint="_{}_question_step_{}".format(ep, step)
+        for ep in range(args.start_epoch, args.end_epoch + 1, 1):
+            for step in range(
+                args.start_step, args.end_step + args.step_up, args.step_up
+            ):
+                prediction_file = (
+                    args.model_path
+                    + "relation.supp_data.offmml-pgg.run.epoch.{}.dev.predictions.step.{}.csv".format(
+                        ep, step
+                    )
+                )
+                answer_checkpoint = "_{}_answer_step_{}".format(ep, step)
+                question_checkpoint = "_{}_question_step_{}".format(ep, step)
                 config.prediction_file = prediction_file
                 load_module(model.answer_model, model.model_path, answer_checkpoint)
                 load_module(model.question_model, model.model_path, question_checkpoint)
@@ -358,7 +367,7 @@ def run_fewrl(args):
                 decoder_max_length=config.decoder_max_length,
                 train_fewrel_path=args.train,
                 shuffle=True,
-                for_fewrel_dataset=for_fewrl
+                for_fewrel_dataset=for_fewrl,
             )
 
             iterative_run_model(
@@ -380,7 +389,7 @@ def run_fewrl(args):
                 decoder_max_length=config.decoder_max_length,
                 train_fewrel_path=args.dev,
                 shuffle=False,
-                for_fewrel_dataset=for_fewrl
+                for_fewrel_dataset=for_fewrl,
             )
             iterative_run_model(
                 model,
@@ -398,7 +407,7 @@ def run_fewrl(args):
                 decoder_max_length=config.decoder_max_length,
                 train_fewrel_path=args.test,
                 shuffle=False,
-                for_fewrel_dataset=for_fewrl
+                for_fewrel_dataset=for_fewrl,
             )
             iterative_run_model(
                 model,
@@ -406,6 +415,7 @@ def run_fewrl(args):
                 test_dataloader=loader,
                 current_device=0,
             )
+
 
 def run_multi_concat_fewrl_dev(args):
     """Run concat model on the fewrl dataset for multiple checkpoints."""
@@ -423,7 +433,7 @@ def run_multi_concat_fewrl_dev(args):
         seed=args.seed,
         predict_type=args.predict_type,
         model_name="t5-small",
-        checkpoint=args.checkpoint, # to avoid error otherwise it is not being used in this multi eval.
+        checkpoint=args.checkpoint,  # to avoid error otherwise it is not being used in this multi eval.
     )
     set_random_seed(config.seed)
     model = T5QA(config)
@@ -444,13 +454,18 @@ def run_multi_concat_fewrl_dev(args):
         train_fewrel_path=args.train,
         dev_fewrel_path=args.dev,
         test_fewrel_path=args.test,
-        concat=True
+        concat=True,
     )
 
-    for ep in range(args.start_epoch, args.end_epoch+1, 1):
+    for ep in range(args.start_epoch, args.end_epoch + 1, 1):
         for step in range(args.start_step, args.end_step + args.step_up, args.step_up):
-            prediction_file = args.model_path + "relation.concat.run.epoch.{}.dev.predictions.step.{}.csv".format(ep, step)
-            checkpoint="_{}_step_{}_model".format(ep, step)
+            prediction_file = (
+                args.model_path
+                + "relation.concat.run.epoch.{}.dev.predictions.step.{}.csv".format(
+                    ep, step
+                )
+            )
+            checkpoint = "_{}_step_{}_model".format(ep, step)
             config.checkpoint = checkpoint
             config.prediction_file = prediction_file
             load_module(model.model, model.model_path, config.checkpoint)
@@ -485,7 +500,7 @@ def run_concat_fewrl(args):
         checkpoint=args.checkpoint,
         seed=args.seed,
         predict_type=args.predict_type,
-        model_name="t5-small"
+        model_name="t5-small",
     )
 
     set_random_seed(config.seed)
@@ -509,7 +524,7 @@ def run_concat_fewrl(args):
         train_fewrel_path=args.train,
         dev_fewrel_path=args.dev,
         test_fewrel_path=args.test,
-        concat=True
+        concat=True,
     )
 
     if args.mode == "concat_fewrl_train":
@@ -550,7 +565,13 @@ def run_main(args):
         run_re_concat_qa(args)
     if args.mode in ["re_qa_train", "re_qa_test"]:
         run_re_qa(args)
-    if args.mode in ["multi_fewrl_dev", "reqa_mml_eval", "fewrl_train", "fewrl_test", "fewrl_dev"]:
+    if args.mode in [
+        "multi_fewrl_dev",
+        "reqa_mml_eval",
+        "fewrl_train",
+        "fewrl_test",
+        "fewrl_dev",
+    ]:
         run_fewrl(args)
     if args.mode in ["concat_fewrl_train", "concat_fewrl_test", "concat_fewrl_dev"]:
         run_concat_fewrl(args)

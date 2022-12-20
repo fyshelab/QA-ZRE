@@ -1,15 +1,34 @@
 import json
 import random
 from pathlib import Path
+from random import sample
 from re import I
+from typing import Dict, List, Tuple, Union
 
 import pandas as pd
 import torch
 # from datasets import load_dataset
-from torch.utils.data import DataLoader
+from torch.utils.data import DataLoader, Dataset
 
-from random import sample
 from src.re_qa_model import set_random_seed
+
+
+class QADataset(Dataset):
+    """Subclass the pytorch's Dataset to build my own dataset for the question-
+    response pre-training."""
+
+    def __init__(self, data: Dict[str, Union[List[int], List[List[int]]]]) -> None:
+        """store the reference to the tokenized data."""
+        self.data = data
+
+    def __getitem__(self, idx: int) -> Dict[str, torch.Tensor]:
+        """Return the elements for example index 'idx' as a dictionary with
+        tensor values."""
+        return {key: torch.tensor(val[idx]) for key, val in self.data.items()}
+
+    def __len__(self) -> int:
+        """Return the length of the data."""
+        return len(self.data["input_ids"])
 
 
 def sample_dev_rows(file_path, seed=12321):
@@ -21,13 +40,15 @@ def sample_dev_rows(file_path, seed=12321):
         if rel_id not in rel_id_data:
             rel_id_data[rel_id] = []
         rel_id_data[rel_id].append(row)
-    
+
     sampled_rows = []
     for key, val in rel_id_data.items():
         total_samples = int(len(val) / 5)
-        random_indices = random.sample(list(range(total_samples)), int(total_samples/10))
+        random_indices = random.sample(
+            list(range(total_samples)), int(total_samples / 10)
+        )
         for sample_index in random_indices:
-            sampled_examples = val[sample_index*5: (sample_index+1)*5]
+            sampled_examples = val[sample_index * 5 : (sample_index + 1) * 5]
             for sampled_example in sampled_examples:
                 ret = {
                     "passages": sampled_example["passages"],
@@ -36,17 +57,18 @@ def sample_dev_rows(file_path, seed=12321):
                     "entity_relations": sampled_example["entity_relations"],
                     "entities": sampled_example["entities"],
                     "posterier_contexts": sampled_example["posterier_contexts"],
-                    "actual_ids": sampled_example["actual_ids"]
+                    "actual_ids": sampled_example["actual_ids"],
                 }
                 sampled_rows.append(ret)
 
     output_df = pd.DataFrame(sampled_rows)
-    output_df.to_csv(file_path+".sampled.csv", sep=",", header=True, index=False)
+    output_df.to_csv(file_path + ".sampled.csv", sep=",", header=True, index=False)
     return
 
 
 def white_space_fix(text):
     return " ".join(text.split())
+
 
 def find_sub_list(sl, l):
     i = 0
@@ -60,6 +82,7 @@ def find_sub_list(sl, l):
             return list(range(i, i + len(sl), 1))
         i += 1
     return []
+
 
 def find_fewrel_ids(path):
     with open(path, "r") as json_file:
@@ -77,8 +100,9 @@ def find_fewrel_ids(path):
     for id in r_ids:
         if id not in id_to_desc:
             ids_not_found.append(id)
-    
+
     return ids_not_found
+
 
 def find_wikizsl_ids(path):
     with open(path, "r") as json_file:
@@ -86,7 +110,7 @@ def find_wikizsl_ids(path):
 
     all_keys = set()
     for i in training_data:
-        label = i['edgeSet'][0]['kbID']
+        label = i["edgeSet"][0]["kbID"]
         if label not in all_keys:
             all_keys.add(label)
 
@@ -101,8 +125,9 @@ def find_wikizsl_ids(path):
     for id in all_keys:
         if id not in id_to_desc:
             ids_not_found.append(id)
-    
+
     return ids_not_found
+
 
 def find_all_relation_ids_in_reqa(path):
     label_to_id = {}
@@ -133,15 +158,19 @@ def find_all_relation_ids_in_reqa(path):
                 rel_dict[rel_token] = "none"
     return rel_dict, rel_desc_dict
 
-import ujson
+
 from pathlib import Path
+
+import ujson
+
 
 def read_jsonl(file_path):
     """Read a .jsonl file and yield its contents line by line.
+
     file_path (unicode / Path): The file path.
     YIELDS: The loaded JSON contents of each line.
     """
-    with Path(file_path).open('r', encoding='utf8') as f:
+    with Path(file_path).open("r", encoding="utf8") as f:
         for line in f:
             try:  # hack to handle broken jsonl
                 yield ujson.loads(line.strip())
@@ -151,11 +180,13 @@ def read_jsonl(file_path):
 
 def write_jsonl(file_path, lines):
     """Create a .jsonl file and dump contents.
-    file_path (unicode / Path): The path to the output file.
-    lines (list): The JSON-serializable contents of each line.
+
+    file_path (unicode / Path): The path to the output file. lines
+    (list): The JSON-serializable contents of each line.
     """
     data = [ujson.dumps(line, escape_forward_slashes=False) for line in lines]
-    Path(file_path).open('w', encoding='utf-8').write('\n'.join(data))
+    Path(file_path).open("w", encoding="utf-8").write("\n".join(data))
+
 
 def convert_promptZRE_to_offmml_format(promptzsl_path, output_path):
     path = Path("./relation_descriptions.json")
@@ -191,33 +222,31 @@ def convert_promptZRE_to_offmml_format(promptzsl_path, output_path):
             )
             train_entities.append(white_space_fix(head_entity))
             train_contexts.append(
-                    "answer: "
-                    + white_space_fix(head_entity)
-                    + " <SEP> "
-                    + white_space_fix(re_label)
-                    + " ; "
-                    + white_space_fix(label_to_desc[re_label])
-                    + " context: "
-                    + white_space_fix(sentence)
-                    + " </s>"
+                "answer: "
+                + white_space_fix(head_entity)
+                + " <SEP> "
+                + white_space_fix(re_label)
+                + " ; "
+                + white_space_fix(label_to_desc[re_label])
+                + " context: "
+                + white_space_fix(sentence)
+                + " </s>"
             )
             train_posterier_contexts.append(
-                    "answer: "
-                    + white_space_fix(head_entity)
-                    + " <SEP> "
-                    + white_space_fix(re_label)
-                    + " ; "
-                    + white_space_fix(label_to_desc[re_label])
-                    + " "
-                    + white_space_fix(gold_answers)
-                    + " context: "
-                    + white_space_fix(sentence)
-                    + " </s>"
+                "answer: "
+                + white_space_fix(head_entity)
+                + " <SEP> "
+                + white_space_fix(re_label)
+                + " ; "
+                + white_space_fix(label_to_desc[re_label])
+                + " "
+                + white_space_fix(gold_answers)
+                + " context: "
+                + white_space_fix(sentence)
+                + " </s>"
             )
-            train_answers.append(
-                    white_space_fix(gold_answers) + " </s>"
-            )
-    
+            train_answers.append(white_space_fix(gold_answers) + " </s>")
+
     # This time generate the negative data per example.
     for row in read_jsonl(promptzsl_path):
         for triple_row in row["triplets"]:
@@ -241,32 +270,30 @@ def convert_promptZRE_to_offmml_format(promptzsl_path, output_path):
             )
             train_entities.append(white_space_fix(head_entity))
             train_contexts.append(
-                    "answer: "
-                    + white_space_fix(head_entity)
-                    + " <SEP> "
-                    + white_space_fix(neg_label)
-                    + " ; "
-                    + white_space_fix(label_to_desc[neg_label])
-                    + " context: "
-                    + white_space_fix(sentence)
-                    + " </s>"
+                "answer: "
+                + white_space_fix(head_entity)
+                + " <SEP> "
+                + white_space_fix(neg_label)
+                + " ; "
+                + white_space_fix(label_to_desc[neg_label])
+                + " context: "
+                + white_space_fix(sentence)
+                + " </s>"
             )
             train_posterier_contexts.append(
-                    "answer: "
-                    + white_space_fix(head_entity)
-                    + " <SEP> "
-                    + white_space_fix(neg_label)
-                    + " ; "
-                    + white_space_fix(label_to_desc[neg_label])
-                    + " "
-                    + white_space_fix(gold_answers)
-                    + " context: "
-                    + white_space_fix(sentence)
-                    + " </s>"
+                "answer: "
+                + white_space_fix(head_entity)
+                + " <SEP> "
+                + white_space_fix(neg_label)
+                + " ; "
+                + white_space_fix(label_to_desc[neg_label])
+                + " "
+                + white_space_fix(gold_answers)
+                + " context: "
+                + white_space_fix(sentence)
+                + " </s>"
             )
-            train_answers.append(
-                    white_space_fix(gold_answers) + " </s>"
-            )
+            train_answers.append(white_space_fix(gold_answers) + " </s>")
 
     shuffled_indices = list(range(len(train_passages)))
     random.shuffle(shuffled_indices)
@@ -278,14 +305,15 @@ def convert_promptZRE_to_offmml_format(promptzsl_path, output_path):
             "answers": [train_answers[i] for i in shuffled_indices],
             "entity_relations": [train_entity_relations[i] for i in shuffled_indices],
             "entities": [train_entities[i] for i in shuffled_indices],
-            "posterier_contexts": [train_posterier_contexts[i] for i in shuffled_indices],
+            "posterier_contexts": [
+                train_posterier_contexts[i] for i in shuffled_indices
+            ],
         }
     )
 
-    train_df.to_csv(
-       output_path, sep=",", header=True, index=False
-    )
+    train_df.to_csv(output_path, sep=",", header=True, index=False)
     return
+
 
 def convert_wikizsl_to_promptZRE_format(zsl_path, output_path, seed=12321, m=5):
     set_random_seed(seed)
@@ -311,7 +339,7 @@ def convert_wikizsl_to_promptZRE_format(zsl_path, output_path, seed=12321, m=5):
 
         r_ids = relation_ids
         random.shuffle(r_ids)
-        val_r_ids = r_ids[: m]
+        val_r_ids = r_ids[:m]
         test_r_ids = r_ids[m : 4 * m]
         train_r_ids = r_ids[4 * m :]
 
@@ -325,13 +353,15 @@ def convert_wikizsl_to_promptZRE_format(zsl_path, output_path, seed=12321, m=5):
         for row in data:
             relation_id = row["edgeSet"][0]["kbID"]
             data_row = {
-                "triplets" : [{
+                "triplets": [
+                    {
                         "tokens": row["tokens"],
                         "head": row["edgeSet"][0]["left"],
                         "tail": row["edgeSet"][0]["right"],
                         "label_id": relation_id,
-                        "label": id_to_label[relation_id]
-                }]
+                        "label": id_to_label[relation_id],
+                    }
+                ]
             }
             if relation_id in set_val_r_ids:
                 val_data.append(data_row)
@@ -340,12 +370,20 @@ def convert_wikizsl_to_promptZRE_format(zsl_path, output_path, seed=12321, m=5):
             elif relation_id in set_train_r_ids:
                 train_data.append(data_row)
 
-        write_jsonl(output_path+'.train.jsonl', train_data)
-        write_jsonl(output_path+'.dev.jsonl', val_data)
-        write_jsonl(output_path+'.test.jsonl', test_data)
+        write_jsonl(output_path + ".train.jsonl", train_data)
+        write_jsonl(output_path + ".dev.jsonl", val_data)
+        write_jsonl(output_path + ".test.jsonl", test_data)
+
 
 def hash_tokens(tokens):
-    return "".join("".join(tokens).split()).replace('"', '').replace("'", "").strip().lower()
+    return (
+        "".join("".join(tokens).split())
+        .replace('"', "")
+        .replace("'", "")
+        .strip()
+        .lower()
+    )
+
 
 def convert_fewrel_to_promptZRE_format(output_path, seed=12321, m=5):
     set_random_seed(seed)
@@ -370,11 +408,11 @@ def convert_fewrel_to_promptZRE_format(output_path, seed=12321, m=5):
     val_keys = all_keys[:m]
     print(val_keys)
 
-    test_keys = all_keys[m: 4 * m]
+    test_keys = all_keys[m : 4 * m]
 
     print(test_keys)
 
-    train_keys = all_keys[4 * m:]
+    train_keys = all_keys[4 * m :]
 
     test_values = [raw_train[k] for k in test_keys]
     raw_test = dict(zip(test_keys, test_values))
@@ -388,32 +426,35 @@ def convert_fewrel_to_promptZRE_format(output_path, seed=12321, m=5):
     val_data = []
     for k, v in raw_val.items():
         for i in v:
-            i['relation'] = k
+            i["relation"] = k
             data_row = {
-                    "triplets" : [{
+                "triplets": [
+                    {
                         "tokens": i["tokens"],
                         "head": i["h"][2][0],
                         "tail": i["t"][2][0],
                         "label_id": i["relation"],
-                        "label": id_to_label[i["relation"]]
-                    }]
+                        "label": id_to_label[i["relation"]],
+                    }
+                ]
             }
             val_data.append(data_row)
 
-    
     train_data = []
     all_train_ids = list(raw_train.keys())
     for k, v in raw_train.items():
         for i in v:
-            i['relation'] = k
+            i["relation"] = k
             data_row = {
-                    "triplets" : [{
+                "triplets": [
+                    {
                         "tokens": i["tokens"],
                         "head": i["h"][2][0],
                         "tail": i["t"][2][0],
                         "label_id": i["relation"],
-                        "label": id_to_label[i["relation"]]
-                    }]
+                        "label": id_to_label[i["relation"]],
+                    }
+                ]
             }
 
             # add negative data_row
@@ -421,13 +462,15 @@ def convert_fewrel_to_promptZRE_format(output_path, seed=12321, m=5):
             temp_train_ids.remove(k)
             neg_id = random.sample(temp_train_ids, 1)[0]
             neg_data_row = {
-                    "triplets" : [{
+                "triplets": [
+                    {
                         "tokens": i["tokens"],
                         "head": i["h"][2][0],
                         "tail": [],
                         "label_id": "negative_example",
-                        "label": id_to_label[neg_id]
-                    }]
+                        "label": id_to_label[neg_id],
+                    }
+                ]
             }
             train_data.append(data_row)
             train_data.append(neg_data_row)
@@ -441,24 +484,25 @@ def convert_fewrel_to_promptZRE_format(output_path, seed=12321, m=5):
 
     for k, v in raw_test.items():
         for i in v:
-            i['relation'] = k
+            i["relation"] = k
             hash = hash_tokens(i["tokens"])
             if count_tokens[hash] == 1:
                 data_row = {
-                        "triplets" : [{
+                    "triplets": [
+                        {
                             "tokens": i["tokens"],
                             "head": i["h"][2][0],
                             "tail": i["t"][2][0],
                             "label_id": i["relation"],
-                            "label": id_to_label[i["relation"]]
-                        }]
+                            "label": id_to_label[i["relation"]],
+                        }
+                    ]
                 }
                 test_data.append(data_row)
 
-    write_jsonl(output_path+'.train.jsonl', train_data)
-    write_jsonl(output_path+'.dev.jsonl', val_data)
-    write_jsonl(output_path+'.test.single_triple.jsonl', test_data)
-
+    write_jsonl(output_path + ".train.jsonl", train_data)
+    write_jsonl(output_path + ".dev.jsonl", val_data)
+    write_jsonl(output_path + ".test.single_triple.jsonl", test_data)
 
 
 def convert_fewrel_to_RCL_format(output_path, seed=12321, m=5):
@@ -484,11 +528,11 @@ def convert_fewrel_to_RCL_format(output_path, seed=12321, m=5):
     val_keys = all_keys[:m]
     print(val_keys)
 
-    test_keys = all_keys[m: 4 * m]
+    test_keys = all_keys[m : 4 * m]
 
     print(test_keys)
 
-    train_keys = all_keys[4 * m:]
+    train_keys = all_keys[4 * m :]
 
     test_values = [raw_train[k] for k in test_keys]
     raw_test = dict(zip(test_keys, test_values))
@@ -528,19 +572,23 @@ def convert_fewrel_to_RCL_format(output_path, seed=12321, m=5):
         data_labels = []
         for k, v in raw_data.items():
             for i in v:
-                i['relation'] = k
-                data_tokens.append(" ".join(insert_markers(i["tokens"], i["h"][2][0], i["t"][2][0])))
+                i["relation"] = k
+                data_tokens.append(
+                    " ".join(insert_markers(i["tokens"], i["h"][2][0], i["t"][2][0]))
+                )
                 data_labels.append(id_to_label[i["relation"]])
-        df = pd.DataFrame({
-            "tokens": data_tokens,
-            "labels": data_labels
-        })
-        df.to_csv(output_path + "." + str(seed) + "." + fold + ".csv", sep=",", header=True, index=False)
-    
-    save_split_to_file(raw_val, fold='val')
-    save_split_to_file(raw_test, fold='test')
-    save_split_to_file(raw_train, fold='train')
-  
+        df = pd.DataFrame({"tokens": data_tokens, "labels": data_labels})
+        df.to_csv(
+            output_path + "." + str(seed) + "." + fold + ".csv",
+            sep=",",
+            header=True,
+            index=False,
+        )
+
+    save_split_to_file(raw_val, fold="val")
+    save_split_to_file(raw_test, fold="test")
+    save_split_to_file(raw_train, fold="train")
+
 
 def convert_reqa_to_fewrel_format(path, output_path):
     path = Path(path)
@@ -587,6 +635,7 @@ def convert_reqa_to_fewrel_format(path, output_path):
                 list_update.append(ret_row)
                 output_json[rel_id] = list_update
         json.dump(output_json, out_fd)
+
 
 def read_re_qa_relation_data_prompt_format(path, train=False):
     """Create data for the UnifiedQA model with a prompt format."""
@@ -650,16 +699,16 @@ def read_re_qa_relation_data_prompt_format(path, train=False):
             else:
                 # negative example.
                 continue
-            
+
             gold_relation = line_arr[0]
             contexts.append(white_space_fix(prompt + " </s>"))
             answers.append(white_space_fix(gold_relation + " </s>"))
 
     data_df = pd.DataFrame(
-            {
-                "contexts": contexts,
-                "answers": answers,
-            }
+        {
+            "contexts": contexts,
+            "answers": answers,
+        }
     )
     data_df.to_csv(str(path) + ".prompt_data.csv", sep=",", header=True, index=False)
     return contexts, answers
@@ -867,7 +916,9 @@ def create_zero_re_qa_gold_dataset(
     return val_loader, val_dataset
 
 
-def read_zero_re_qa(path, ignore_unknowns=False, gold_question=False, concat=False, only_unknowns=False):
+def read_zero_re_qa(
+    path, ignore_unknowns=False, gold_question=False, concat=False, only_unknowns=False
+):
     """Main function to read the zero re qa dataset."""
     path = Path(path)
 
@@ -956,19 +1007,17 @@ def read_zero_re_qa(path, ignore_unknowns=False, gold_question=False, concat=Fal
                     )
 
             answers.append(white_space_fix(" and ".join(gold_answers)) + " </s>")
-    
+
     data_df = pd.DataFrame(
-            {
-                "passages": passages,
-                "contexts": contexts,
-                "answers": answers,
-                "entity_relations": entity_relations,
-                "entities": entities,
-            }
+        {
+            "passages": passages,
+            "contexts": contexts,
+            "answers": answers,
+            "entity_relations": entity_relations,
+            "entities": entities,
+        }
     )
-    data_df.to_csv(
-            str(path) + ".unknowns.csv", sep=",", header=True, index=False
-    )
+    data_df.to_csv(str(path) + ".unknowns.csv", sep=",", header=True, index=False)
     return (
         passages,
         contexts,
@@ -1014,10 +1063,7 @@ def create_prompt_zero_re_qa_dataset(
     # because HuggingFace automatically shifts the labels, the labels correspond exactly to `target_ids`.
     # We have to make sure that the PAD token is ignored
     labels = [
-        [
-            -100 if token == tokenizer.pad_token_id else token
-            for token in labels
-        ]
+        [-100 if token == tokenizer.pad_token_id else token for token in labels]
         for labels in encodings["labels"]
     ]
     encodings["labels"] = labels
@@ -1275,7 +1321,6 @@ def create_zero_re_qa_dataset(
 
 
 def read_wikizsl_dataset(zsl_path, seed=10, m=5, add_negs=False):
-
     set_random_seed(seed)
 
     path = Path("./relation_descriptions.json")
@@ -1325,7 +1370,7 @@ def read_wikizsl_dataset(zsl_path, seed=10, m=5, add_negs=False):
 
         r_ids = relation_ids
         random.shuffle(r_ids)
-        val_r_ids = r_ids[: m]
+        val_r_ids = r_ids[:m]
         test_r_ids = r_ids[m : 4 * m]
         train_r_ids = r_ids[4 * m :]
 
@@ -1366,7 +1411,9 @@ def read_wikizsl_dataset(zsl_path, seed=10, m=5, add_negs=False):
                     r_name = id_to_label[second_relation_id]
                     re_desc = id_to_desc[second_relation_id]
                     val_passages.append(sentence)
-                    val_entity_relations.append(white_space_fix(head_entity + " <SEP> " + r_name))
+                    val_entity_relations.append(
+                        white_space_fix(head_entity + " <SEP> " + r_name)
+                    )
                     val_entities.append(white_space_fix(head_entity))
                     val_contexts.append(
                         "answer: "
@@ -1528,7 +1575,7 @@ def read_wikizsl_dataset(zsl_path, seed=10, m=5, add_negs=False):
             "entity_relations": val_entity_relations,
             "entities": val_entities,
             "posterier_contexts": val_posterier_contexts,
-            "actual_ids": val_actual_ids
+            "actual_ids": val_actual_ids,
         }
     )
 
@@ -1540,7 +1587,7 @@ def read_wikizsl_dataset(zsl_path, seed=10, m=5, add_negs=False):
             "entity_relations": test_entity_relations,
             "entities": test_entities,
             "posterier_contexts": test_posterier_contexts,
-            "actual_ids": test_actual_ids
+            "actual_ids": test_actual_ids,
         }
     )
 
@@ -1581,7 +1628,6 @@ def read_wikizsl_dataset(zsl_path, seed=10, m=5, add_negs=False):
 
 
 def read_fewrl_dataset(fewrel_path, seed=10, m=5):
-
     set_random_seed(seed)
 
     path = Path("./relation_descriptions.json")
@@ -1624,9 +1670,9 @@ def read_fewrl_dataset(fewrel_path, seed=10, m=5):
         data = json.load(json_file)
         r_ids = list(data.keys())
         random.shuffle(r_ids)
-        val_r_ids = r_ids[: m]
-        test_r_ids = r_ids[m: 4 * m]
-        train_r_ids = r_ids[4 * m:]
+        val_r_ids = r_ids[:m]
+        test_r_ids = r_ids[m : 4 * m]
+        train_r_ids = r_ids[4 * m :]
 
         train_id_df = pd.DataFrame(train_r_ids, columns=["relation_ids"])
         train_id_df.to_csv(
@@ -1657,8 +1703,12 @@ def read_fewrl_dataset(fewrel_path, seed=10, m=5):
                     sentence = " ".join(sent["tokens"])
                     head_entity_indices = sent["h"][2][0]
                     tail_entity_indices = sent["t"][2][0]
-                    head_entity = " ".join([sent["tokens"][i] for i in head_entity_indices])
-                    tail_entity = " ".join([sent["tokens"][i] for i in tail_entity_indices])
+                    head_entity = " ".join(
+                        [sent["tokens"][i] for i in head_entity_indices]
+                    )
+                    tail_entity = " ".join(
+                        [sent["tokens"][i] for i in tail_entity_indices]
+                    )
                     gold_answers = tail_entity
                     val_passages.append(sentence)
                     val_entity_relations.append(
@@ -1689,9 +1739,7 @@ def read_fewrl_dataset(fewrel_path, seed=10, m=5):
                         + white_space_fix(sentence)
                         + " </s>"
                     )
-                    val_answers.append(
-                        white_space_fix(gold_answers) + " </s>"
-                    )
+                    val_answers.append(white_space_fix(gold_answers) + " </s>")
 
         for r_id in test_r_ids:
             r_name = id_to_label[r_id]
@@ -1705,8 +1753,12 @@ def read_fewrl_dataset(fewrel_path, seed=10, m=5):
                     sentence = " ".join(sent["tokens"])
                     head_entity_indices = sent["h"][2][0]
                     tail_entity_indices = sent["t"][2][0]
-                    head_entity = " ".join([sent["tokens"][i] for i in head_entity_indices])
-                    tail_entity = " ".join([sent["tokens"][i] for i in tail_entity_indices])
+                    head_entity = " ".join(
+                        [sent["tokens"][i] for i in head_entity_indices]
+                    )
+                    tail_entity = " ".join(
+                        [sent["tokens"][i] for i in tail_entity_indices]
+                    )
                     gold_answers = tail_entity
                     test_passages.append(sentence)
                     test_entity_relations.append(
@@ -1737,9 +1789,7 @@ def read_fewrl_dataset(fewrel_path, seed=10, m=5):
                         + white_space_fix(sentence)
                         + " </s>"
                     )
-                    test_answers.append(
-                        white_space_fix(gold_answers) + " </s>"
-                    )
+                    test_answers.append(white_space_fix(gold_answers) + " </s>")
 
         for r_id in train_r_ids:
             r_name = id_to_label[r_id]
@@ -1781,10 +1831,8 @@ def read_fewrl_dataset(fewrel_path, seed=10, m=5):
                     + white_space_fix(sentence)
                     + " </s>"
                 )
-                train_answers.append(
-                    white_space_fix(gold_answers) + " </s>"
-                )
-            
+                train_answers.append(white_space_fix(gold_answers) + " </s>")
+
                 # Add the negative example.
                 temp_ids = list(train_r_ids)
                 temp_ids.remove(r_id)
@@ -1821,9 +1869,7 @@ def read_fewrl_dataset(fewrel_path, seed=10, m=5):
                     + white_space_fix(sentence)
                     + " </s>"
                 )
-                train_answers.append(
-                    white_space_fix("no_answer") + " </s>"
-                )
+                train_answers.append(white_space_fix("no_answer") + " </s>")
 
     train_df = pd.DataFrame(
         {
@@ -1926,7 +1972,6 @@ def create_fewrl_dataset(
                 "question: " + ent_rel_str + " context: " + ctx_str
             )
             val_contexts[i] = new_val_context
-
 
         for i in range(len(test_contexts)):
             ctx = test_contexts[i]
@@ -2136,12 +2181,12 @@ def create_relation_qq_dataset(
         train_posterier_contexts = train_df["posterier_contexts"].tolist()
     else:
         (
-        train_passages,
-        train_contexts,
-        train_posterier_contexts,
-        train_answers,
-        train_entity_relations,
-        train_entities,
+            train_passages,
+            train_contexts,
+            train_posterier_contexts,
+            train_answers,
+            train_entity_relations,
+            train_entities,
         ) = read_gold_re_qa_relation_data(
             train_fewrel_path, concat=False, for_question_generation=True
         )

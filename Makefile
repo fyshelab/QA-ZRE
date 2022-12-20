@@ -2,8 +2,8 @@
 clean_code:
 
 	source env/bin/activate; \
-	black src; \
-	isort src; \
+	black src/*py; \
+	isort src/*py; \
 	docformatter --in-place src/*py ; \
 	docformatter --in-place src/*/*py
 

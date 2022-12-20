@@ -17,11 +17,13 @@ from src.question_response_generation.t5_model import T5QA, HyperParameters
 from src.re_qa_model import set_random_seed
 from src.zero_extraction_utils import create_prompt_zero_re_qa_dataset
 
+
 def run_train_epoch(
     model,
     train_dataloader,
 ):
     """Train the model and return the loss for each step.
+
     Randomly pick a batch from the train_dataset.
     """
     step = 0
@@ -139,7 +141,8 @@ def run_model(
 
 
 def run_all(args):
-    """Run the T5 on multiple qa datasets to pre-train the response generator"""
+    """Run the T5 on multiple qa datasets to pre-train the response
+    generator."""
     config = HyperParameters(
         model_path=args.model_path,
         batch_size=args.batch_size,
@@ -263,6 +266,7 @@ def run_pretrain_question_generator(args):
         save_always=True,
     )
 
+
 def run_prompt_qa(args):
     """Run UnifiedQA model with prompts."""
     model_name = "allenai/unifiedqa-t5-small"
@@ -294,7 +298,7 @@ def run_prompt_qa(args):
         checkpoint=args.checkpoint,
         seed=args.seed,
         predict_type="prompt",
-        model_name=model_name
+        model_name=model_name,
     )
 
     set_random_seed(config.seed)
@@ -302,12 +306,13 @@ def run_prompt_qa(args):
     model = T5QA(config)
 
     loader, dataset = create_prompt_zero_re_qa_dataset(
-        tokenizer=model.tokenizer, 
+        tokenizer=model.tokenizer,
         batch_size=config.batch_size,
         source_max_length=config.source_max_length,
         decoder_max_length=config.decoder_max_length,
         file_path=file,
-        for_evaluation=for_evaluation)
+        for_evaluation=for_evaluation,
+    )
 
     if mode == "train":
         run_model(
@@ -327,6 +332,7 @@ def run_prompt_qa(args):
             save_always=True,
         )
 
+
 def run_main(args):
     """Decides what to do in the code."""
     if args.mode in ["all_train"]:
@@ -337,6 +343,7 @@ def run_main(args):
         run_pretrain_question_generator(args)
     if args.mode in ["prompt_qa_train", "prompt_qa_test", "prompt_qa_dev"]:
         run_prompt_qa(args)
+
 
 def argument_parser():
     """Augments arguments for protein-gene model."""
