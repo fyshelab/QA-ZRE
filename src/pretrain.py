@@ -1,5 +1,5 @@
-"""This is the main module to launch the pre-training steps for the question and response generation.
-"""
+"""This is the main module to launch the pre-training steps for the question
+and response generation."""
 
 import csv
 import io
@@ -11,24 +11,47 @@ import torch
 from absl import app, flags
 from torch.utils.tensorboard import SummaryWriter
 
+from src.metrics import compute_response_f1
+from src.models import QAT5, MyBaseT5
 from src.question_utils import create_question_pretrain_dataset
 from src.response_utils import create_response_dataset
-from src.models import QAT5, MyBaseT5
 
 FLAGS = flags.FLAGS
 flags.DEFINE_integer("max_epochs", 10, "The maximum number of epochs for training.")
-flags.DEFINE_integer("training_steps", 100, "The number of training steps for each epoch.")
-flags.DEFINE_integer("steps_per_checkpoint", 100, "keep checkpoint of the model every this number of steps")
-flags.DEFINE_string("prediction_file", "/tmp/predictions.csv", "the path/name for saving the predictions.")
+flags.DEFINE_integer(
+    "training_steps", 100, "The number of training steps for each epoch."
+)
+flags.DEFINE_integer(
+    "steps_per_checkpoint",
+    100,
+    "keep checkpoint of the model every this number of steps",
+)
+flags.DEFINE_string(
+    "prediction_file",
+    "/tmp/predictions.csv",
+    "the path/name for saving the predictions.",
+)
 flags.DEFINE_string("dev_file", "/tmp/dev.csv", "the path/name of the dev file.")
-flags.DEFINE_string("task_name", "question_pretrain", "the name of the downstream nlp task.")
+flags.DEFINE_string(
+    "task_name", "question_pretrain", "the name of the downstream nlp task."
+)
 flags.DEFINE_string("train_file", "/tmp/train.csv", "the path/name of the train file.")
 flags.DEFINE_integer("batch_size", 16, "The batch size used for training or inference.")
-flags.DEFINE_integer("source_max_length", 128, "The maximum number of tokens consider in the input sequence.")
-flags.DEFINE_integer("decoder_max_length", 128, "The maximum number of tokens consider in the output sequence.")
+flags.DEFINE_integer(
+    "source_max_length",
+    128,
+    "The maximum number of tokens consider in the input sequence.",
+)
+flags.DEFINE_integer(
+    "decoder_max_length",
+    128,
+    "The maximum number of tokens consider in the output sequence.",
+)
 
 
-def start_training(model: MyBaseT5, dataloader: torch.utils.data.DataLoader) -> Iterator[Tuple[int, float]]:
+def start_training(
+    model: MyBaseT5, dataloader: torch.utils.data.DataLoader
+) -> Iterator[Tuple[int, float]]:
     """Pick a batch from the dataloader, and train the model for one step."""
     step = 0
     for batch in dataloader:
@@ -37,7 +60,9 @@ def start_training(model: MyBaseT5, dataloader: torch.utils.data.DataLoader) -> 
         yield step, loss_values["loss_value"]
 
 
-def start_predicting(model: MyBaseT5, dataloader: torch.utils.data.DataLoader, prediction_file: str) -> None:
+def start_predicting(
+    model: MyBaseT5, dataloader: torch.utils.data.DataLoader, prediction_file: str
+) -> None:
     """Read batches from the dataloader and predict the outputs from the model
     for the correct experiment and save the results in the prediction_file as
     csv format row by row."""
@@ -74,7 +99,11 @@ def run_model(
                 global_step += 1
                 total_loss.append(loss)
                 mean_loss = np.mean(total_loss)
-                print("\rEpoch:{0} | Batch:{1} | Mean Loss:{2} | Loss:{3}\n".format(epoch, step, mean_loss, loss))
+                print(
+                    "\rEpoch:{0} | Batch:{1} | Mean Loss:{2} | Loss:{3}\n".format(
+                        epoch, step, mean_loss, loss
+                    )
+                )
                 if global_step % FLAGS.steps_per_checkpoint == 0:
                     if eval_dataloader is not None:
                         start_predicting(model, eval_dataloader, eval_file)
@@ -107,7 +136,6 @@ def run_model(
         if eval_dataloader is not None:
             # delete the eval_file
             os.remove(eval_file)
-
 
     if FLAGS.mode in ["test", "inference", "eval"]:
         print("Predicting...")
@@ -143,7 +171,7 @@ def launch_qa_pretrain() -> None:
             batch_size=FLAGS.batch_size,
             source_max_length=FLAGS.source_max_length,
             decoder_max_length=FLAGS.decoder_max_length,
-            dataset="all"
+            dataset="all",
         )
 
         _, sq_val_loader, _ = create_response_dataset(
@@ -151,14 +179,14 @@ def launch_qa_pretrain() -> None:
             batch_size=FLAGS.batch_size,
             source_max_length=FLAGS.source_max_length,
             decoder_max_length=FLAGS.decoder_max_length,
-            dataset="squad_v2"
+            dataset="squad_v2",
         )
 
         run_model(
             model=model,
             train_dataloader=train_loader,
             eval_dataloader=sq_val_loader,
-            metric=semeval_sentiment_metric,
+            metric=compute_response_f1,
         )
 
 

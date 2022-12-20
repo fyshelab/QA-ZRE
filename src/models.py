@@ -237,7 +237,6 @@ class QAT5(MyBaseT5):
             loaded_batch["input_ids"], skip_special_tokens=True
         )
         for index, pred_str in enumerate(predictions_str):
-            pred_str = pred_str if pred_str != "" else "<EMPTY>"
             output_row = {
                 "predictions_str": pred_str,
                 "input_str": input_str[index],

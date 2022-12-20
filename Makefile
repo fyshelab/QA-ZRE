@@ -5,7 +5,6 @@ clean_code:
 	black src/*py; \
 	isort src/*py; \
 	docformatter --in-place src/*py ; \
-	docformatter --in-place src/*/*py
 
 .PHONY: install_gsutil
 install_gsutil:
