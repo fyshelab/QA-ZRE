@@ -25,3 +25,5 @@ install:
 	pip3 install datasets; \
 	pip3 install spacy; \
 	pip3 install ujson; \
+	pip3 install tensorboard; \
+	python -m spacy download en

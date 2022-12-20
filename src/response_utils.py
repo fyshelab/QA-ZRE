@@ -4,7 +4,7 @@ import torch
 from datasets import load_dataset
 from torch.utils.data import DataLoader
 
-from zero_extraction_utils import white_space_fix
+from src.zero_extraction_utils import white_space_fix
 
 
 def read_narrative_dataset():

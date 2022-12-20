@@ -5,7 +5,7 @@ from datasets import load_dataset
 from spacy.lang.en.stop_words import STOP_WORDS
 from torch.utils.data import DataLoader
 
-from zero_extraction_utils import QADataset, white_space_fix
+from src.zero_extraction_utils import QADataset, white_space_fix
 
 
 def q_only_read_narrative_dataset():
