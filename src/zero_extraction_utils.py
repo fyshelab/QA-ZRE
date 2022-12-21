@@ -70,6 +70,13 @@ def white_space_fix(text):
     return " ".join(text.split())
 
 
+def remove_prefix(text, prefix):
+    """This function is used to remove prefix key from the text."""
+    if text.startswith(prefix):
+        return text[len(prefix) :]
+    return text  # or whatever
+
+
 def find_sub_list(sl, l):
     i = 0
     while i <= len(l) - len(sl):

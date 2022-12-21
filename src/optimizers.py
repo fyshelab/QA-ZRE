@@ -74,7 +74,7 @@ def dual_opt(opt_args: OPTIMIZER_ARGS_TYPE) -> List[Optimizer]:
     """Define the optimizers that fine-tune one question generator and one
     response generator on the RE corpora."""
     return construct_optimizer(
-        model=opt_args["q_model"], second_model=opt_args["r_model"]
+        model=opt_args["question_model"], second_model=opt_args["answer_model"]
     )
 
 
