@@ -83,7 +83,7 @@ def run_model(
     model: MyBaseT5,
     train_dataloader: Optional[torch.utils.data.DataLoader] = None,
     eval_dataloader: Optional[torch.utils.data.DataLoader] = None,
-    metric: Optional[Callable[[str, str, str], float]] = None,
+    metric: Optional[Callable[[str, str], float]] = None,
 ) -> None:
     """Run the model on input data; for training or inference."""
     if FLAGS.mode == "train":
@@ -110,7 +110,7 @@ def run_model(
                 if global_step % FLAGS.steps_per_checkpoint == 0:
                     if eval_dataloader is not None:
                         start_predicting(model, eval_dataloader, eval_file)
-                        score = metric(FLAGS.dev_file, eval_file, FLAGS.task_name)  # type: ignore
+                        score = metric(FLAGS.dev_file, eval_file)  # type: ignore
                         writer.add_scalar("Score/dev", score, global_step)
                         if score > best_score:
                             best_score = score
@@ -126,7 +126,7 @@ def run_model(
             if eval_dataloader is not None:
                 # do final evaluation on the dev data at the end of epoch.
                 start_predicting(model, eval_dataloader, eval_file)
-                score = metric(FLAGS.dev_file, eval_file, FLAGS.task_name)  # type: ignore
+                score = metric(FLAGS.dev_file, eval_file)  # type: ignore
                 writer.add_scalar("Score/dev", score, global_step)
                 if score > best_score:
                     best_score = score

@@ -22,7 +22,7 @@ mkdir -p ${model_path}
 
 # training_steps is a very large value to go over everything on the train dataset.
 python -m src.pretrain \
-    --batch_size 64 \
+    --batch_size 32 \
     --task_name ${TASK_NAME} \
     --t5_exp_type ${EXPERIMENT_TYPE} \
     --dev_file ./squad/dev-v2.0.json \
@@ -30,6 +30,7 @@ python -m src.pretrain \
     --model_path ${model_path} \
     --learning_rate 0.0005 \
     --max_epochs 4 \
+    --steps_per_checkpoint 5000 \
     --training_steps 10000000 \
     --source_max_length 512 \
     --decoder_max_length 128 \
