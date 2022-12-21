@@ -176,15 +176,13 @@ class QAT5(MyBaseT5):
 
         self.setup_models()
 
-        # only use the single optimizer defined.
-        self.optimizer = self.optimizers[0]
-
     def train(self, batch: torch.utils.data.Dataset) -> Dict[str, float]:
         """The main train loop for generating the output sequence in the
         decoder T5."""
 
         self.train_mode_on()
-        self.optimizer.zero_grad()
+        # only use the single optimizer defined.
+        self.optimizers[0].zero_grad()
 
         loaded_batch = self.move_to_gpu(
             batch,
@@ -212,7 +210,7 @@ class QAT5(MyBaseT5):
         loss.backward()
 
         # optimize
-        self.optimizer.step()
+        self.optimizers[0].step()
 
         return {"loss_value": loss_value}
 

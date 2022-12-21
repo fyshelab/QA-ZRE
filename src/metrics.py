@@ -95,6 +95,10 @@ def get_raw_scores(squad_path, preds):
     all_refs = read_squad_refs(squad_path)
     for i, gold_answers in enumerate(all_refs):
         a_pred = preds[i]
+        if a_pred == "no_answer":
+            # our model will generate the special no_answer token.
+            # map it to the empty string if you want to compare with squad's gold output for unanswerable questions.
+            a_pred = ""
         # Take max over all gold answers
         exact_scores[i] = max(compute_exact(a, a_pred) for a in gold_answers)
         f1_scores[i] = max(compute_f1(a, a_pred) for a in gold_answers)

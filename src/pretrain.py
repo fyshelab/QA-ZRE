@@ -149,10 +149,9 @@ def run_model(
 def launch_qa_pretrain() -> None:
     """launch the pre-training phase for question and response generation."""
 
-    FLAGS.mode = "train"
-
-    model = QAT5()
     if FLAGS.task_name == "question_pretrain":
+        FLAGS.mode = "train"
+        model = QAT5()
         # Run the T5 to do the pretraining of the question module.
         train_dataloader = create_question_pretrain_dataset(
             question_tokenizer=model.tokenizer,
@@ -168,6 +167,8 @@ def launch_qa_pretrain() -> None:
             metric=None,
         )
     elif FLAGS.task_name == "response_pretrain":
+        FLAGS.mode = "train"
+        model = QAT5()
         # Run the T5 on multiple qa datasets to pre-train the response generator.
         # Test the T5 for response generation on the squad v2 dev data as you train.
         train_loader, _, _ = create_response_dataset(
@@ -192,6 +193,25 @@ def launch_qa_pretrain() -> None:
             eval_dataloader=sq_val_loader,
             metric=compute_response_f1,
         )
+
+    elif FLAGS.task_name == "response_eval":
+        FLAGS.mode = "test"
+        model = QAT5()
+        # Test the T5 for response generation on the squad v2 dev data.
+        _, sq_val_loader, _ = create_response_dataset(
+            tokenizer=model.tokenizer,
+            batch_size=FLAGS.batch_size,
+            source_max_length=FLAGS.source_max_length,
+            decoder_max_length=FLAGS.decoder_max_length,
+            dataset="squad_v2",
+        )
+
+        run_model(
+            model=model,
+            eval_dataloader=sq_val_loader,
+        )
+        score = compute_response_f1(FLAGS.dev_file, FLAGS.prediction_file)
+        print(f"The f1 mean on the squad val split:{score}")
 
 
 def main(argv: Any) -> None:
