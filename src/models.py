@@ -415,3 +415,99 @@ class QA_ZRET5(MyBaseT5):
             question_predictions_str,
             question_log_ps,
         )
+
+    def tail_entity_gen(self, batch):
+        """Code to generate the question from the question module and then
+        generate the tail entity from the response module."""
+        self.predict_mode_on()
+        (
+            answer_input_ids,
+            answer_input_mask,
+            _,
+            _,
+            question_predictions_str,
+            question_log_ps,
+        ) = self.question_beam_predict(batch)
+
+        answer_model = self.model_pool["answer_model"]
+        # greedy decoding with the answer model.
+        tail_entity_predictions = answer_model.generate(
+            input_ids=answer_input_ids,
+            attention_mask=answer_input_mask,
+        )
+        tail_entity_predictions_str = self.answer_tokenizer.batch_decode(
+            tail_entity_predictions, skip_special_tokens=True
+        )
+
+        for index, tail_entity in enumerate(tail_entity_predictions_str):
+            output_row = {
+                "predictions_str": tail_entity,
+                "question_predictions": question_predictions_str[index],
+            }
+            yield output_row
+
+    def relation_scorer(self, batch):
+        """Relation classifier using tail entity generation for scoring every
+        possible relation."""
+        self.predict_mode_on()
+        loss_fct = torch.nn.CrossEntropyLoss(ignore_index=-100, reduction="none")
+        loss_fct = loss_fct.to(self.device)
+        (
+            answer_input_ids,
+            answer_input_mask,
+            question_input_ids,
+            question_input_mask,
+            question_predictions_str,
+            question_log_ps,
+        ) = self.question_beam_predict(
+            batch,
+            num_ret_seqs=FLAGS.num_search_samples,
+        )
+
+        loaded_batch = self.move_to_gpu(
+            batch,
+            keys=[
+                "second_entity_attention_mask",
+                "second_entity_labels",
+            ],
+        )
+        target_mask, labels = prepare_response_module_input(
+            labels=loaded_batch["second_entity_labels"],
+            target_mask=loaded_batch["second_entity_attention_mask"],
+            num_samples=FLAGS.num_search_samples,
+        )
+        labels.masked_fill_(labels == self.answer_tokenizer.pad_token_id, -100)
+
+        # Answer Computation
+        with torch.no_grad():
+            answer_model = self.model_pool["answer_model"]
+            output = answer_model(
+                input_ids=answer_input_ids,
+                attention_mask=answer_input_mask,
+                decoder_attention_mask=target_mask,
+                decoder_input_ids=self.answer_model._shift_right(labels),
+                labels=None,
+            )
+
+            log_p = -loss_fct(
+                output.logits.view(-1, output.logits.size(-1)),
+                labels.view(-1),
+            )
+
+            # b: batch size
+            # sz: sequence size
+            # v: vocab size
+            b, sz, v = output.logits.size()
+            log_p = log_p.view(b, sz)
+            good_log_p = log_p.masked_fill_(labels == -100, 0.0)
+            answer_log_p = torch.sum(good_log_p, dim=1).squeeze().cpu().numpy()
+            question_log_ps = question_log_ps.cpu().numpy()
+            for index in range(b):
+                relation_log_p = answer_log_p[index] + question_log_ps[index]
+                output_row = {
+                    "relation_log_p": relation_log_p,
+                    "question_log_p": question_log_ps[index],
+                    "answer_log_p": answer_log_p[index],
+                    "generated_question": question_predictions_str[index],
+                }
+                yield output_row
