@@ -13,7 +13,7 @@ from absl import flags
 from transformers import T5ForConditionalGeneration, T5Tokenizer
 
 from src.optimizers import optimizer_definer
-from src.zero_extraction_utils import remove_prefix
+from src.zero_extraction_utils import remove_prefix, white_space_fix
 
 FLAGS = flags.FLAGS
 
@@ -485,7 +485,7 @@ class QA_ZRET5(MyBaseT5):
                 input_ids=answer_input_ids,
                 attention_mask=answer_input_mask,
                 decoder_attention_mask=target_mask,
-                decoder_input_ids=self.answer_model._shift_right(labels),
+                decoder_input_ids=answer_model._shift_right(labels),
                 labels=None,
             )
 
@@ -511,3 +511,186 @@ class QA_ZRET5(MyBaseT5):
                     "generated_question": question_predictions_str[index],
                 }
                 yield output_row
+
+    def g_answer_training(self, batch):
+        """Compute G loss only for the answer module."""
+        loss_fct = torch.nn.CrossEntropyLoss(ignore_index=-100, reduction="none")
+        loss_fct = loss_fct.to(self.device)
+        (
+            answer_input_ids,
+            answer_input_mask,
+            question_input_ids,
+            question_input_mask,
+            question_predictions_str,
+            question_log_ps,
+        ) = self.question_beam_predict(batch)
+
+        loaded_batch = self.move_to_gpu(
+            batch,
+            keys=[
+                "second_entity_attention_mask",
+                "second_entity_labels",
+            ],
+        )
+
+        labels = loaded_batch["second_entity_labels"]
+        labels.masked_fill_(labels == self.answer_tokenizer.pad_token_id, -100)
+
+        # Answer Computation
+        answer_model = self.model_pool["answer_model"]
+        answer_model.train()
+        output = answer_model(
+            input_ids=answer_input_ids,
+            attention_mask=answer_input_mask,
+            decoder_attention_mask=loaded_batch["second_entity_attention_mask"],
+            decoder_input_ids=answer_model._shift_right(labels),
+            labels=None,
+        )
+
+        log_p = -loss_fct(
+            output.logits.view(-1, output.logits.size(-1)),
+            labels.view(-1),
+        )
+
+        # b: batch size
+        # sz: sequence size
+        # v: vocab size
+        b, sz, v = output.logits.size()
+        log_p = log_p.view(b, sz)
+        good_log_p = log_p.masked_fill_(labels == -100, 0.0)
+        answer_log_p = torch.sum(good_log_p, dim=1).squeeze()
+
+        loss = -torch.mean(answer_log_p, dim=0)
+        loss_value = loss.item()
+        return loss, loss_value
+
+    def response_forward(self, batch, new_articles, loss_fct):
+        """Prepare the input for the answer module, don't train it with PGG
+        objective."""
+        # Get output from the answer module
+        answer_inputs = self.answer_tokenizer(
+            new_articles,
+            truncation=True,
+            padding="max_length",
+            max_length=self.source_max_length,
+            add_special_tokens=False,
+            return_tensors="pt",
+        )
+
+        answer_input_ids = answer_inputs.input_ids.to(self.device)
+        answer_input_mask = answer_inputs.attention_mask.to(self.device)
+
+        loaded_batch = self.move_to_gpu(
+            batch,
+            keys=[
+                "second_entity_attention_mask",
+                "second_entity_labels",
+            ],
+        )
+
+        labels = loaded_batch["second_entity_labels"]
+        labels.masked_fill_(labels == self.answer_tokenizer.pad_token_id, -100)
+
+        b_sz, _ = labels.size()
+        (
+            answer_input_ids,
+            answer_input_mask,
+            target_mask,
+            new_labels,
+        ) = prepare_response_module_input(
+            answer_input_ids=answer_input_ids,
+            answer_input_mask=answer_input_mask,
+            labels=labels,
+            target_mask=target_mask,
+            num_samples=FLAGS.num_search_samples,
+        )
+
+        with torch.no_grad():
+            answer_model = self.model_pool["answer_model"]
+            output = answer_model(
+                input_ids=answer_input_ids,
+                attention_mask=answer_input_mask,
+                decoder_attention_mask=target_mask,
+                decoder_input_ids=answer_model._shift_right(new_labels),
+                labels=None,
+            )
+
+            log_p = -loss_fct(
+                output.logits.view(-1, output.logits.size(-1)),
+                new_labels.view(-1),
+            )
+
+            b, s_len, v = output.logits.size()
+            log_p = log_p.view(b, s_len)
+            good_log_p = log_p.masked_fill_(new_labels == -100, 0.0)
+            answer_log_p = torch.sum(good_log_p, dim=1).squeeze()
+            answer_log_p = answer_log_p.view(b_sz, FLAGS.num_search_samples)
+            return answer_log_p
+
+    def question_forward(
+        self,
+        question_input_ids,
+        question_input_mask,
+        final_sampled_question_predictions_str_reshaped,
+        loss_fct,
+    ):
+        """Now re-run the question generator and compute the loss for the
+        sampled predictions.
+
+        This will compute the gradients in the question module.
+        """
+
+        b_sz, src_seq_len = question_input_ids.size()
+        question_input_ids = question_input_ids.repeat(
+            1, FLAGS.config.num_search_samples
+        ).view(-1, src_seq_len)
+        question_input_mask = question_input_mask.repeat(
+            1, FLAGS.config.num_search_samples
+        ).view(-1, src_seq_len)
+
+        output_questions = []
+        for i in range(b_sz):
+            for j in range(FLAGS.num_search_samples):
+                output_question = (
+                    white_space_fix(
+                        final_sampled_question_predictions_str_reshaped[i][j]
+                    )
+                    + " </s>"
+                )
+                output_questions.append(output_question)
+
+        question_encodings = self.question_tokenizer(
+            output_questions,
+            truncation=True,
+            padding="max_length",
+            max_length=self.decoder_max_length,
+            add_special_tokens=False,
+            return_tensors="pt",
+        )
+        question_labels = torch.tensor(question_encodings.pop("input_ids")).to(
+            self.device
+        )
+        question_target_mask = question_encodings.pop("attention_mask").to(self.device)
+
+        question_model = self.model_pool["question_model"]
+        question_model.train()
+        _, dec_seq_len = question_labels.size()
+        question_output = question_model(
+            input_ids=question_input_ids,
+            attention_mask=question_input_mask,
+            decoder_attention_mask=question_target_mask,
+            decoder_input_ids=question_model._shift_right(question_labels),
+            labels=None,
+        )
+
+        log_question_p = -loss_fct(
+            question_output.logits.view(-1, question_output.logits.size(-1)),
+            question_labels.view(-1),
+        )
+
+        b, seq_len, v = question_output.logits.size()
+        log_question_p = log_question_p.view(b, seq_len)
+        good_log_question_p = log_question_p.masked_fill_(question_labels == -100, 0.0)
+        question_log_p = torch.sum(good_log_question_p, dim=1).squeeze()
+        question_log_p = question_log_p.view(b_sz, FLAGS.num_search_samples)
+        return question_log_p, output_questions
