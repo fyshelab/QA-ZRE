@@ -694,3 +694,139 @@ class QA_ZRET5(MyBaseT5):
         question_log_p = torch.sum(good_log_question_p, dim=1).squeeze()
         question_log_p = question_log_p.view(b_sz, FLAGS.num_search_samples)
         return question_log_p, output_questions
+
+    def overall_training(
+        self,
+        batch,
+        off_policy=True,
+    ):
+        """The main training function to decide which sampling technique to use
+        and also to compute the loss corresponding to different training
+        objectives."""
+        loss_fct = torch.nn.CrossEntropyLoss(ignore_index=-100, reduction="none")
+        loss_fct = loss_fct.to(self.device)
+
+        loaded_batch = self.move_to_gpu(
+            batch,
+            keys=[
+                "entity_relation_passage_input_ids",
+                "entity_relation_passage_attention_mask",
+                "posterier_input_ids",
+                "posterier_attention_mask",
+            ],
+        )
+
+        # Loss from the entity relation examples!
+        question_input_ids = loaded_batch["entity_relation_passage_input_ids"]
+        question_input_mask = loaded_batch["entity_relation_passage_attention_mask"]
+        if off_policy:
+            # the posterior inputs also have the tail entity.
+            posterier_question_input_ids = loaded_batch["posterier_input_ids"]
+            posterier_question_input_mask = loaded_batch["posterier_attention_mask"]
+
+        b_sz, _ = question_input_ids.size()
+
+        with torch.no_grad():
+            if off_policy:
+                init_question_model = self.model_pool["init_question_model"]
+                init_question_model.eval()
+                sampled_question_outputs = init_question_model.generate(
+                    input_ids=posterier_question_input_ids,
+                    do_sample=True,
+                    no_repeat_ngram_size=FLAGS.no_repeat_ngram_size,
+                    max_length=self.decoder_max_length,
+                    num_return_sequences=FLAGS.num_search_samples,
+                    top_p=0.95,
+                    output_scores=True,
+                    return_dict_in_generate=True,
+                    attention_mask=posterier_question_input_mask,
+                )
+
+            sampled_questions, question_log_ps = prob_of_sampled_predictions(
+                loss_fct, sampled_question_outputs
+            )
+
+            if off_policy:
+                sampled_question_predictions_str = (
+                    self.init_question_tokenizer.batch_decode(
+                        sampled_questions, skip_special_tokens=True
+                    )
+                )
+
+            sampled_question_predictions_str = [
+                remove_prefix(pred, "question: ")
+                for pred in sampled_question_predictions_str
+            ]
+
+            sampled_question_predictions_str_reshaped = [
+                sampled_question_predictions_str[
+                    i
+                    * (FLAGS.num_search_samples) : (i + 1)
+                    * (FLAGS.num_search_samples)
+                ]
+                for i in range(b_sz)
+            ]
+
+        sample_log_ps = question_log_ps.view(b_sz, FLAGS.num_search_samples)
+        new_articles = []
+        for i in range(b_sz):
+            for j in range(FLAGS.num_search_samples):
+                new_article = (
+                    "relation: "
+                    + batch["entity_relations"][i]
+                    + " question: "
+                    + sampled_question_predictions_str_reshaped[i][j]
+                    + " context: "
+                    + batch["passages"][i]
+                    + " </s>"
+                )
+                new_articles.append(new_article)
+
+        answer_log_p = self.response_forward(
+            batch,
+            new_articles,
+            loss_fct,
+        )
+
+        question_log_p, output_questions = self.question_forward(
+            question_input_ids,
+            question_input_mask,
+            sampled_question_predictions_str_reshaped,
+            loss_fct,
+        )
+
+        # easier stable way to use MML objective with backpropogation.
+        if off_policy:
+            ratio_log = question_log_p - sample_log_ps + answer_log_p
+        easier_mml_loss = -torch.mean(torch.logsumexp(ratio_log, dim=1), dim=0)
+        return easier_mml_loss
+
+    def train(
+        self,
+        batch,
+    ):
+        """The main train objective for offmml-g objective."""
+
+        # Free memory in GPU, very important!
+        self.clear_cache()
+
+        self.answer_optimizer.zero_grad()
+        self.question_optimizer.zero_grad()
+
+        answer_model = self.model_pool["answer_model"]
+        answer_model.eval()
+        loss = self.overall_training(
+            batch,
+            off_policy=True,
+        )
+        loss_value = loss.item()
+        loss.backward()
+
+        question_model = self.model_pool["question_model"]
+        question_model.eval()
+        pgg_loss, pgg_loss_value = self.pgg_answer_training(batch)
+        pgg_loss.backward()
+
+        self.answer_optimizer.step()
+        self.question_optimizer.step()
+        return (loss_value, pgg_loss_value)
