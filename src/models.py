@@ -328,13 +328,15 @@ class QA_ZRET5(MyBaseT5):
         self.question_tokenizer = T5Tokenizer.from_pretrained(FLAGS.t5_pretrained_model)
 
         # construct the underlying t5 models
-        self.model_pool["answer_model"] = T5ForConditionalGeneration.from_pretrained(
+        self.answer_model = T5ForConditionalGeneration.from_pretrained(
             FLAGS.t5_pretrained_model
         )
+        self.model_pool["answer_model"] = self.answer_model
 
-        self.model_pool["question_model"] = T5ForConditionalGeneration.from_pretrained(
+        self.question_model = T5ForConditionalGeneration.from_pretrained(
             FLAGS.t5_pretrained_model
         )
+        self.model_pool["question_model"] = self.question_model
 
         if FLAGS.mode == "train":
             # the search model is only for training.
@@ -342,28 +344,47 @@ class QA_ZRET5(MyBaseT5):
             self.init_question_tokenizer = T5Tokenizer.from_pretrained(
                 FLAGS.t5_pretrained_model
             )
-            self.model_pool[
-                "init_question_model"
-            ] = T5ForConditionalGeneration.from_pretrained(FLAGS.t5_pretrained_model)
+
+            self.init_question_model = T5ForConditionalGeneration.from_pretrained(
+                FLAGS.t5_pretrained_model
+            )
+            self.model_pool["init_question_model"] = self.init_question_model
 
         self.setup_models()
 
-    def question_beam_predict(self, batch, num_ret_seqs=1):
-        """Use beam search to generate the questions and prepare inputs for the
-        answer module."""
+    def log_of_labels(self, model, input_ids, input_mask, decoder_mask, labels):
+        """Do a forward computation and compute the log probability for the
+        label."""
 
-        loaded_batch = self.move_to_gpu(
-            batch,
-            keys=[
-                "entity_relation_passage_input_ids",
-                "entity_relation_passage_attention_mask",
-            ],
+        output = model(
+            input_ids=input_ids,
+            attention_mask=input_mask,
+            decoder_attention_mask=decoder_mask,
+            decoder_input_ids=model._shift_right(labels),
+            labels=None,
         )
-        q_input_ids = loaded_batch["entity_relation_passage_input_ids"]
-        q_attn_mask = loaded_batch["entity_relation_passage_attention_mask"]
+
+        log_p = -self.loss_fct(
+            output.logits.view(-1, output.logits.size(-1)),
+            labels.view(-1),
+        )
+
+        # b: batch size
+        # sz: sequence size
+        # v: vocab size
+        b, sz, v = output.logits.size()
+        log_p = log_p.view(b, sz)
+        good_log_p = log_p.masked_fill_(labels == -100, 0.0)
+
+        # sum over the sequence length
+        return torch.sum(good_log_p, dim=1).squeeze()
+
+    def question_beam_predict(self, num_ret_seqs=1):
+        """Use beam search to generate the questions."""
+        q_input_ids = self.gpu_batch["entity_relation_passage_input_ids"]
+        q_attn_mask = self.gpu_batch["entity_relation_passage_attention_mask"]
         with torch.no_grad():
-            question_model = self.model_pool["question_model"]
-            question_output = question_model.generate(
+            question_output = self.question_model.generate(
                 input_ids=q_input_ids,
                 attention_mask=q_attn_mask,
                 no_repeat_ngram_size=FLAGS.no_repeat_ngram_size,
@@ -386,15 +407,20 @@ class QA_ZRET5(MyBaseT5):
             remove_prefix(pred, "question: ") for pred in question_predictions_str
         ]
 
+        return question_predictions_str, question_log_ps
+
+    def format_answer_inputs(self, question_predictions_str, num_ret_seqs=1):
+        """Use the generated questions to create the input for the answer
+        module in the correct format."""
         new_articles = []
         for i in range(len(question_predictions_str)):
             new_article = (
                 "relation: "
-                + batch["entity_relations"][i // num_ret_seqs]
+                + self.cpu_batch["entity_relations"][i // num_ret_seqs]
                 + " question: "
                 + question_predictions_str[i]
                 + " context: "
-                + batch["passages"][i // num_ret_seqs]
+                + self.cpu_batch["passages"][i // num_ret_seqs]
                 + " </s>"
             )
             new_articles.append(new_article)
@@ -407,31 +433,39 @@ class QA_ZRET5(MyBaseT5):
             add_special_tokens=False,
             return_tensors="pt",
         )
-        return (
-            answer_inputs.input_ids.to(self.device),
-            answer_inputs.attention_mask.to(self.device),
-            q_input_ids,
-            q_attn_mask,
-            question_predictions_str,
-            question_log_ps,
+        return answer_inputs.input_ids.to(self.device), answer_inputs.attention_mask.to(
+            self.device
         )
 
-    def tail_entity_gen(self, batch):
+    def format_question_outputs(self, question_sampled_str):
+        """Use the sampled questions to create the output for the question
+        module in the correct format."""
+        output_questions = [white_space_fix(q) + " </s>" for q in question_sampled_str]
+        question_encodings = self.question_tokenizer(
+            output_questions,
+            truncation=True,
+            padding="max_length",
+            max_length=self.decoder_max_length,
+            add_special_tokens=False,
+            return_tensors="pt",
+        )
+        question_labels = question_encodings.input_ids.to(self.device)
+        question_target_mask = question_encodings.attention_mask.to(self.device)
+
+        return question_labels, question_target_mask
+
+    def tail_entity_gen(self):
         """Code to generate the question from the question module and then
         generate the tail entity from the response module."""
         self.predict_mode_on()
-        (
-            answer_input_ids,
-            answer_input_mask,
-            _,
-            _,
-            question_predictions_str,
-            question_log_ps,
-        ) = self.question_beam_predict(batch)
 
-        answer_model = self.model_pool["answer_model"]
+        question_predictions_str, _ = self.question_beam_predict()
+        answer_input_ids, answer_input_mask = self.format_answer_inputs(
+            question_predictions_str
+        )
+
         # greedy decoding with the answer model.
-        tail_entity_predictions = answer_model.generate(
+        tail_entity_predictions = self.answer_model.generate(
             input_ids=answer_input_ids,
             attention_mask=answer_input_mask,
         )
@@ -446,150 +480,75 @@ class QA_ZRET5(MyBaseT5):
             }
             yield output_row
 
-    def relation_scorer(self, batch):
+    def relation_scorer(self):
         """Relation classifier using tail entity generation for scoring every
         possible relation."""
         self.predict_mode_on()
-        loss_fct = torch.nn.CrossEntropyLoss(ignore_index=-100, reduction="none")
-        loss_fct = loss_fct.to(self.device)
-        (
-            answer_input_ids,
-            answer_input_mask,
-            question_input_ids,
-            question_input_mask,
-            question_predictions_str,
-            question_log_ps,
-        ) = self.question_beam_predict(
-            batch,
-            num_ret_seqs=FLAGS.num_search_samples,
+
+        question_predictions_str, question_log_ps = self.question_beam_predict(
+            num_ret_seqs=FLAGS.num_search_samples
+        )
+        answer_input_ids, answer_input_mask = self.format_answer_inputs(
+            question_predictions_str, num_ret_seqs=FLAGS.num_search_samples
         )
 
-        loaded_batch = self.move_to_gpu(
-            batch,
-            keys=[
-                "second_entity_attention_mask",
-                "second_entity_labels",
-            ],
-        )
         target_mask, labels = prepare_response_module_input(
-            labels=loaded_batch["second_entity_labels"],
-            target_mask=loaded_batch["second_entity_attention_mask"],
+            labels=self.gpu_batch["second_entity_labels"],
+            target_mask=self.gpu_batch["second_entity_attention_mask"],
             num_samples=FLAGS.num_search_samples,
         )
-        labels.masked_fill_(labels == self.answer_tokenizer.pad_token_id, -100)
 
         # Answer Computation
         with torch.no_grad():
-            answer_model = self.model_pool["answer_model"]
-            output = answer_model(
+            log_p = self.log_of_labels(
+                model=self.answer_model,
                 input_ids=answer_input_ids,
-                attention_mask=answer_input_mask,
-                decoder_attention_mask=target_mask,
-                decoder_input_ids=answer_model._shift_right(labels),
-                labels=None,
+                input_mask=answer_input_mask,
+                decoder_mask=target_mask,
+                labels=labels,
             )
 
-            log_p = -loss_fct(
-                output.logits.view(-1, output.logits.size(-1)),
-                labels.view(-1),
-            )
-
-            # b: batch size
-            # sz: sequence size
-            # v: vocab size
-            b, sz, v = output.logits.size()
-            log_p = log_p.view(b, sz)
-            good_log_p = log_p.masked_fill_(labels == -100, 0.0)
-            answer_log_p = torch.sum(good_log_p, dim=1).squeeze().cpu().numpy()
+            answer_log_ps = log_p.cpu().numpy()
             question_log_ps = question_log_ps.cpu().numpy()
-            for index in range(b):
-                relation_log_p = answer_log_p[index] + question_log_ps[index]
+
+            for index, generated_q in enumerate(question_predictions_str):
                 output_row = {
-                    "relation_log_p": relation_log_p,
+                    "relation_log_p": answer_log_ps[index] + question_log_ps[index],
                     "question_log_p": question_log_ps[index],
-                    "answer_log_p": answer_log_p[index],
-                    "generated_question": question_predictions_str[index],
+                    "answer_log_p": answer_log_ps[index],
+                    "generated_question": generated_q,
                 }
                 yield output_row
 
-    def g_answer_training(self, batch):
+    def g_answer_training(self):
         """Compute G loss only for the answer module."""
-        loss_fct = torch.nn.CrossEntropyLoss(ignore_index=-100, reduction="none")
-        loss_fct = loss_fct.to(self.device)
-        (
-            answer_input_ids,
-            answer_input_mask,
-            question_input_ids,
-            question_input_mask,
-            question_predictions_str,
-            question_log_ps,
-        ) = self.question_beam_predict(batch)
-
-        loaded_batch = self.move_to_gpu(
-            batch,
-            keys=[
-                "second_entity_attention_mask",
-                "second_entity_labels",
-            ],
+        question_predictions_str, _ = self.question_beam_predict()
+        answer_input_ids, answer_input_mask = self.format_answer_inputs(
+            question_predictions_str
         )
-
-        labels = loaded_batch["second_entity_labels"]
-        labels.masked_fill_(labels == self.answer_tokenizer.pad_token_id, -100)
-
         # Answer Computation
-        answer_model = self.model_pool["answer_model"]
-        answer_model.train()
-        output = answer_model(
+        self.answer_model.train()
+        log_p = self.log_of_labels(
+            model=self.answer_model,
             input_ids=answer_input_ids,
-            attention_mask=answer_input_mask,
-            decoder_attention_mask=loaded_batch["second_entity_attention_mask"],
-            decoder_input_ids=answer_model._shift_right(labels),
-            labels=None,
+            input_mask=answer_input_mask,
+            decoder_mask=self.gpu_batch["second_entity_attention_mask"],
+            labels=self.gpu_batch["second_entity_labels"],
         )
 
-        log_p = -loss_fct(
-            output.logits.view(-1, output.logits.size(-1)),
-            labels.view(-1),
-        )
-
-        # b: batch size
-        # sz: sequence size
-        # v: vocab size
-        b, sz, v = output.logits.size()
-        log_p = log_p.view(b, sz)
-        good_log_p = log_p.masked_fill_(labels == -100, 0.0)
-        answer_log_p = torch.sum(good_log_p, dim=1).squeeze()
-
-        loss = -torch.mean(answer_log_p, dim=0)
+        loss = -torch.mean(log_p, dim=0)
         loss_value = loss.item()
         return loss, loss_value
 
-    def response_forward(self, batch, new_articles, loss_fct):
+    def response_forward(self, sampled_question_predictions_str):
         """Prepare the input for the answer module, don't train it with PGG
         objective."""
-        # Get output from the answer module
-        answer_inputs = self.answer_tokenizer(
-            new_articles,
-            truncation=True,
-            padding="max_length",
-            max_length=self.source_max_length,
-            add_special_tokens=False,
-            return_tensors="pt",
+
+        answer_input_ids, answer_input_mask = self.format_answer_inputs(
+            sampled_question_predictions_str, num_ret_seqs=FLAGS.num_search_samples
         )
 
-        answer_input_ids = answer_inputs.input_ids.to(self.device)
-        answer_input_mask = answer_inputs.attention_mask.to(self.device)
-
-        loaded_batch = self.move_to_gpu(
-            batch,
-            keys=[
-                "second_entity_attention_mask",
-                "second_entity_labels",
-            ],
-        )
-
-        labels = loaded_batch["second_entity_labels"]
-        labels.masked_fill_(labels == self.answer_tokenizer.pad_token_id, -100)
+        labels = self.gpu_batch["second_entity_labels"]
 
         b_sz, _ = labels.size()
         (
@@ -606,33 +565,21 @@ class QA_ZRET5(MyBaseT5):
         )
 
         with torch.no_grad():
-            answer_model = self.model_pool["answer_model"]
-            output = answer_model(
+            log_p = self.log_of_labels(
+                model=self.answer_model,
                 input_ids=answer_input_ids,
-                attention_mask=answer_input_mask,
-                decoder_attention_mask=target_mask,
-                decoder_input_ids=answer_model._shift_right(new_labels),
-                labels=None,
+                input_mask=answer_input_mask,
+                decoder_mask=target_mask,
+                labels=new_labels,
             )
-
-            log_p = -loss_fct(
-                output.logits.view(-1, output.logits.size(-1)),
-                new_labels.view(-1),
-            )
-
-            b, s_len, v = output.logits.size()
-            log_p = log_p.view(b, s_len)
-            good_log_p = log_p.masked_fill_(new_labels == -100, 0.0)
-            answer_log_p = torch.sum(good_log_p, dim=1).squeeze()
-            answer_log_p = answer_log_p.view(b_sz, FLAGS.num_search_samples)
+            answer_log_p = log_p.view(b_sz, FLAGS.num_search_samples)
             return answer_log_p
 
     def question_forward(
         self,
         question_input_ids,
         question_input_mask,
-        final_sampled_question_predictions_str_reshaped,
-        loss_fct,
+        sampled_question_predictions_str,
     ):
         """Now re-run the question generator and compute the loss for the
         sampled predictions.
@@ -648,52 +595,19 @@ class QA_ZRET5(MyBaseT5):
             1, FLAGS.config.num_search_samples
         ).view(-1, src_seq_len)
 
-        output_questions = []
-        for i in range(b_sz):
-            for j in range(FLAGS.num_search_samples):
-                output_question = (
-                    white_space_fix(
-                        final_sampled_question_predictions_str_reshaped[i][j]
-                    )
-                    + " </s>"
-                )
-                output_questions.append(output_question)
-
-        question_encodings = self.question_tokenizer(
-            output_questions,
-            truncation=True,
-            padding="max_length",
-            max_length=self.decoder_max_length,
-            add_special_tokens=False,
-            return_tensors="pt",
+        question_labels, question_target_mask = self.format_question_outputs(
+            sampled_question_predictions_str
         )
-        question_labels = torch.tensor(question_encodings.pop("input_ids")).to(
-            self.device
-        )
-        question_target_mask = question_encodings.pop("attention_mask").to(self.device)
-
-        question_model = self.model_pool["question_model"]
-        question_model.train()
-        _, dec_seq_len = question_labels.size()
-        question_output = question_model(
+        self.question_model.train()
+        log_p = self.log_of_labels(
+            model=self.question_model,
             input_ids=question_input_ids,
-            attention_mask=question_input_mask,
-            decoder_attention_mask=question_target_mask,
-            decoder_input_ids=question_model._shift_right(question_labels),
-            labels=None,
+            input_mask=question_input_mask,
+            decoder_mask=question_target_mask,
+            labels=question_labels,
         )
-
-        log_question_p = -loss_fct(
-            question_output.logits.view(-1, question_output.logits.size(-1)),
-            question_labels.view(-1),
-        )
-
-        b, seq_len, v = question_output.logits.size()
-        log_question_p = log_question_p.view(b, seq_len)
-        good_log_question_p = log_question_p.masked_fill_(question_labels == -100, 0.0)
-        question_log_p = torch.sum(good_log_question_p, dim=1).squeeze()
-        question_log_p = question_log_p.view(b_sz, FLAGS.num_search_samples)
-        return question_log_p, output_questions
+        question_log_p = log_p.view(b_sz, FLAGS.num_search_samples)
+        return question_log_p
 
     def overall_training(
         self,
@@ -704,33 +618,41 @@ class QA_ZRET5(MyBaseT5):
         and also to compute the loss corresponding to different training
         objectives."""
         loss_fct = torch.nn.CrossEntropyLoss(ignore_index=-100, reduction="none")
-        loss_fct = loss_fct.to(self.device)
+        self.loss_fct = loss_fct.to(self.device)
 
-        loaded_batch = self.move_to_gpu(
+        self.loaded_batch = self.move_to_gpu(
             batch,
             keys=[
                 "entity_relation_passage_input_ids",
                 "entity_relation_passage_attention_mask",
                 "posterier_input_ids",
                 "posterier_attention_mask",
+                "second_entity_attention_mask",
+                "second_entity_labels",
             ],
         )
+        labels = self.loaded_batch["second_entity_labels"]
+        labels.masked_fill_(labels == self.answer_tokenizer.pad_token_id, -100)
+        self.loaded_batch["second_entity_labels"] = labels
 
         # Loss from the entity relation examples!
-        question_input_ids = loaded_batch["entity_relation_passage_input_ids"]
-        question_input_mask = loaded_batch["entity_relation_passage_attention_mask"]
+        question_input_ids = self.loaded_batch["entity_relation_passage_input_ids"]
+        question_input_mask = self.loaded_batch[
+            "entity_relation_passage_attention_mask"
+        ]
         if off_policy:
             # the posterior inputs also have the tail entity.
-            posterier_question_input_ids = loaded_batch["posterier_input_ids"]
-            posterier_question_input_mask = loaded_batch["posterier_attention_mask"]
+            posterier_question_input_ids = self.loaded_batch["posterier_input_ids"]
+            posterier_question_input_mask = self.loaded_batch[
+                "posterier_attention_mask"
+            ]
 
         b_sz, _ = question_input_ids.size()
 
         with torch.no_grad():
             if off_policy:
-                init_question_model = self.model_pool["init_question_model"]
-                init_question_model.eval()
-                sampled_question_outputs = init_question_model.generate(
+                self.init_question_model.eval()
+                sampled_question_outputs = self.init_question_model.generate(
                     input_ids=posterier_question_input_ids,
                     do_sample=True,
                     no_repeat_ngram_size=FLAGS.no_repeat_ngram_size,
@@ -743,7 +665,7 @@ class QA_ZRET5(MyBaseT5):
                 )
 
             sampled_questions, question_log_ps = prob_of_sampled_predictions(
-                loss_fct, sampled_question_outputs
+                self.loss_fct, sampled_question_outputs
             )
 
             if off_policy:
@@ -758,46 +680,17 @@ class QA_ZRET5(MyBaseT5):
                 for pred in sampled_question_predictions_str
             ]
 
-            sampled_question_predictions_str_reshaped = [
-                sampled_question_predictions_str[
-                    i
-                    * (FLAGS.num_search_samples) : (i + 1)
-                    * (FLAGS.num_search_samples)
-                ]
-                for i in range(b_sz)
-            ]
-
+        answer_log_ps = self.response_forward(sampled_question_predictions_str)
         sample_log_ps = question_log_ps.view(b_sz, FLAGS.num_search_samples)
-        new_articles = []
-        for i in range(b_sz):
-            for j in range(FLAGS.num_search_samples):
-                new_article = (
-                    "relation: "
-                    + batch["entity_relations"][i]
-                    + " question: "
-                    + sampled_question_predictions_str_reshaped[i][j]
-                    + " context: "
-                    + batch["passages"][i]
-                    + " </s>"
-                )
-                new_articles.append(new_article)
-
-        answer_log_p = self.response_forward(
-            batch,
-            new_articles,
-            loss_fct,
-        )
-
-        question_log_p, output_questions = self.question_forward(
+        question_log_ps = self.question_forward(
             question_input_ids,
             question_input_mask,
-            sampled_question_predictions_str_reshaped,
-            loss_fct,
+            sampled_question_predictions_str,
         )
 
         # easier stable way to use MML objective with backpropogation.
         if off_policy:
-            ratio_log = question_log_p - sample_log_ps + answer_log_p
+            ratio_log = question_log_ps - sample_log_ps + answer_log_ps
         easier_mml_loss = -torch.mean(torch.logsumexp(ratio_log, dim=1), dim=0)
         return easier_mml_loss
 
@@ -813,8 +706,7 @@ class QA_ZRET5(MyBaseT5):
         self.answer_optimizer.zero_grad()
         self.question_optimizer.zero_grad()
 
-        answer_model = self.model_pool["answer_model"]
-        answer_model.eval()
+        self.answer_model.eval()
         loss = self.overall_training(
             batch,
             off_policy=True,
@@ -822,8 +714,7 @@ class QA_ZRET5(MyBaseT5):
         loss_value = loss.item()
         loss.backward()
 
-        question_model = self.model_pool["question_model"]
-        question_model.eval()
+        self.question_model.eval()
         pgg_loss, pgg_loss_value = self.pgg_answer_training(batch)
         pgg_loss.backward()
 
