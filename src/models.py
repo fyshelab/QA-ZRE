@@ -19,6 +19,11 @@ FLAGS = flags.FLAGS
 
 # for all possible t5_exp_type, see 'optimizer_definer'
 flags.DEFINE_string("t5_exp_type", "qa", "The type of experiment with the T5 model.")
+flags.DEFINE_string(
+    "prediction_type",
+    "tail_entity",
+    "The type of prediction with the qa_zre experiment: tail_entity for generating the tail entity, relation for scoring every possible relation.",
+)
 
 flags.DEFINE_integer("seed", 42, "the seed number")
 flags.DEFINE_integer("no_repeat_ngram_size", 2, "related to beam search decoding.")
@@ -421,7 +426,7 @@ class QA_ZRET5(MyBaseT5):
                     return_dict_in_generate=True,
                     attention_mask=posterier_q_input_mask,
                 )
-                questions, question_log_ps = prob_of_sampled_predictions(
+                questions, question_log_ps = self.prob_of_sampled_predictions(
                     sampled_question_outputs
                 )
                 questions_str = self.init_question_tokenizer.batch_decode(
@@ -638,21 +643,19 @@ class QA_ZRET5(MyBaseT5):
         easier_mml_loss = -torch.mean(torch.logsumexp(ratio_log, dim=1), dim=0)
         return easier_mml_loss
 
-    def train(
-        self,
-        batch,
-    ):
-        """The main train objective for offmml-g objective."""
-
+    def predict(self, batch):
         # Free memory in GPU, very important!
         self.clear_cache()
 
-        self.answer_optimizer.zero_grad()
-        self.question_optimizer.zero_grad()
+        self.transfer_batch(batch)
 
-        loss_fct = torch.nn.CrossEntropyLoss(ignore_index=-100, reduction="none")
-        self.loss_fct = loss_fct.to(self.device)
+        if FLAGS.prediction_type == "tail_entity":
+            return self.tail_entity_gen()
 
+        elif FLAGS.prediction_type == "relation":
+            return self.relation_scorer()
+
+    def transfer_batch(self, batch):
         self.gpu_batch = self.move_to_gpu(
             batch,
             keys=[
@@ -673,6 +676,23 @@ class QA_ZRET5(MyBaseT5):
         labels.masked_fill_(labels == self.answer_tokenizer.pad_token_id, -100)
         self.gpu_batch["second_entity_labels"] = labels
 
+    def train(
+        self,
+        batch,
+    ):
+        """The main train objective for offmml-g objective."""
+
+        # Free memory in GPU, very important!
+        self.clear_cache()
+
+        self.answer_optimizer.zero_grad()
+        self.question_optimizer.zero_grad()
+
+        self.transfer_batch(batch)
+
+        loss_fct = torch.nn.CrossEntropyLoss(ignore_index=-100, reduction="none")
+        self.loss_fct = loss_fct.to(self.device)
+
         self.answer_model.eval()
         q_loss = self.offmml_question_training()
         q_loss_value = q_loss.item()
@@ -684,4 +704,4 @@ class QA_ZRET5(MyBaseT5):
 
         self.answer_optimizer.step()
         self.question_optimizer.step()
-        return (q_loss_value, r_loss_value)
+        return {"loss_value": q_loss_value + r_loss_value}
