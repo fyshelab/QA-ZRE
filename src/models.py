@@ -13,7 +13,7 @@ from absl import flags
 from transformers import T5ForConditionalGeneration, T5Tokenizer
 
 from src.optimizers import optimizer_definer
-from src.zero_extraction_utils import remove_prefix, white_space_fix
+from src.qa_zre_utils import remove_prefix, white_space_fix
 
 FLAGS = flags.FLAGS
 

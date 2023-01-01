@@ -2,15 +2,11 @@ import json
 import random
 from pathlib import Path
 from random import sample
-from re import I
-from typing import Dict, List, Tuple, Union
+from typing import Dict, List, Union
 
 import pandas as pd
 import torch
-# from datasets import load_dataset
 from torch.utils.data import DataLoader, Dataset
-
-from src.models import set_random_seed
 
 
 def white_space_fix(text):
@@ -69,8 +65,6 @@ class ZREQADataset(Dataset):
 def read_fewrl_dataset(
     fewrel_file, relation_descriptions_file, seed=10, val_split_size=5
 ):
-    set_random_seed(seed)
-
     path = Path(relation_descriptions_file)
 
     id_to_desc = {}
@@ -128,14 +122,14 @@ def read_fewrl_dataset(
         for r_id in val_r_ids:
             r_name = id_to_label[r_id]
             r_desc = id_to_desc[r_id]
-            sentence = " ".join(sent["tokens"])
-            head_entity_indices = sent["h"][2][0]
-            tail_entity_indices = sent["t"][2][0]
-            head_entity = " ".join([sent["tokens"][i] for i in head_entity_indices])
-            tail_entity = " ".join([sent["tokens"][i] for i in tail_entity_indices])
-            gold_answers = tail_entity
             # validate on a smaller dev data for faster computation. Sample 50 sentences per relation.
             for sent in sample(data[r_id], 50):
+                sentence = " ".join(sent["tokens"])
+                head_entity_indices = sent["h"][2][0]
+                tail_entity_indices = sent["t"][2][0]
+                head_entity = " ".join([sent["tokens"][i] for i in head_entity_indices])
+                tail_entity = " ".join([sent["tokens"][i] for i in tail_entity_indices])
+                gold_answers = tail_entity
                 for second_r_id in val_r_ids:
                     second_r_name = id_to_label[second_r_id]
                     second_r_desc = id_to_desc[second_r_id]
@@ -173,13 +167,13 @@ def read_fewrl_dataset(
         for r_id in test_r_ids:
             r_name = id_to_label[r_id]
             r_desc = id_to_desc[r_id]
-            sentence = " ".join(sent["tokens"])
-            head_entity_indices = sent["h"][2][0]
-            tail_entity_indices = sent["t"][2][0]
-            head_entity = " ".join([sent["tokens"][i] for i in head_entity_indices])
-            tail_entity = " ".join([sent["tokens"][i] for i in tail_entity_indices])
-            gold_answers = tail_entity
             for sent in data[r_id]:
+                sentence = " ".join(sent["tokens"])
+                head_entity_indices = sent["h"][2][0]
+                tail_entity_indices = sent["t"][2][0]
+                head_entity = " ".join([sent["tokens"][i] for i in head_entity_indices])
+                tail_entity = " ".join([sent["tokens"][i] for i in tail_entity_indices])
+                gold_answers = tail_entity
                 for second_r_id in test_r_ids:
                     second_r_name = id_to_label[second_r_id]
                     second_r_desc = id_to_desc[second_r_id]
