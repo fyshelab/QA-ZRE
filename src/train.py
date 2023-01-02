@@ -12,7 +12,8 @@ from absl import app, flags
 from torch.utils.tensorboard import SummaryWriter
 
 from src.metrics import compute_response_f1
-from src.models import QAT5, MyBaseT5
+from src.models import QA_ZRET5, QAT5, MyBaseT5, set_random_seed
+from src.qa_zre_utils import create_fewrl_dataset, read_fewrl_dataset
 from src.question_utils import create_question_pretrain_dataset
 from src.response_utils import create_response_dataset
 
@@ -46,6 +47,17 @@ flags.DEFINE_integer(
     "decoder_max_length",
     128,
     "The maximum number of tokens consider in the output sequence.",
+)
+flags.DEFINE_string("fewrel_file", "fewrel_all.json", "the path of the fewrel file.")
+flags.DEFINE_string(
+    "relation_descriptions_file",
+    "relation_descriptions.json",
+    "the file to read relation descriptions from.",
+)
+flags.DEFINE_integer(
+    "val_split_size",
+    5,
+    "The number of unseen relation ids in the validation set! 3 * val_split_size will be the number of the unseen relations of the test set.",
 )
 
 
@@ -214,11 +226,57 @@ def launch_qa_pretrain() -> None:
         print(f"The f1 mean on the squad val split:{score}")
 
 
+def launch_qa_zre() -> None:
+    """launch the fine-tuning phase for question and response models on the RE
+    dataset."""
+    if FLAGS.task_name == "fewrel_train":
+        # for training, we need to learn the tail entity generator.
+        FLAGS.mode = "train"
+        FLAGS.prediction_type = "tail_entity"
+        set_random_seed(FLAGS.seed)
+        model = QA_ZRET5(
+            source_max_len=FLAGS.source_max_length,
+            decoder_max_len=FLAGS.decoder_max_length,
+        )
+        train_df, val_df, test_df = read_fewrl_dataset(
+            FLAGS.fewrel_file,
+            FLAGS.relation_descriptions_file,
+            seed=FLAGS.seed,
+            val_split_size=FLAGS.val_split_size,
+        )
+        train_dataloader = create_fewrl_dataset(
+            model.question_tokenizer,
+            model.answer_tokenizer,
+            FLAGS.batch_size,
+            FLAGS.source_max_length,
+            FLAGS.decoder_max_length,
+            train_df,
+            shuffle=True,
+        )
+        val_dataloader = create_fewrl_dataset(
+            model.question_tokenizer,
+            model.answer_tokenizer,
+            FLAGS.batch_size,
+            FLAGS.source_max_length,
+            FLAGS.decoder_max_length,
+            val_df,
+            shuffle=False,
+        )
+        run_model(
+            model=model,
+            train_dataloader=train_dataloader,
+            eval_dataloader=val_dataloader,
+            metric=None,
+        )
+
+
 def main(argv: Any) -> None:
     """Main function to switch over the t5 experiment type and launch the
     correct train script."""
     if FLAGS.t5_exp_type == "qa":
         launch_qa_pretrain()
+    if FLAGS.t5_exp_type == "qa_zre":
+        launch_qa_zre()
 
 
 if __name__ == "__main__":

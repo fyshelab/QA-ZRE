@@ -16,7 +16,7 @@ echo "Using Python from: $(which python)"
 EXPERIMENT_TYPE="qa"
 TASK_NAME="response_eval"
 
-python -m src.pretrain \
+python -m src.train \
     --batch_size 128 \
     --task_name ${TASK_NAME} \
     --t5_exp_type ${EXPERIMENT_TYPE} \
