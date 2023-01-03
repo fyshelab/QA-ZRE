@@ -11,7 +11,7 @@ import torch
 from absl import app, flags
 from torch.utils.tensorboard import SummaryWriter
 
-from src.metrics import compute_response_f1
+from src.metrics import compute_relation_score, compute_response_f1
 from src.models import QA_ZRET5, QAT5, MyBaseT5, set_random_seed
 from src.qa_zre_utils import create_fewrl_dataset, read_fewrl_dataset
 from src.question_utils import create_question_pretrain_dataset
@@ -266,7 +266,7 @@ def launch_qa_zre() -> None:
             model=model,
             train_dataloader=train_dataloader,
             eval_dataloader=val_dataloader,
-            metric=None,
+            metric=compute_relation_score,
         )
 
 

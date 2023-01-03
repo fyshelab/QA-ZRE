@@ -4,6 +4,7 @@ import re
 import string
 from pathlib import Path
 
+import numpy as np
 import pandas as pd
 
 # implementation of the squad evaluation. Basic Average F1 from the squad v2 evaluation script.
@@ -112,3 +113,57 @@ def compute_response_f1(gold_file, prediction_file):
     preds = read_pred_file(prediction_file)
     exact_scores, f1_scores, mean_f1 = get_raw_scores(gold_file, preds)
     return mean_f1
+
+
+def compute_macro_PRF(predicted_idx, gold_idx, i=-1, empty_label=None):
+    """This evaluation function follows work from Sorokin and
+    Gurevych(https://www.aclweb.org/anthology/D17-1188.pdf) code borrowed from
+    the following link:
+
+    https://github.com/UKPLab/emnlp2017-relation-
+    extraction/blob/master/relation_extraction/evaluation/metrics.py
+    """
+    if i == -1:
+        i = len(predicted_idx)
+
+    complete_rel_set = set(gold_idx) - {empty_label}
+    avg_prec = 0.0
+    avg_rec = 0.0
+
+    for r in complete_rel_set:
+        r_indices = predicted_idx[:i] == r
+        tp = len((predicted_idx[:i][r_indices] == gold_idx[:i][r_indices]).nonzero()[0])
+        tp_fp = len(r_indices.nonzero()[0])
+        tp_fn = len((gold_idx == r).nonzero()[0])
+        prec = (tp / tp_fp) if tp_fp > 0 else 0
+        rec = tp / tp_fn
+        # print(id_to_labels[r], prec, rec, 2.0 * prec * rec / (prec + rec))
+        avg_prec += prec
+        avg_rec += rec
+    f1 = 0
+    avg_prec = avg_prec / len(set(predicted_idx[:i]))
+    avg_rec = avg_rec / len(complete_rel_set)
+    if (avg_rec + avg_prec) > 0:
+        f1 = 2.0 * avg_prec * avg_rec / (avg_prec + avg_rec)
+
+    return avg_prec, avg_rec, f1
+
+
+def compute_relation_score(gold_file, prediction_file):
+    df = pd.read_csv(gold_file, sep=",")
+    gold_indices = np.array(df["gold_indices"].tolist())
+    num_unseen_relations = np.amax(gold_indices) + 1
+    gold_indices = np.reshape(gold_indices, (-1, num_unseen_relations))
+    num_examples, num_unseen_relations = gold_indices.shape
+    pred_log_ps = pd.read_csv(prediction_file, sep=",")["answer_log_p"].tolist()
+    pred_log_ps = np.log(
+        np.mean(
+            np.reshape(
+                np.exp(np.array(pred_log_ps)), (num_examples, num_unseen_relations, -1)
+            ),
+            axis=2,
+        )
+    )
+    pred_ids = np.argmax(pred_log_ps, axis=1)
+    prec, rec, f1 = compute_macro_PRF(pred_ids, gold_indices)
+    return prec, rec, f1

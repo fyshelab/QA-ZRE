@@ -89,14 +89,14 @@ def read_fewrl_dataset(
     val_answers = []
     val_passages = []
     val_entity_relations = []
-    val_actual_ids = []
+    val_gold_indices = []
 
     test_contexts = []
     test_posterier_contexts = []
     test_answers = []
     test_passages = []
     test_entity_relations = []
-    test_actual_ids = []
+    test_gold_indices = []
 
     with open(fewrel_file, "r") as json_file:
         data = json.load(json_file)
@@ -106,18 +106,8 @@ def read_fewrl_dataset(
         test_r_ids = r_ids[val_split_size : 4 * val_split_size]
         train_r_ids = r_ids[4 * val_split_size :]
 
-        train_id_df = pd.DataFrame(train_r_ids, columns=["relation_ids"])
-        train_id_df.to_csv(
-            f"/tmp/train_ids_{seed}.csv", sep=",", header=True, index=False
-        )
-
-        val_id_df = pd.DataFrame(val_r_ids, columns=["relation_ids"])
-        val_id_df.to_csv(f"/tmp/val_ids_{seed}.csv", sep=",", header=True, index=False)
-
-        test_id_df = pd.DataFrame(test_r_ids, columns=["relation_ids"])
-        test_id_df.to_csv(
-            f"/tmp/test_ids_{seed}.csv", sep=",", header=True, index=False
-        )
+        val_r_id_to_index = {r_id: idx for idx, r_id in enumerate(val_r_ids)}
+        test_r_id_to_index = {r_id: idx for idx, r_id in enumerate(test_r_ids)}
 
         for r_id in val_r_ids:
             r_name = id_to_label[r_id]
@@ -133,7 +123,7 @@ def read_fewrl_dataset(
                 for second_r_id in val_r_ids:
                     second_r_name = id_to_label[second_r_id]
                     second_r_desc = id_to_desc[second_r_id]
-                    val_actual_ids.append(r_id)
+                    val_gold_indices.append(val_r_id_to_index[r_id])
                     val_passages.append(sentence)
                     val_entity_relations.append(
                         white_space_fix(head_entity + " <SEP> " + second_r_name)
@@ -177,7 +167,7 @@ def read_fewrl_dataset(
                 for second_r_id in test_r_ids:
                     second_r_name = id_to_label[second_r_id]
                     second_r_desc = id_to_desc[second_r_id]
-                    test_actual_ids.append(r_id)
+                    test_gold_indices.append(test_r_id_to_index[r_id])
                     test_passages.append(sentence)
                     test_entity_relations.append(
                         white_space_fix(head_entity + " <SEP> " + second_r_name)
@@ -303,7 +293,7 @@ def read_fewrl_dataset(
             "answers": val_answers,
             "entity_relations": val_entity_relations,
             "posterier_contexts": val_posterier_contexts,
-            "actual_ids": val_actual_ids,
+            "gold_indices": val_gold_indices,
         }
     )
 
@@ -314,7 +304,7 @@ def read_fewrl_dataset(
             "answers": test_answers,
             "entity_relations": test_entity_relations,
             "posterier_contexts": test_posterier_contexts,
-            "actual_ids": test_actual_ids,
+            "gold_indices": test_gold_indices,
         }
     )
 
